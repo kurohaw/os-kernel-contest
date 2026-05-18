@@ -1,0 +1,9 @@
+target/
+*.exe
+*.pdb
+*.o
+*.bin
+*.elf
+.DS_Store
+.vscode/
+.idea/
