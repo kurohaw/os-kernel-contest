@@ -1,4 +1,5 @@
 target/
+hello-rust/
 *.exe
 *.pdb
 *.o
