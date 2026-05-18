@@ -51,8 +51,8 @@ make run
 |---|---|---|---|
 | 1 | 清理仓库 | `hello-rust/` 不再出现在 `git status` | 进行中 |
 | 2 | 运行基础用户程序 | 至少记录 3 个用户程序运行结果 | 未开始 |
-| 3 | 阅读启动流程 | 写出 `entry.asm -> rust_main` 的流程说明 | 未开始 |
-| 4 | 阅读日志系统 | 说明 `console.rs`、`logging.rs` 的作用 | 未开始 |
+| 3 | 阅读启动流程 | 写出 `entry.asm -> rust_main` 的流程说明 | 已完成 |
+| 4 | 阅读日志系统 | 说明 `console.rs`、`logging.rs` 的作用 | 已完成 |
 | 5 | 建立 Phoenix 差距表 | 写 `docs/phoenix-gap.md` | 未开始 |
 
 ## 用户程序测试记录
@@ -72,6 +72,6 @@ make run
 | 3 | 引入 rCore baseline | 已完成 |
 | 4 | 记录 rCore baseline 运行结果 | 已完成 |
 | 5 | 清理仓库并完善参考说明 | 进行中 |
-| 6 | 阅读并记录 boot/logging 流程 | 未开始 |
+| 6 | 阅读并记录 boot/logging 流程 | 已完成 |
 | 7 | 增加 Phoenix 差距分析 | 未开始 |
 | 8 | 接入测试记录矩阵 | 未开始 |
