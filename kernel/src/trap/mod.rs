@@ -30,16 +30,47 @@ pub fn enable_timer_interrupt() {
 pub fn trap_handler() {
     let scause = read_scause();
     let stval = read_stval();
+    let sepc = read_sepc();
 
+    match decode_trap(scause) {
+        Trap::SupervisorTimer => handle_timer_interrupt(),
+        Trap::Unknown {is_interrupt, code} => {
+            panic!(
+                "unsupported trap: interrupt={}, code={}, scause={:#x}, stval={:#x}, sepc={:#x}",
+                is_interrupt,
+                code,
+                scause,
+                stval,
+                sepc,
+            );
+        }
+    }
+
+
+}
+
+fn handle_timer_interrupt() {
+    crate::println!("timer tick");
+    crate::timer::set_next_trigger();
+}
+
+fn decode_trap(scause: usize) -> Trap {
     let is_interrupt = scause & SCAUSE_INTERRUPT_BIT != 0;
     let code = scause & SCAUSE_EXCEPTION_CODE_MASK;
 
     if is_interrupt && code == SUPERVISOR_TIMER {
-        crate::println!("timer tick");
-        crate::timer::set_next_trigger();
-    } else {
-        panic!("unsupported trap: scause={:#x}, stval={:#x}", scause, stval);
+        Trap::SupervisorTimer
+    }else {
+        Trap::Unknown { is_interrupt, code}
     }
+}
+
+enum Trap{
+    SupervisorTimer,
+    Unknown{
+        is_interrupt: bool,
+        code: usize,
+    },
 }
 
 fn read_scause() -> usize {
@@ -56,4 +87,12 @@ fn read_stval() -> usize{
         asm!("csrr {}, stval", out(reg) stval);
     }
     stval
+}
+
+fn read_sepc() -> usize {
+    let sepc;
+    unsafe {
+        asm!("csrr {}, sepc", out(reg) sepc);
+    }
+    sepc
 }

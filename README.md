@@ -6,11 +6,11 @@
 
 - 以 `rCore-Tutorial-v3-main` 作为学习和参考 baseline。
 - 在 `kernel/` 目录中逐步实现自建最小内核。
-- 当前阶段目标是跑通最小内核启动、串口输出、trap 初始化和 timer interrupt。
+- 当前阶段目标是跑通最小内核启动、串口输出、trap 初始化和 timer interrupt，并逐步整理后续 syscall / 异常处理所需结构。
 
 ## 当前进度
 
-截至 2026-05-23，`kernel/` 已完成：
+截至 2026-05-24，`kernel/` 已完成：
 
 - RISC-V 裸机工程配置
 - linker 脚本
@@ -22,6 +22,7 @@
 - panic handler
 - trap 入口初始化
 - supervisor timer interrupt
+- trap 判断逻辑初步整理
 
 QEMU 中可以看到：
 
@@ -29,6 +30,28 @@ QEMU 中可以看到：
 Hello kernel
 kernel started
 timer tick
+```
+
+## 运行方式
+
+在 WSL/bash 中执行：
+
+```bash
+cd /mnt/d/os-kernel-contest/kernel
+make run
+```
+
+退出 QEMU：
+
+```text
+Ctrl + A
+X
+```
+
+## 文档
+
+- 开发进度记录：`docs/progress.md`
+- 启动流程阅读记录：`docs/boot-notes.md`
 
 # 参考来源与增量贡献说明
 

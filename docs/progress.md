@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 阶段 | 初赛开发期 |
-| 当前日期 | 2026-05-23 |
+| 当前日期 | 2026-05-24 |
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 跑通自建 `kernel/` 最小内核，并完成 trap/timer interrupt 验收 |
+| 当前目标 | 整理自建 `kernel/` 的 trap 处理结构，为后续 syscall / 异常处理做准备 |
 
 ## 2026-05-18
 
@@ -101,6 +101,52 @@ bootloader -> _start -> rust_main -> console -> trap -> timer interrupt
 2. 补充 panic 验证记录。
 3. 继续完善 trap 处理结构，为后续 syscall / 异常处理做准备。
 
+## 2026-05-24
+
+### 今日目标
+
+整理 `kernel/` 中的 trap 处理结构，让当前 timer interrupt 逻辑更清晰，并为后续 syscall 和异常处理预留扩展位置。
+
+### 修改内容
+
+- 将 trap 类型判断逻辑拆分为 `decode_trap()`。
+- 新增 `Trap` 枚举，用于区分已支持的 trap 类型和未知 trap。
+- 将 supervisor timer interrupt 的处理逻辑拆分到 `handle_timer_interrupt()`。
+- 在未知 trap 的 panic 信息中补充 `scause`、`stval` 和 `sepc`，方便后续定位异常来源。
+
+### 当前处理流程
+
+```text
+__alltraps
+-> trap_handler
+-> read scause / stval / sepc
+-> decode_trap
+-> handle_timer_interrupt
+-> timer::set_next_trigger
+-> sret
+```
+
+### 验证计划
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+验收标准：
+
+- `make build` 能成功生成 `kernel.bin`。
+- QEMU 中能看到 `Hello kernel` 和 `kernel started`。
+- QEMU 中仍能周期性看到 `timer tick`。
+
+### 下一步
+
+1. 运行 `make build` / `make run` 验证 trap 重构没有破坏 timer interrupt。
+2. 验证通过后，将本次 trap 结构整理和文档记录一起提交。
+3. 后续继续补充 panic 验证记录，并准备进入 syscall / 异常处理设计。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -112,6 +158,7 @@ bootloader -> _start -> rust_main -> console -> trap -> timer interrupt
 | 5 | 建立 Phoenix 差距表 | 写 `docs/phoenix-gap.md` | 未开始 |
 | 6 | 跑通自建最小内核 | QEMU 中看到 `Hello kernel` / `kernel started` | 已完成 |
 | 7 | 接入 timer interrupt | QEMU 中周期性看到 `timer tick` | 已完成 |
+| 8 | 整理 trap 处理结构 | trap 判断和 timer 处理逻辑拆分清楚 | 进行中 |
 
 ## 用户程序测试记录
 
@@ -134,3 +181,4 @@ bootloader -> _start -> rust_main -> console -> trap -> timer interrupt
 | 7 | 增加 Phoenix 差距分析 | 未开始 |
 | 8 | 接入测试记录矩阵 | 未开始 |
 | 9 | 提交自建最小内核启动与 timer interrupt | 准备提交 |
+| 10 | 提交 trap 处理结构整理 | 待验证 |
