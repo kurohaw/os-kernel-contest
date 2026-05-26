@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 阶段 | 初赛开发期 |
-| 当前日期 | 2026-05-24 |
+| 当前日期 | 2026-05-26 |
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 整理自建 `kernel/` 的 trap 处理结构，为后续 syscall / 异常处理做准备 |
+| 当前目标 | 引入 `TrapContext`，为后续 syscall / 异常处理做准备 |
 
 ## 2026-05-18
 
@@ -147,6 +147,50 @@ make run
 2. 验证通过后，将本次 trap 结构整理和文档记录一起提交。
 3. 后续继续补充 panic 验证记录，并准备进入 syscall / 异常处理设计。
 
+## 2026-05-26
+
+### 今日目标
+
+引入 `TrapContext`，让 trap handler 可以接收完整的 trap 现场，为后续 syscall 和异常处理做准备。
+
+### 修改内容
+
+- 在 `trap/mod.rs` 中新增 `TrapContext`，保存 32 个通用寄存器、`sstatus` 和 `sepc`。
+- 修改 `trap.S`，在 trap 入口保存 `x0`、原始 `sp`、通用寄存器、`sstatus` 和 `sepc`。
+- 通过 `mv a0, sp` 将当前 trap frame 地址传给 `trap_handler`。
+- 修改 `trap_handler` 签名，让 Rust 侧通过 `&mut TrapContext` 访问 trap 现场。
+- 未知 trap 的 panic 信息改为从 `TrapContext` 中读取 `sepc`。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中仍能看到：
+
+```text
+Hello kernel
+kernel started
+timer tick
+timer tick
+```
+
+### 结论
+
+当前 trap 流程已经从“只处理 timer interrupt”升级为“保存并传递 trap 上下文”。后续可以基于 `TrapContext` 继续实现 syscall 参数读取、返回值写回和 `sepc` 调整。
+
+### 下一步
+
+1. 提交本次 `TrapContext` 结构整理。
+2. 设计最小 syscall 分发入口。
+3. 先实现一个最小测试 syscall，再扩展到用户态程序加载。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -158,7 +202,8 @@ make run
 | 5 | 建立 Phoenix 差距表 | 写 `docs/phoenix-gap.md` | 未开始 |
 | 6 | 跑通自建最小内核 | QEMU 中看到 `Hello kernel` / `kernel started` | 已完成 |
 | 7 | 接入 timer interrupt | QEMU 中周期性看到 `timer tick` | 已完成 |
-| 8 | 整理 trap 处理结构 | trap 判断和 timer 处理逻辑拆分清楚 | 进行中 |
+| 8 | 整理 trap 处理结构 | trap 判断、timer 处理和 `TrapContext` 传递逻辑拆分清楚 | 已完成 |
+| 9 | 设计最小 syscall 入口 | 能从 `TrapContext` 读取 syscall id 和参数 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -181,4 +226,5 @@ make run
 | 7 | 增加 Phoenix 差距分析 | 未开始 |
 | 8 | 接入测试记录矩阵 | 未开始 |
 | 9 | 提交自建最小内核启动与 timer interrupt | 准备提交 |
-| 10 | 提交 trap 处理结构整理 | 待验证 |
+| 10 | 提交 trap 处理结构整理 | 已验证，准备提交 |
+| 11 | 设计最小 syscall 分发 | 未开始 |

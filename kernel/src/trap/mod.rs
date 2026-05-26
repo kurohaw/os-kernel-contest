@@ -2,6 +2,13 @@ use core::arch::{asm, global_asm};
 
 global_asm!(include_str!("trap.S"));
 
+#[repr(C)]
+pub struct TrapContext {
+    pub x: [usize; 32],
+    pub sstatus: usize,
+    pub sepc: usize,
+}
+
 const SCAUSE_INTERRUPT_BIT: usize = 1usize << 63;
 const SCAUSE_EXCEPTION_CODE_MASK: usize = !SCAUSE_INTERRUPT_BIT;
 const SUPERVISOR_TIMER: usize = 5;
@@ -27,10 +34,9 @@ pub fn enable_timer_interrupt() {
 }
 
 #[no_mangle]
-pub fn trap_handler() {
+pub extern "C" fn trap_handler(cx: &mut TrapContext) {
     let scause = read_scause();
     let stval = read_stval();
-    let sepc = read_sepc();
 
     match decode_trap(scause) {
         Trap::SupervisorTimer => handle_timer_interrupt(),
@@ -41,7 +47,7 @@ pub fn trap_handler() {
                 code,
                 scause,
                 stval,
-                sepc,
+                cx.sepc,
             );
         }
     }
@@ -87,12 +93,4 @@ fn read_stval() -> usize{
         asm!("csrr {}, stval", out(reg) stval);
     }
     stval
-}
-
-fn read_sepc() -> usize {
-    let sepc;
-    unsafe {
-        asm!("csrr {}, sepc", out(reg) sepc);
-    }
-    sepc
 }

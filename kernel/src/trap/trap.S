@@ -36,11 +36,17 @@ __alltraps:
     sd x30, 30 * 8(sp)
     sd x31, 31 * 8(sp)
 
+    li t0, 0
+    sd t0, 0 * 8(sp)
+    addi t0, sp, 34 * 8
+    sd t0, 2 * 8(sp)
+    
     csrr t0, sstatus
     csrr t1, sepc
     sd t0, 32 * 8(sp)
     sd t1, 33 * 8(sp)
 
+    mv a0, sp
     call trap_handler
 
 __restore:
