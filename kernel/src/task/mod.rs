@@ -1,3 +1,10 @@
+mod context;
+
+use core::arch::global_asm;
+
+use context::TaskContext;
+
+global_asm!(include_str!("switch.S"));
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskStatus {
@@ -9,6 +16,7 @@ pub enum TaskStatus {
 pub struct TaskControlBlock {
     pub status: TaskStatus,
     pub trap_cx_addr: usize,
+    pub task_cx: TaskContext,
 }
 
 static mut INIT_TASK: Option<TaskControlBlock> = None;
@@ -20,6 +28,7 @@ pub fn init() {
         INIT_TASK = Some(TaskControlBlock {
             status: TaskStatus::Ready,
             trap_cx_addr,
+            task_cx: TaskContext::zero_init(),
         });
     }
 }
@@ -36,6 +45,17 @@ pub fn run_first_task() -> ! {
 
     unsafe {
         crate::trap::restore(task.trap_cx_addr);
+    }
+}
+
+pub fn suspend_current_and_run_next() {
+    crate::println!("user yield");
+
+    unsafe {
+        if let Some(task) = INIT_TASK.as_mut() {
+            task.status = TaskStatus::Ready;
+            task.status = TaskStatus::Running;
+        }
     }
 }
 

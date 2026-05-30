@@ -9,7 +9,7 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 完成最小单任务模型，并准备进入任务退出/调度结构扩展 |
+| 当前目标 | 完成 `TaskContext` 和 `SYS_YIELD`，为多任务轮转做准备 |
 
 ## 2026-05-18
 
@@ -416,6 +416,67 @@ all tasks exited
 3. 引入任务队列，为 `yield` 和多任务轮转做准备。
 4. 后续将 `exit_current()` 从死循环改为切换到下一个可运行任务。
 
+## 2026-05-30 TaskContext 与 SYS_YIELD
+
+### 今日目标
+
+引入内核任务上下文 `TaskContext` 和 `SYS_YIELD`，为后续多任务轮转和上下文切换做准备。
+
+### 修改内容
+
+- 新增 `kernel/src/task/context.rs`。
+- 新增 `TaskContext`，保存 `ra`、`sp` 和 `s0-s11`。
+- 新增 `kernel/src/task/switch.S`。
+- 新增 `__switch` 汇编入口，用于保存当前任务上下文并恢复下一个任务上下文。
+- 在 `task/mod.rs` 中引入 `TaskContext` 和 `switch.S`。
+- 在 `TaskControlBlock` 中新增 `task_cx` 字段。
+- 初始化任务时使用 `TaskContext::zero_init()`。
+- 新增 `task::suspend_current_and_run_next()`。
+- 在 `syscall.rs` 中新增 `SYS_YIELD`。
+- 用户态入口在 `SYS_TEST` 后调用 `SYS_YIELD`，再调用 `SYS_EXIT`。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+Hello kernel
+kernel started
+run first task
+sys_test called, arg0=41
+user yield
+user exited with code 0
+all tasks exited
+```
+
+### 关键结论
+
+当前已经完成任务上下文和 yield syscall 的最小接入：
+
+```text
+U-mode SYS_YIELD
+-> syscall dispatcher
+-> task::suspend_current_and_run_next()
+```
+
+当前仍然只有一个任务，因此 `SYS_YIELD` 暂时不会真正切换任务，只完成状态路径和接口验证。`__switch` 已经准备好，后续多任务轮转阶段再正式接入。
+
+### 下一步
+
+1. 提交 `TaskContext` 和 `SYS_YIELD`。
+2. 将单个 `INIT_TASK` 扩展为任务数组或任务队列。
+3. 创建第二个用户任务。
+4. 接入真正的 round-robin 调度。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -432,7 +493,8 @@ all tasks exited
 | 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 进入 syscall dispatcher | 已完成 |
 | 11 | 增加最小 exit syscall | 用户态可以主动结束并打印退出码 | 已完成 |
 | 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 已完成 |
-| 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` | 未开始 |
+| 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` 并接入 `SYS_YIELD` | 已完成 |
+| 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -460,4 +522,5 @@ all tasks exited
 | 12 | 提交最小用户态闭环 | 已验证，准备提交 |
 | 13 | 提交最小 exit syscall | 已验证，准备提交 |
 | 14 | 提交最小单任务模型 | 已验证，准备提交 |
-| 15 | 设计任务上下文和 yield | 未开始 |
+| 15 | 提交任务上下文和 yield | 已验证，准备提交 |
+| 16 | 设计多任务轮转 | 未开始 |
