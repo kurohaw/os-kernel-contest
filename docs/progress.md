@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 阶段 | 初赛开发期 |
-| 当前日期 | 2026-05-26 |
+| 当前日期 | 2026-05-30 |
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 引入 `TrapContext`，为后续 syscall / 异常处理做准备 |
+| 当前目标 | 完成最小 syscall 分发器，并准备进入最小用户态闭环设计 |
 
 ## 2026-05-18
 
@@ -191,6 +191,66 @@ timer tick
 2. 设计最小 syscall 分发入口。
 3. 先实现一个最小测试 syscall，再扩展到用户态程序加载。
 
+## 2026-05-30
+
+### 今日目标
+
+加入最小 syscall 分发模块，并验证内核侧 syscall dispatcher 的基本行为。
+
+### 修改内容
+
+- 新增 `kernel/src/syscall.rs`。
+- 定义 `SYS_TEST` 测试 syscall。
+- 实现最小 syscall dispatcher：根据 syscall id 分发到对应处理函数。
+- 在 `main.rs` 中注册 `syscall` 模块。
+- 在 `main.rs` 中通过直接调用 `syscall::syscall()` 验证分发逻辑。
+- 在 `trap/mod.rs` 中保留 `UserEnvCall` 处理分支，为后续用户态 `ecall` 接入做准备。
+- 移除将 S-mode `ecall` 当作用户 syscall 测试的做法，避免和 SBI 调用语义混淆。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+Hello kernel
+kernel started
+sys_test called, arg0=41
+syscall dispatch test ret = 42
+timer tick
+```
+
+### 关键结论
+
+当前已经验证：
+
+```text
+kernel -> syscall dispatcher -> SYS_TEST -> return value
+```
+
+当前尚未验证：
+
+```text
+U-mode ecall -> trap_handler -> syscall dispatcher -> return to U-mode
+```
+
+原因是当前内核还没有用户态执行环境。S-mode 下直接执行 `ecall` 更接近 SBI 调用语义，不适合作为用户 syscall 路径测试。
+
+### 下一步
+
+1. 提交本次最小 syscall dispatcher。
+2. 设计最小用户态执行闭环。
+3. 准备用户态入口、用户栈和进入 U-mode 所需的 `TrapContext`。
+4. 后续用真正的 U-mode `ecall` 验证 syscall path。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -203,7 +263,8 @@ timer tick
 | 6 | 跑通自建最小内核 | QEMU 中看到 `Hello kernel` / `kernel started` | 已完成 |
 | 7 | 接入 timer interrupt | QEMU 中周期性看到 `timer tick` | 已完成 |
 | 8 | 整理 trap 处理结构 | trap 判断、timer 处理和 `TrapContext` 传递逻辑拆分清楚 | 已完成 |
-| 9 | 设计最小 syscall 入口 | 能从 `TrapContext` 读取 syscall id 和参数 | 未开始 |
+| 9 | 设计最小 syscall 入口 | 能完成 syscall id 分发和返回值验证 | 已完成 |
+| 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 并返回 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -227,4 +288,5 @@ timer tick
 | 8 | 接入测试记录矩阵 | 未开始 |
 | 9 | 提交自建最小内核启动与 timer interrupt | 准备提交 |
 | 10 | 提交 trap 处理结构整理 | 已验证，准备提交 |
-| 11 | 设计最小 syscall 分发 | 未开始 |
+| 11 | 提交最小 syscall 分发 | 已验证，准备提交 |
+| 12 | 设计最小用户态闭环 | 未开始 |

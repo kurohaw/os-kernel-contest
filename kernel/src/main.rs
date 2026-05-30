@@ -4,6 +4,7 @@
 mod console;
 mod lang_items;
 mod sbi;
+mod syscall;
 mod timer;
 mod trap;
 
@@ -19,6 +20,8 @@ pub fn rust_main() -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
+
+    test_syscall();
     
     loop {}
 }
@@ -38,4 +41,9 @@ fn clear_bss() {
         )
         .fill(0);
     }
+}
+
+fn test_syscall() {
+    let ret = syscall::syscall(syscall::SYS_TEST, [41, 0, 0]);
+    println!("syscall dispatch test ret = {}", ret);
 }

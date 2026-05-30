@@ -12,6 +12,7 @@ pub struct TrapContext {
 const SCAUSE_INTERRUPT_BIT: usize = 1usize << 63;
 const SCAUSE_EXCEPTION_CODE_MASK: usize = !SCAUSE_INTERRUPT_BIT;
 const SUPERVISOR_TIMER: usize = 5;
+const USER_ENV_CALL: usize = 8;
 
 extern "C"{
     fn __alltraps();
@@ -40,6 +41,7 @@ pub extern "C" fn trap_handler(cx: &mut TrapContext) {
 
     match decode_trap(scause) {
         Trap::SupervisorTimer => handle_timer_interrupt(),
+        Trap::EnvironmentCall => handle_environment_call(cx),
         Trap::Unknown {is_interrupt, code} => {
             panic!(
                 "unsupported trap: interrupt={}, code={}, scause={:#x}, stval={:#x}, sepc={:#x}",
@@ -60,12 +62,23 @@ fn handle_timer_interrupt() {
     crate::timer::set_next_trigger();
 }
 
+fn handle_environment_call(cx: &mut TrapContext) {
+    //ecall 指令的长度是4字节
+    cx.sepc += 4;
+    let id = cx.x[17];
+    let args = [cx.x[10], cx.x[11], cx.x[12]];
+
+    let ret = crate::syscall::syscall(id, args);
+    cx.x[10] = ret as usize;
+}
 fn decode_trap(scause: usize) -> Trap {
     let is_interrupt = scause & SCAUSE_INTERRUPT_BIT != 0;
     let code = scause & SCAUSE_EXCEPTION_CODE_MASK;
 
     if is_interrupt && code == SUPERVISOR_TIMER {
         Trap::SupervisorTimer
+    }else if !is_interrupt && code == USER_ENV_CALL  {
+        Trap::EnvironmentCall
     }else {
         Trap::Unknown { is_interrupt, code}
     }
@@ -73,6 +86,7 @@ fn decode_trap(scause: usize) -> Trap {
 
 enum Trap{
     SupervisorTimer,
+    EnvironmentCall,
     Unknown{
         is_interrupt: bool,
         code: usize,
