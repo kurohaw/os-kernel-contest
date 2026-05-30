@@ -11,22 +11,18 @@ static mut USER_STACK: UserStack = UserStack {
     data: [0; USER_STACK_SIZE],
 };
 
-pub fn run_first_user() -> ! {
+pub fn init_user_context() -> usize {
     let user_stack_top = user_stack_top();
     let cx_addr = user_stack_top - core::mem::size_of::<TrapContext>();
 
     let cx = unsafe { &mut *(cx_addr as *mut TrapContext) };
     *cx = TrapContext::app_init_context(user_entry as usize, user_stack_top);
 
-    crate::println!("enter user mode");
-
-    unsafe {
-        crate::trap::restore(cx_addr);
-    }
+    cx_addr
 }
 
 fn user_stack_top() -> usize {
-    unsafe { core::ptr::addr_of!(USER_STACK) as usize + USER_STACK_SIZE }
+    core::ptr::addr_of!(USER_STACK) as usize + USER_STACK_SIZE 
 }
 
 #[no_mangle]

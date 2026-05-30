@@ -18,6 +18,5 @@ fn sys_test(value: usize) -> isize {
 }
 
 fn sys_exit(code: i32) -> isize {
-    crate::println!("user exited with code {}", code);
-    loop{}
+    crate::task::exit_current(code);
 }

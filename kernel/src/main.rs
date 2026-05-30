@@ -8,6 +8,7 @@ mod syscall;
 mod timer;
 mod trap;
 mod user;
+mod task;
 
 core::arch::global_asm!(include_str!("entry.asm"));
 
@@ -22,7 +23,8 @@ pub fn rust_main() -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
 
-    user::run_first_user();
+    task::init();
+    task::run_first_task();
 }
 
 fn clear_bss() {

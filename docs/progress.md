@@ -9,7 +9,7 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 完成最小 exit syscall，并准备进入最小单任务模型设计 |
+| 当前目标 | 完成最小单任务模型，并准备进入任务退出/调度结构扩展 |
 
 ## 2026-05-18
 
@@ -365,6 +365,57 @@ user exited with code 0
 3. 将当前直接运行用户态的逻辑整理为 `create_init_task()` / `run_task()`。
 4. 后续让 `sys_exit()` 修改任务状态，而不是直接死循环。
 
+## 2026-05-30 最小单任务模型
+
+### 今日目标
+
+引入最小任务结构，让用户态执行实体不再由 `main.rs` 直接启动，而是通过任务模块统一管理。
+
+### 修改内容
+
+- 新增 `kernel/src/task/mod.rs`。
+- 新增 `TaskStatus`，包含 `Ready`、`Running`、`Exited`。
+- 新增 `TaskControlBlock`，保存任务状态和 `trap_cx_addr`。
+- 新增 `task::init()`，创建初始用户任务。
+- 新增 `task::run_first_task()`，将任务状态切换为 `Running` 并恢复用户态上下文。
+- 新增 `task::exit_current(code)`，将当前任务状态切换为 `Exited`。
+- 将 `user.rs` 中的用户上下文准备逻辑整理为 `init_user_context()`。
+- 将 `main.rs` 中的直接用户态启动改为 `task::init()` / `task::run_first_task()`。
+- 将 `SYS_EXIT` 接入 `task::exit_current()`。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+Hello kernel
+kernel started
+run first task
+sys_test called, arg0=41
+user exited with code 0
+all tasks exited
+```
+
+### 结论
+
+当前用户态执行已经具备最小任务承载结构。虽然目前仍然只有一个任务，但后续可以在 `TaskControlBlock` 基础上继续扩展任务队列、上下文切换和调度器。
+
+### 下一步
+
+1. 提交最小单任务模型。
+2. 设计内核任务上下文 `TaskContext`。
+3. 引入任务队列，为 `yield` 和多任务轮转做准备。
+4. 后续将 `exit_current()` 从死循环改为切换到下一个可运行任务。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -380,7 +431,8 @@ user exited with code 0
 | 9 | 设计最小 syscall 入口 | 能完成 syscall id 分发和返回值验证 | 已完成 |
 | 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 进入 syscall dispatcher | 已完成 |
 | 11 | 增加最小 exit syscall | 用户态可以主动结束并打印退出码 | 已完成 |
-| 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 未开始 |
+| 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 已完成 |
+| 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` | 未开始 |
 
 ## 用户程序测试记录
 
@@ -407,4 +459,5 @@ user exited with code 0
 | 11 | 提交最小 syscall 分发 | 已验证，准备提交 |
 | 12 | 提交最小用户态闭环 | 已验证，准备提交 |
 | 13 | 提交最小 exit syscall | 已验证，准备提交 |
-| 14 | 设计最小单任务模型 | 未开始 |
+| 14 | 提交最小单任务模型 | 已验证，准备提交 |
+| 15 | 设计任务上下文和 yield | 未开始 |
