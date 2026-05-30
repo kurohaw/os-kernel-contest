@@ -9,7 +9,7 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 打通最小用户态闭环，并准备扩展用户态返回与 exit syscall |
+| 当前目标 | 完成最小 exit syscall，并准备进入最小单任务模型设计 |
 
 ## 2026-05-18
 
@@ -319,6 +319,52 @@ S-mode kernel
 3. 让用户态验证 syscall 返回值，而不是只停在死循环。
 4. 后续再进入用户程序加载和地址空间设计。
 
+## 2026-05-30 最小 exit syscall
+
+### 今日目标
+
+增加最小 `SYS_EXIT`，让用户态可以通过 syscall 主动结束执行。
+
+### 修改内容
+
+- 在 `syscall.rs` 中新增 `SYS_EXIT`。
+- 在 syscall dispatcher 中接入 `SYS_EXIT`。
+- 新增 `sys_exit(code)`，打印用户态退出码。
+- 修改 `user_entry()`，在 `SYS_TEST` 后继续调用 `SYS_EXIT`。
+- 保留 `j .` 作为兜底路径。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+Hello kernel
+kernel started
+enter user mode
+sys_test called, arg0=41
+user exited with code 0
+```
+
+### 结论
+
+当前用户态已经可以通过 syscall 通知内核结束执行。后续引入任务系统后，需要将 `sys_exit()` 从死循环改为任务退出、资源回收和调度下一个任务。
+
+### 下一步
+
+1. 提交最小 exit syscall。
+2. 引入最小 `TaskControlBlock` 和任务状态。
+3. 将当前直接运行用户态的逻辑整理为 `create_init_task()` / `run_task()`。
+4. 后续让 `sys_exit()` 修改任务状态，而不是直接死循环。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -333,7 +379,8 @@ S-mode kernel
 | 8 | 整理 trap 处理结构 | trap 判断、timer 处理和 `TrapContext` 传递逻辑拆分清楚 | 已完成 |
 | 9 | 设计最小 syscall 入口 | 能完成 syscall id 分发和返回值验证 | 已完成 |
 | 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 进入 syscall dispatcher | 已完成 |
-| 11 | 增加最小 exit syscall | 用户态可以主动结束并回到内核停机逻辑 | 未开始 |
+| 11 | 增加最小 exit syscall | 用户态可以主动结束并打印退出码 | 已完成 |
+| 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -359,4 +406,5 @@ S-mode kernel
 | 10 | 提交 trap 处理结构整理 | 已验证，准备提交 |
 | 11 | 提交最小 syscall 分发 | 已验证，准备提交 |
 | 12 | 提交最小用户态闭环 | 已验证，准备提交 |
-| 13 | 实现最小 exit syscall | 未开始 |
+| 13 | 提交最小 exit syscall | 已验证，准备提交 |
+| 14 | 设计最小单任务模型 | 未开始 |

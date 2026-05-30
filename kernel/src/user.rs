@@ -36,6 +36,9 @@ pub extern "C" fn user_entry() -> ! {
             "li a7, 0",
             "li a0, 41",
             "ecall",
+            "li a7, 1",
+            "li a0, 0",
+            "ecall",
             "j .",
             options(noreturn),
         );
