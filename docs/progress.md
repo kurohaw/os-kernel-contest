@@ -9,7 +9,7 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 完成最小 syscall 分发器，并准备进入最小用户态闭环设计 |
+| 当前目标 | 打通最小用户态闭环，并准备扩展用户态返回与 exit syscall |
 
 ## 2026-05-18
 
@@ -251,6 +251,74 @@ U-mode ecall -> trap_handler -> syscall dispatcher -> return to U-mode
 3. 准备用户态入口、用户栈和进入 U-mode 所需的 `TrapContext`。
 4. 后续用真正的 U-mode `ecall` 验证 syscall path。
 
+## 2026-05-30 最小用户态闭环
+
+### 今日目标
+
+建立最小用户态执行闭环，让内核可以从 S-mode 构造用户态上下文，进入 U-mode，并由 U-mode 通过 `ecall` 回到内核 syscall dispatcher。
+
+### 修改内容
+
+- 新增 `kernel/src/user.rs`。
+- 增加临时用户栈 `USER_STACK`。
+- 增加临时用户态入口 `user_entry()`。
+- 在 `TrapContext` 中增加 `app_init_context()`，用于构造用户态初始上下文。
+- 在 `trap/mod.rs` 中暴露 `restore(cx_addr)`，复用 `__restore` 完成 `sret`。
+- 在 `main.rs` 中注册 `user` 模块，并从 `rust_main` 调用 `user::run_first_user()`。
+- 用户态入口通过 `ecall` 触发 `UserEnvCall`，进入内核 syscall dispatcher。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到类似输出：
+
+```text
+Hello kernel
+kernel started
+enter user mode
+sys_test called, arg0=41
+timer tick
+```
+
+### 关键结论
+
+当前已经验证：
+
+```text
+S-mode kernel
+-> 构造用户态 TrapContext
+-> sret 进入 U-mode
+-> U-mode ecall
+-> S-mode trap_handler
+-> syscall dispatcher
+```
+
+这说明当前内核已经具备最小的用户态 syscall 闭环。
+
+当前尚未完成：
+
+```text
+用户态读取 syscall 返回值
+用户态 exit
+用户程序加载
+用户地址空间隔离
+```
+
+### 下一步
+
+1. 提交最小用户态闭环。
+2. 增加 `SYS_EXIT`，让用户态可以主动结束。
+3. 让用户态验证 syscall 返回值，而不是只停在死循环。
+4. 后续再进入用户程序加载和地址空间设计。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -264,7 +332,8 @@ U-mode ecall -> trap_handler -> syscall dispatcher -> return to U-mode
 | 7 | 接入 timer interrupt | QEMU 中周期性看到 `timer tick` | 已完成 |
 | 8 | 整理 trap 处理结构 | trap 判断、timer 处理和 `TrapContext` 传递逻辑拆分清楚 | 已完成 |
 | 9 | 设计最小 syscall 入口 | 能完成 syscall id 分发和返回值验证 | 已完成 |
-| 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 并返回 | 未开始 |
+| 10 | 设计最小用户态闭环 | 能从 U-mode 执行 `ecall` 进入 syscall dispatcher | 已完成 |
+| 11 | 增加最小 exit syscall | 用户态可以主动结束并回到内核停机逻辑 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -289,4 +358,5 @@ U-mode ecall -> trap_handler -> syscall dispatcher -> return to U-mode
 | 9 | 提交自建最小内核启动与 timer interrupt | 准备提交 |
 | 10 | 提交 trap 处理结构整理 | 已验证，准备提交 |
 | 11 | 提交最小 syscall 分发 | 已验证，准备提交 |
-| 12 | 设计最小用户态闭环 | 未开始 |
+| 12 | 提交最小用户态闭环 | 已验证，准备提交 |
+| 13 | 实现最小 exit syscall | 未开始 |

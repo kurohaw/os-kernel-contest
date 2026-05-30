@@ -9,6 +9,27 @@ pub struct TrapContext {
     pub sepc: usize,
 }
 
+impl TrapContext {
+    pub fn app_init_context(entry: usize, sp: usize) -> Self {
+        let mut sstatus = read_sstatus();
+
+        const SSTATUS_SPP: usize = 1 << 8;
+        const SSTATUS_SPIE: usize = 1 << 5;
+
+        sstatus &= !SSTATUS_SPP;
+        sstatus |= SSTATUS_SPIE;
+
+        let mut cx = Self {
+            x: [0; 32],
+            sstatus,
+            sepc: entry,
+        };
+
+        cx.x[2] = sp;
+        cx
+    }
+}
+
 const SCAUSE_INTERRUPT_BIT: usize = 1usize << 63;
 const SCAUSE_EXCEPTION_CODE_MASK: usize = !SCAUSE_INTERRUPT_BIT;
 const SUPERVISOR_TIMER: usize = 5;
@@ -16,6 +37,7 @@ const USER_ENV_CALL: usize = 8;
 
 extern "C"{
     fn __alltraps();
+    fn __restore();
 }
 
 pub fn init(){
@@ -32,6 +54,16 @@ pub fn enable_timer_interrupt() {
         let sstatus_sie = 1usize << 1;
         asm!("csrs sstatus, {}", in(reg) sstatus_sie);
     }
+}
+
+pub unsafe fn restore(cx_addr: usize) -> ! {
+    asm!(
+        "mv sp, {cx}",
+        "j {restore}",
+        cx = in(reg) cx_addr,
+        restore = sym __restore,
+        options(noreturn),
+    )
 }
 
 #[no_mangle]
@@ -107,4 +139,12 @@ fn read_stval() -> usize{
         asm!("csrr {}, stval", out(reg) stval);
     }
     stval
+}
+
+fn read_sstatus() -> usize {
+    let sstatus;
+    unsafe {
+        asm!("csrr {}, sstatus", out(reg) sstatus);
+    }
+    sstatus
 }

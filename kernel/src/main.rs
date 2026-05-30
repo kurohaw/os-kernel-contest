@@ -7,6 +7,7 @@ mod sbi;
 mod syscall;
 mod timer;
 mod trap;
+mod user;
 
 core::arch::global_asm!(include_str!("entry.asm"));
 
@@ -21,9 +22,7 @@ pub fn rust_main() -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
 
-    test_syscall();
-    
-    loop {}
+    user::run_first_user();
 }
 
 fn clear_bss() {
@@ -43,7 +42,3 @@ fn clear_bss() {
     }
 }
 
-fn test_syscall() {
-    let ret = syscall::syscall(syscall::SYS_TEST, [41, 0, 0]);
-    println!("syscall dispatch test ret = {}", ret);
-}
