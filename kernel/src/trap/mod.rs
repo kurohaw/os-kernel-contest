@@ -97,11 +97,16 @@ fn handle_timer_interrupt() {
 fn handle_environment_call(cx: &mut TrapContext) {
     //ecall 指令的长度是4字节
     cx.sepc += 4;
+
     let id = cx.x[17];
     let args = [cx.x[10], cx.x[11], cx.x[12]];
 
     let ret = crate::syscall::syscall(id, args);
     cx.x[10] = ret as usize;
+
+    if id == crate::syscall::SYS_YIELD {
+        crate::task::suspend_current_and_run_next();
+    }
 }
 fn decode_trap(scause: usize) -> Trap {
     let is_interrupt = scause & SCAUSE_INTERRUPT_BIT != 0;

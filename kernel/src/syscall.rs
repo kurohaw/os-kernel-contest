@@ -24,6 +24,5 @@ fn sys_exit(code: i32) -> isize {
 }
 
 fn sys_yield() -> isize {
-    crate::task::suspend_current_and_run_next();
     0
 }

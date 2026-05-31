@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 阶段 | 初赛开发期 |
-| 当前日期 | 2026-05-30 |
+| 当前日期 | 2026-05-31 |
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 完成 `TaskContext` 和 `SYS_YIELD`，为多任务轮转做准备 |
+| 当前目标 | 进入内存管理基础设计，为用户程序加载和地址空间隔离做准备 |
 
 ## 2026-05-18
 
@@ -477,6 +477,78 @@ U-mode SYS_YIELD
 3. 创建第二个用户任务。
 4. 接入真正的 round-robin 调度。
 
+## 2026-05-31 多任务轮转
+
+### 今日目标
+
+将单任务模型扩展为最小多任务 round-robin，让至少两个用户任务可以通过 `SYS_YIELD` 主动让出 CPU，并在退出后调度下一个可运行任务。
+
+### 修改内容
+
+- 在 `user.rs` 中增加 `APP_NUM`，表示当前内嵌用户任务数量。
+- 将单个用户栈扩展为 `USER_STACK_0` 和 `USER_STACK_1`。
+- 将 `init_user_context()` 改为接收 `app_id`，为不同任务构造不同的 `TrapContext`。
+- 新增 `user_entry_0()` 和 `user_entry_1()`，分别使用不同的 syscall 参数和 exit code，便于观察任务切换顺序。
+- 在 `task/mod.rs` 中将单个 `INIT_TASK` 扩展为 `TASKS` 数组。
+- 新增 `CURRENT` 记录当前运行任务编号。
+- 新增 `find_next_ready()`，从当前任务后面开始查找下一个 `Ready` 任务。
+- 修改 `suspend_current_and_run_next()`，让当前任务变回 `Ready` 后调度下一个任务。
+- 修改 `exit_current()`，让当前任务变为 `Exited` 后继续调度下一个任务；所有任务结束后打印 `all tasks exited`。
+- 将 `SYS_YIELD` 的真正调度放到 `trap/mod.rs` 的 `handle_environment_call()` 中，在 syscall 返回值写回 `a0` 之后执行。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到类似输出：
+
+```text
+Hello kernel
+kernel started
+run task 0
+sys_test called, arg0=100
+task 0 yield
+run task 1
+sys_test called, arg0=200
+task 1 yield
+run task 0
+task 0 exited with code 0
+run task 1
+task 1 exited with code 1
+all tasks exited
+```
+
+### 关键结论
+
+当前已经完成最小多任务调度闭环：
+
+```text
+task 0
+-> SYS_YIELD
+-> trap_handler
+-> scheduler
+-> task 1
+-> SYS_YIELD
+-> scheduler
+-> task 0 / task 1 exit
+```
+
+当前调度仍然是教学型最小实现：任务上下文结构已经存在，但真实调度路径仍主要依赖恢复不同任务的 `TrapContext`。后续进入内存管理和用户程序加载前，需要继续保持调度逻辑简单，避免过早引入复杂进程模型。
+
+### 下一步
+
+1. 提交本次多任务轮转修改。
+2. 进入内存管理基础阶段。
+3. 先建立物理页帧分配器，再进入 Sv39 页表。
+4. 验证目标不是完整虚拟内存，而是先保证已有两个用户任务在引入内存模块后仍能正常运行。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -494,7 +566,8 @@ U-mode SYS_YIELD
 | 11 | 增加最小 exit syscall | 用户态可以主动结束并打印退出码 | 已完成 |
 | 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 已完成 |
 | 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` 并接入 `SYS_YIELD` | 已完成 |
-| 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 未开始 |
+| 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 已完成 |
+| 15 | 设计内存管理基础 | 建立物理页帧分配器，为 Sv39 页表做准备 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -523,4 +596,5 @@ U-mode SYS_YIELD
 | 13 | 提交最小 exit syscall | 已验证，准备提交 |
 | 14 | 提交最小单任务模型 | 已验证，准备提交 |
 | 15 | 提交任务上下文和 yield | 已验证，准备提交 |
-| 16 | 设计多任务轮转 | 未开始 |
+| 16 | 设计多任务轮转 | 已验证，准备提交 |
+| 17 | 设计内存管理基础 | 未开始 |

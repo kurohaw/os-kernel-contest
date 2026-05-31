@@ -6,6 +6,8 @@ use context::TaskContext;
 
 global_asm!(include_str!("switch.S"));
 
+const MAX_TASKS: usize = crate::user::APP_NUM;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskStatus {
     Ready,
@@ -13,61 +15,106 @@ pub enum TaskStatus {
     Exited,
 }
 
+#[derive(Clone, Copy)]
 pub struct TaskControlBlock {
     pub status: TaskStatus,
     pub trap_cx_addr: usize,
     pub task_cx: TaskContext,
 }
 
-static mut INIT_TASK: Option<TaskControlBlock> = None;
+impl TaskControlBlock {
+    pub const fn zero_init() -> Self {
+        Self {
+            status: TaskStatus::Exited,
+            trap_cx_addr: 0,
+            task_cx: TaskContext::zero_init(),
+        }
+    }
+}
+
+static mut TASKS: [TaskControlBlock; MAX_TASKS] = 
+    [TaskControlBlock::zero_init(); MAX_TASKS];
+
+static mut CURRENT: usize = 0;
 
 pub fn init() {
-    let trap_cx_addr = crate::user::init_user_context();
+    let mut i = 0;
 
-    unsafe {
-        INIT_TASK = Some(TaskControlBlock {
-            status: TaskStatus::Ready,
-            trap_cx_addr,
-            task_cx: TaskContext::zero_init(),
-        });
+    while i < MAX_TASKS {
+        unsafe {
+            TASKS[i] = TaskControlBlock {
+                status: TaskStatus::Ready,
+                trap_cx_addr: crate::user::init_user_context(i),
+                task_cx: TaskContext::zero_init(),
+            };
+        }
+
+        i += 1;
     }
 }
 
 pub fn run_first_task() -> ! {
-    let task = unsafe {
-        INIT_TASK
-            .as_mut()
-            .expect("init task must be initialized before run")
-    };
+   run_task(0)
+}
 
-    task.status = TaskStatus::Running;
-    crate::println!("run first task");
-
+fn run_task(task_id: usize) -> ! {
     unsafe {
-        crate::trap::restore(task.trap_cx_addr);
+        CURRENT = task_id;
+        TASKS[task_id].status = TaskStatus::Running;
+
+        crate::println!("run task {}", task_id);
+        crate::trap::restore(TASKS[task_id].trap_cx_addr);
     }
 }
 
 pub fn suspend_current_and_run_next() {
-    crate::println!("user yield");
+    let current = unsafe { CURRENT };
+
+    crate::println!("task {} yield", current);
 
     unsafe {
-        if let Some(task) = INIT_TASK.as_mut() {
-            task.status = TaskStatus::Ready;
-            task.status = TaskStatus::Running;
-        }
+        TASKS[current].status = TaskStatus::Ready;
     }
+
+    if let Some(next) = find_next_ready() {
+        run_task(next);
+    }
+
+    panic!("no ready task after yield");
 }
 
 pub fn exit_current(code: i32) -> ! {
-    crate::println!("user exited with code {}", code);
+    let current = unsafe { CURRENT };
+
+    crate::println!("task {} exited with code {}",current, code);
 
     unsafe {
-        if let Some(task) = INIT_TASK.as_mut() {
-            task.status = TaskStatus::Exited;
-        }
+        TASKS[current].status = TaskStatus::Exited;
+    }
+
+    if let Some(next) = find_next_ready() {
+        run_task(next);
     }
 
     crate::println!("all tasks exited");
     loop{}
+}
+
+fn find_next_ready() -> Option<usize> {
+    let current = unsafe { CURRENT };
+
+    let mut offset = 1;
+    while offset <= MAX_TASKS {
+        let id = (current + offset) % MAX_TASKS;
+
+        unsafe {
+            if TASKS[id].status == TaskStatus::Ready {
+                return Some(id);
+            }
+        }
+
+        offset += 1;
+    }
+
+    None
 }
