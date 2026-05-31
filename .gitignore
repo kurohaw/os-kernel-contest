@@ -5,6 +5,7 @@ hello-rust/
 *.o
 *.bin
 *.elf
+exec.out
 .DS_Store
 .vscode/
 .idea/

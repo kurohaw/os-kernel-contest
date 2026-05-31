@@ -7,6 +7,8 @@ KERNEL_ENTRY_PA := 0x80200000
 
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
+all: build
+
 env:
 	rustup target add $(TARGET)
 	rustup component add llvm-tools
@@ -26,4 +28,4 @@ run: build
 clean:
 	cargo clean
 
-.PHONY: env build run clean
+.PHONY: all env build run clean
