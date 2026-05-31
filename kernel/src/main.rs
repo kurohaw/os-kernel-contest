@@ -3,12 +3,14 @@
 
 mod console;
 mod lang_items;
+mod mm;
 mod sbi;
 mod syscall;
+mod task;
 mod timer;
 mod trap;
 mod user;
-mod task;
+
 
 core::arch::global_asm!(include_str!("entry.asm"));
 
@@ -18,6 +20,8 @@ pub fn rust_main() -> ! {
 
     println!("Hello kernel");
     println!("kernel started");
+
+    mm::init();
 
     trap::init();
     trap::enable_timer_interrupt();

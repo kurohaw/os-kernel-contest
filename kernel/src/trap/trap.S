@@ -2,6 +2,7 @@
     .globl __alltraps
     .globl __restore
 
+    .align 2
 __alltraps:
     addi sp, sp, -34 * 8
 
@@ -49,6 +50,7 @@ __alltraps:
     mv a0, sp
     call trap_handler
 
+    .align 2
 __restore:
     ld t0, 32 * 8(sp)
     ld t1, 33 * 8(sp)

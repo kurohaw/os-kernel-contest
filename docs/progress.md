@@ -549,6 +549,75 @@ task 0
 3. 先建立物理页帧分配器，再进入 Sv39 页表。
 4. 验证目标不是完整虚拟内存，而是先保证已有两个用户任务在引入内存模块后仍能正常运行。
 
+## 2026-05-31 物理页帧分配器
+
+### 今日目标
+
+建立最小物理页帧分配器，为后续 Sv39 页表和用户地址空间映射做准备。
+
+### 修改内容
+
+- 新增 `kernel/src/mm/mod.rs`，作为内存管理模块入口。
+- 新增 `kernel/src/mm/frame_allocator.rs`。
+- 定义 `PAGE_SIZE = 4096`。
+- 定义 `MEMORY_END = 0x8800_0000`，匹配当前 QEMU virt 平台的物理内存结束地址。
+- 通过 linker symbol `ekernel` 确定内核镜像结束位置。
+- 从 `ekernel` 向上按 4KiB 对齐后开始分配物理页帧。
+- 新增 `FrameTracker`，保存分配到的物理页号，并提供 `start_pa()` 和 `zero()`。
+- 新增 `StackFrameAllocator`，当前只支持顺序分配，不支持回收。
+- 在 `main.rs` 中注册 `mm` 模块，并在任务初始化前调用 `mm::init()`。
+- 修复 `trap.S` 中 `__alltraps` 和 `__restore` 的 4 字节对齐问题，避免 `stvec` 写入非对齐 trap 入口后导致用户态 `ecall` 无法进入 `trap_handler`。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make clean
+make run
+```
+
+QEMU 中可以看到类似输出：
+
+```text
+Hello kernel
+kernel started
+frame allocator: start=0x80219000, end=0x88000000, frames=32231
+run task 0
+sys_test called, arg0=100
+task 0 yield
+run task 1
+sys_test called, arg0=200
+task 1 yield
+run task 0
+task 0 exited with code 0
+run task 1
+task 1 exited with code 1
+all tasks exited
+```
+
+### 关键结论
+
+当前已经完成最小物理页帧分配闭环：
+
+```text
+linker ekernel
+-> frame allocator init
+-> allocatable physical frames
+-> existing user tasks still run correctly
+```
+
+这一步还没有启用分页，也没有建立页表。它只解决后续页表页和用户内存页从哪里来的问题。
+
+### 下一步
+
+1. 提交多任务轮转和物理页帧分配器。
+2. 新增地址类型封装：`PhysAddr`、`VirtAddr`、`PhysPageNum`、`VirtPageNum`。
+3. 新增 Sv39 页表项 `PageTableEntry`。
+4. 再实现最小 `PageTable`，先做到可以创建空页表和映射单页。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -567,7 +636,8 @@ task 0
 | 12 | 设计最小单任务模型 | 用户态执行实体由任务结构管理 | 已完成 |
 | 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` 并接入 `SYS_YIELD` | 已完成 |
 | 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 已完成 |
-| 15 | 设计内存管理基础 | 建立物理页帧分配器，为 Sv39 页表做准备 | 未开始 |
+| 15 | 设计内存管理基础 | 建立物理页帧分配器，为 Sv39 页表做准备 | 已完成 |
+| 16 | 设计地址类型和页表项 | 支持 Sv39 地址转换基础类型和 `PageTableEntry` | 未开始 |
 
 ## 用户程序测试记录
 
@@ -597,4 +667,5 @@ task 0
 | 14 | 提交最小单任务模型 | 已验证，准备提交 |
 | 15 | 提交任务上下文和 yield | 已验证，准备提交 |
 | 16 | 设计多任务轮转 | 已验证，准备提交 |
-| 17 | 设计内存管理基础 | 未开始 |
+| 17 | 设计内存管理基础 | 已验证，准备提交 |
+| 18 | 设计地址类型和页表项 | 未开始 |
