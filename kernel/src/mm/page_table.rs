@@ -1,4 +1,4 @@
-use super::PhysPageNum;
+use super::{alloc_frame, FrameTracker, PhysPageNum, VirtPageNum, PAGE_SIZE};
 
 const PTE_PPN_SHIFT: usize = 10;
 const PTE_FLAGS_MASK: usize = 0x3ff;
@@ -75,7 +75,7 @@ impl PageTableEntry {
         PTEFlags::from_bits(self.bits & PTE_FLAGS_MASK)
     }
 
-    pub fn is_vaild(self) -> bool {
+    pub fn is_valid(self) -> bool {
         self.flags().contains(PTEFlags::V)
     }
 
@@ -87,8 +87,88 @@ impl PageTableEntry {
         self.flags().contains(PTEFlags::W)
     }
 
-    pub fn excutable(self) -> bool {
+    pub fn executable(self) -> bool {
         self.flags().contains(PTEFlags::X)
+    }
+}
+
+const PTE_COUNT: usize = PAGE_SIZE / core::mem::size_of::<PageTableEntry>();
+
+pub struct PageTable {
+    root_ppn: PhysPageNum,
+    _root_frame: FrameTracker,
+}
+
+impl PageTable {
+    pub fn new() -> Self {
+        let root_frame = alloc_frame().expect("failed to allocate root page table");
+        let root_ppn = PhysPageNum(root_frame.ppn());
+
+        Self {
+            root_ppn,
+            _root_frame: root_frame,
+        }
+    }
+
+    pub fn root_ppn(&self) -> PhysPageNum {
+        self.root_ppn
+    }
+
+    pub fn map(&self, vpn:VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        let pte = self.find_pte_create(vpn);
+        assert!(!pte.is_valid(), "vpn {:#x} is already mapped", vpn.0);
+
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+    }
+
+    pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+        let indexes = vpn.indexes();
+        let mut ppn = self.root_ppn;
+
+        for i in 0..3 {
+            let pte = ppn_to_pte_array(ppn)[indexes[i]];
+
+            if !pte.is_valid() {
+                return None;
+            }
+
+            if i == 2 {
+                return Some(pte);
+            }
+
+            ppn = pte.ppn();
+        }
+
+        None
+    }
+
+    fn find_pte_create(&self, vpn: VirtPageNum) -> &'static mut PageTableEntry {
+        let indexes = vpn.indexes();
+        let mut ppn = self.root_ppn;
+
+        for i in 0..2 {
+            let pte = &mut ppn_to_pte_array(ppn)[indexes[i]];
+
+            if !pte.is_valid() {
+                let frame = alloc_frame().expect("failed to allocate page table frame");
+                *pte = PageTableEntry::new(PhysPageNum(frame.ppn()),PTEFlags::V);
+            }
+
+            ppn = pte.ppn();
+        }
+
+        &mut ppn_to_pte_array(ppn)[indexes[2]]
+    }
+}
+
+fn ppn_to_pte_array(ppn: PhysPageNum) -> &'static mut [PageTableEntry] {
+    let start_pa = ppn.0 * PAGE_SIZE;
+
+    unsafe {
+        core::slice::from_raw_parts_mut(
+            start_pa as *mut PageTableEntry,
+            PTE_COUNT,
+        )
     }
 }
 
@@ -103,4 +183,22 @@ pub fn self_check() {
         pte.ppn().0,
         pte.flags().bits(),
     );
+
+    let page_table = PageTable::new();
+    let vpn = VirtPageNum(0x100);
+    let ppn = PhysPageNum(0x80200);
+    let flags = PTEFlags::R | PTEFlags::W;
+
+    page_table.map(vpn, ppn, flags);
+
+    let translate = page_table
+        .translate(vpn)
+        .expect("mapped vpn should be translated");
+    
+        crate::println!(
+            "page table map test: vpn={:#x}, ppn={:#x}, flags={:#x}",
+            vpn.0,
+            translate.ppn().0,
+            translate.flags().bits(),
+        );
 }

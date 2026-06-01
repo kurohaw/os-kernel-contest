@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 阶段 | 初赛开发期 |
-| 当前日期 | 2026-05-31 |
+| 当前日期 | 2026-06-01 |
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 进入内存管理基础设计，为用户程序加载和地址空间隔离做准备 |
+| 当前目标 | 完善页表映射能力，为内核地址空间恒等映射做准备 |
 
 ## 2026-05-18
 
@@ -688,6 +688,72 @@ usize address
 4. 支持单页 `map(vpn, ppn, flags)`。
 5. 先用自检验证映射，不急着开启分页。
 
+## 2026-06-01 最小 PageTable
+
+### 今日目标
+
+实现最小 `PageTable`，支持创建根页表、自动分配中间页表页、映射单个虚拟页，并通过 `translate()` 查回映射结果。
+
+### 修改内容
+
+- 在 `page_table.rs` 中新增 `PageTable`。
+- `PageTable::new()` 会通过 `alloc_frame()` 分配一个根页表页。
+- `map(vpn, ppn, flags)` 支持建立单页映射。
+- `find_pte_create()` 会按 Sv39 三级页表索引查找页表项；中间页表不存在时自动分配新的页表页。
+- `translate(vpn)` 支持从根页表查询一个虚拟页对应的页表项。
+- `self_check()` 增加页表映射测试，验证 `vpn -> ppn` 能正确写入并查回。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+page table map test: vpn=0x100, ppn=0x80200, flags=0x7
+```
+
+并且原有多任务轮转仍然正常：
+
+```text
+run task 0
+sys_test called, arg0=100
+task 0 yield
+run task 1
+sys_test called, arg0=200
+task 1 yield
+task 0 exited with code 0
+task 1 exited with code 1
+all tasks exited
+```
+
+### 关键结论
+
+当前已经完成最小页表数据结构闭环：
+
+```text
+alloc root page table
+-> allocate intermediate page table frames
+-> map single VPN to PPN
+-> translate VPN back to PTE
+```
+
+这一步仍然没有写 `satp`，没有开启分页，因此不会影响当前物理地址直接运行模式。
+
+### 下一步
+
+1. 支持页表区间映射。
+2. 将一段虚拟地址区间映射到连续物理页。
+3. 用自检验证多个连续页都能被 `translate()` 查回。
+4. 完成后再进入内核地址空间恒等映射。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -708,7 +774,8 @@ usize address
 | 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 已完成 |
 | 15 | 设计内存管理基础 | 建立物理页帧分配器，为 Sv39 页表做准备 | 已完成 |
 | 16 | 设计地址类型和页表项 | 支持 Sv39 地址转换基础类型和 `PageTableEntry` | 已完成 |
-| 17 | 设计最小页表 | 支持创建根页表和单页映射自检 | 未开始 |
+| 17 | 设计最小页表 | 支持创建根页表和单页映射自检 | 已完成 |
+| 18 | 设计页表区间映射 | 支持连续虚拟页映射到连续物理页并通过自检 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -740,4 +807,5 @@ usize address
 | 16 | 设计多任务轮转 | 已验证，准备提交 |
 | 17 | 设计内存管理基础 | 已验证，准备提交 |
 | 18 | 设计地址类型和页表项 | 已验证，准备提交 |
-| 19 | 设计最小页表 | 未开始 |
+| 19 | 设计最小页表 | 已验证，准备提交 |
+| 20 | 设计页表区间映射 | 未开始 |
