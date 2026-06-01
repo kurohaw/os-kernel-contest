@@ -618,6 +618,76 @@ linker ekernel
 3. 新增 Sv39 页表项 `PageTableEntry`。
 4. 再实现最小 `PageTable`，先做到可以创建空页表和映射单页。
 
+## 2026-06-01 地址类型和页表项
+
+### 今日目标
+
+新增 Sv39 地址类型封装和页表项结构，为后续实现 `PageTable`、`map()` 和地址空间隔离做准备。
+
+### 修改内容
+
+- 新增 `kernel/src/mm/address.rs`。
+- 定义 `PhysAddr`、`VirtAddr`、`PhysPageNum`、`VirtPageNum`。
+- 为物理地址和虚拟地址提供 `floor()`、`ceil()`、`page_offset()` 和 `is_aligned()`。
+- 为物理页号提供 `start_pa()`。
+- 为虚拟页号提供 `start_va()` 和三级页表索引拆分 `indexes()`。
+- 新增 `kernel/src/mm/page_table.rs`。
+- 定义 `PTEFlags`，表示 Sv39 页表项低 10 位 flags。
+- 定义 `PageTableEntry`，支持从 `PhysPageNum + PTEFlags` 构造页表项。
+- 支持从页表项中解析 `ppn()`、`flags()`，并判断 `V/R/W/X` 权限。
+- 在 `mm::init()` 中加入临时 `page_table::self_check()`，验证页表项编码和解码。
+
+### 验证结果
+
+成功。
+
+在 `kernel/` 下执行：
+
+```bash
+make build
+make run
+```
+
+QEMU 中可以看到：
+
+```text
+page table entry test: ppn=0x80200, flags=0x7
+```
+
+并且原有多任务轮转仍然正常：
+
+```text
+run task 0
+sys_test called, arg0=100
+task 0 yield
+run task 1
+sys_test called, arg0=200
+task 1 yield
+task 0 exited with code 0
+task 1 exited with code 1
+all tasks exited
+```
+
+### 关键结论
+
+当前已经完成页表实现前的基础类型准备：
+
+```text
+usize address
+-> typed address/page number
+-> Sv39 PTE encode/decode
+```
+
+这一步仍未启用分页，也未修改 `satp`。系统仍运行在直接物理地址访问模式下，因此可以安全验证，不影响现有任务调度。
+
+### 下一步
+
+1. 提交地址类型和页表项。
+2. 实现最小 `PageTable`。
+3. 支持创建根页表。
+4. 支持单页 `map(vpn, ppn, flags)`。
+5. 先用自检验证映射，不急着开启分页。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -637,7 +707,8 @@ linker ekernel
 | 13 | 设计任务上下文和 yield | 为多任务轮转准备 `TaskContext` 并接入 `SYS_YIELD` | 已完成 |
 | 14 | 设计多任务轮转 | 至少两个用户任务可以通过 yield 轮转 | 已完成 |
 | 15 | 设计内存管理基础 | 建立物理页帧分配器，为 Sv39 页表做准备 | 已完成 |
-| 16 | 设计地址类型和页表项 | 支持 Sv39 地址转换基础类型和 `PageTableEntry` | 未开始 |
+| 16 | 设计地址类型和页表项 | 支持 Sv39 地址转换基础类型和 `PageTableEntry` | 已完成 |
+| 17 | 设计最小页表 | 支持创建根页表和单页映射自检 | 未开始 |
 
 ## 用户程序测试记录
 
@@ -668,4 +739,5 @@ linker ekernel
 | 15 | 提交任务上下文和 yield | 已验证，准备提交 |
 | 16 | 设计多任务轮转 | 已验证，准备提交 |
 | 17 | 设计内存管理基础 | 已验证，准备提交 |
-| 18 | 设计地址类型和页表项 | 未开始 |
+| 18 | 设计地址类型和页表项 | 已验证，准备提交 |
+| 19 | 设计最小页表 | 未开始 |
