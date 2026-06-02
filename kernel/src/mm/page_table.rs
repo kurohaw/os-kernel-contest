@@ -1,4 +1,4 @@
-use super::{alloc_frame, FrameTracker, PhysPageNum, VirtPageNum, PAGE_SIZE};
+use super::{alloc_frame, FrameTracker, PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, PAGE_SIZE};
 
 const PTE_PPN_SHIFT: usize = 10;
 const PTE_FLAGS_MASK: usize = 0x3ff;
@@ -121,6 +121,28 @@ impl PageTable {
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
 
+    pub fn map_range(
+        &self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        start_pa: PhysAddr,
+        flags: PTEFlags,
+    ) {
+        assert!(start_va.is_aligned(), "start_va must be page aligned");
+        assert!(end_va.is_aligned(), "edn_va must be page aligned");
+        assert!(start_pa.is_aligned(), "start_pa must be page aligned ");
+        assert!(start_va.0 < end_va.0, "invalid map range");
+
+        let mut vpn = start_va.floor().0;
+        let end_vpn = end_va.floor().0;
+        let mut ppn = start_pa.floor().0;
+
+        while vpn < end_vpn {
+            self.map(VirtPageNum(vpn), PhysPageNum(ppn), flags);
+            vpn += 1;
+            ppn += 1;
+        }
+    }
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         let indexes = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -201,4 +223,35 @@ pub fn self_check() {
             translate.ppn().0,
             translate.flags().bits(),
         );
+
+    let range_start_va = VirtAddr(0x20_0000);
+    let range_end_va = VirtAddr(0x20_3000);
+    let range_start_pa = PhysAddr(0x8040_0000);
+
+    page_table.map_range(
+        range_start_va,
+        range_end_va,
+        range_start_pa,
+        PTEFlags::R | PTEFlags::X,
+    );
+
+    let start_vpn = range_start_va.floor().0;
+    let start_ppn = range_start_pa.floor().0;
+
+    for i in 0..3 {
+        let pte = page_table
+            .translate(VirtPageNum(start_vpn + i))
+            .expect("mapped range vpn should be translate");
+
+        assert_eq!(pte.ppn().0, start_ppn + i);
+        assert!(pte.readable());
+        assert!(pte.executable());
+    }
+
+    crate::println!(
+        "page table range map test: start_vpn={:#x}, start_ppn={:#x}, pages=3",
+        start_vpn,
+        start_ppn,
+    );
+
 }
