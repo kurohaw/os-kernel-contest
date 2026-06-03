@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use super::{PageTable, PageTableEntry, PTEFlags, PhysAddr, VirtAddr};
 
 pub struct MemorySet {
@@ -78,6 +80,21 @@ impl MemorySet {
         self.page_table.translate(va.floor())
     }
 
+    pub fn satp_token(&self) -> usize {
+        self.page_table.satp_token()
+    }
+
+    pub fn activate(&self) {
+        let token = self.satp_token();
+
+        unsafe {
+            asm!("csrw satp, {}", in(reg) token);
+            asm!("sfence.vma");
+        }
+
+        crate::println!("kernel memory set activated: satp={:#x}", token);
+    }
+
     fn check_kernel_mapping(&self, va: usize, readable: bool, writable: bool, executable: bool) {
         let pte = self
             .translate(VirtAddr(va))
@@ -104,6 +121,7 @@ impl MemorySet {
             self.check_kernel_mapping(edata as *const() as usize, true, true, false);
         }
 
+        crate::println!("kernel memory set satp token: {:#x}", self.satp_token());
         crate::println!("kernel memory set test passed");
     }
 }

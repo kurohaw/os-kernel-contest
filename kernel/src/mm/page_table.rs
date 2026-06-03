@@ -3,6 +3,7 @@ use super::{alloc_frame, FrameTracker, PhysAddr, PhysPageNum, VirtAddr, VirtPage
 const PTE_PPN_SHIFT: usize = 10;
 const PTE_FLAGS_MASK: usize = 0x3ff;
 const PTE_PPN_MASK: usize = (1usize << 44) - 1;
+const SATP_MODE_SV39: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PTEFlags {
@@ -112,6 +113,10 @@ impl PageTable {
 
     pub fn root_ppn(&self) -> PhysPageNum {
         self.root_ppn
+    }
+
+    pub fn satp_token(&self) -> usize {
+        (SATP_MODE_SV39 << 60) | self.root_ppn.0
     }
 
     pub fn map(&self, vpn:VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
