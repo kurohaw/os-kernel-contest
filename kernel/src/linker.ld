@@ -25,6 +25,14 @@ SECTIONS
     . = ALIGN(4K);
     erodata = .;
 
+    suser_text = .;
+    .user.text : {
+        *(.user.text .user.text.*)
+    }
+
+    . = ALIGN(4K);
+    euser_text = .;
+
     sdata = .;
     .data : {
         *(.data .data.*)
@@ -43,6 +51,14 @@ SECTIONS
 
     . = ALIGN(4K);
     ebss = .;
+
+    suser_stack = .;
+    .user.stack : {
+        *(.user.stack .user.stack.*)
+    }
+
+    . = ALIGN(4K);
+    euser_stack = .;
     ekernel = .;
 
     /DISCARD/ : {

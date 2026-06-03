@@ -9,10 +9,12 @@ struct UserStack {
     data: [u8; USER_STACK_SIZE],
 }
 
+#[link_section = ".user.stack"]
 static mut USER_STACK_0: UserStack = UserStack {
     data: [0; USER_STACK_SIZE],
 };
 
+#[link_section = ".user.stack"]
 static mut USER_STACK_1: UserStack = UserStack {
     data: [0; USER_STACK_SIZE],
 };
@@ -44,6 +46,7 @@ fn user_entry(app_id: usize) -> usize {
 }
 
 #[no_mangle]
+#[link_section = ".user.text"]
 pub extern "C" fn user_entry_0() -> ! {
     unsafe {
         core::arch::asm!(
@@ -62,6 +65,7 @@ pub extern "C" fn user_entry_0() -> ! {
 }
 
 #[no_mangle]
+#[link_section = ".user.text"]
 pub extern "C" fn user_entry_1() -> ! {
     unsafe {
         core::arch::asm!(

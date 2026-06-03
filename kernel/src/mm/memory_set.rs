@@ -13,9 +13,13 @@ impl MemorySet {
             fn etext();
             fn srodata();
             fn erodata();
+            fn suser_text();
+            fn euser_text();
             fn sdata();
             fn edata();
-            fn ekernel();
+            fn ebss();
+            fn suser_stack();
+            fn euser_stack();
         }
 
         let memory_set = Self {
@@ -38,6 +42,13 @@ impl MemorySet {
             );
 
             memory_set.map_identical_range(
+                suser_text as *const () as usize,
+                euser_text as *const () as usize,
+                PTEFlags::R | PTEFlags::X | PTEFlags::U,
+                ".user.text",
+            );
+
+            memory_set.map_identical_range(
                 sdata as *const () as usize,
                 edata as *const () as usize,
                 PTEFlags::R | PTEFlags::W,
@@ -46,10 +57,18 @@ impl MemorySet {
 
             memory_set.map_identical_range(
                 edata as *const () as usize,
-                ekernel as *const () as usize,
+                ebss as *const () as usize,
                 PTEFlags::R | PTEFlags::W,
                 ".bss",
             );
+
+            memory_set.map_identical_range(
+                suser_stack as *const () as usize,
+                euser_stack as *const () as usize,
+                PTEFlags::R | PTEFlags::W | PTEFlags::U,
+                ".user.stack",
+            )
+
         }
 
         memory_set
@@ -110,15 +129,19 @@ impl MemorySet {
         extern "C" {
             fn stext();
             fn srodata();
+            fn suser_text();
             fn sdata();
             fn edata();
+            fn suser_stack();
         }
 
         unsafe {
             self.check_kernel_mapping(stext as *const () as usize, true, false, true);
             self.check_kernel_mapping(srodata as *const () as usize, true, false, false);
+            self.check_kernel_mapping(suser_text as *const () as usize, true, false, true);
             self.check_kernel_mapping(sdata as *const () as usize, true, true, false);
-            self.check_kernel_mapping(edata as *const() as usize, true, true, false);
+            self.check_kernel_mapping(edata as *const () as usize, true, true, false);
+            self.check_kernel_mapping(suser_stack as *const () as usize,true, true, false);
         }
 
         crate::println!("kernel memory set satp token: {:#x}", self.satp_token());
