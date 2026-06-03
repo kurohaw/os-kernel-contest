@@ -56,6 +56,14 @@ pub fn enable_timer_interrupt() {
     }
 }
 
+pub fn enable_user_memory_access() {
+    const SSTATUS_SUM: usize = 1 << 18;
+
+    unsafe {
+        asm!("csrs sstatus, {}", in(reg) SSTATUS_SUM);
+    }
+}
+
 pub unsafe fn restore(cx_addr: usize) -> ! {
     asm!(
         "mv sp, {cx}",

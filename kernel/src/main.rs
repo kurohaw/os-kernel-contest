@@ -24,6 +24,7 @@ pub fn rust_main() -> ! {
     mm::init();
 
     trap::init();
+    trap::enable_user_memory_access();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
 
