@@ -4,6 +4,7 @@
 #[no_mangle]
 #[link_section = ".text.entry"]
 pub extern "C" fn _start() -> ! {
+    user::write(1, "app0: hello from write\n");
     user::sys_test(100);
     user::sys_yield();
     user::sys_exit(0);
