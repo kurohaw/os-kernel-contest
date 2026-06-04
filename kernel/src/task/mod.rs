@@ -68,6 +68,10 @@ pub fn run_first_task() -> ! {
    run_task(0)
 }
 
+pub fn current_task_id() -> usize {
+    unsafe { CURRENT }
+}
+
 fn run_task(task_id: usize) -> ! {
     unsafe {
         CURRENT = task_id;

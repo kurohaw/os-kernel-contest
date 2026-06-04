@@ -6,6 +6,7 @@ const SYS_TEST: usize = 0;
 const SYS_EXIT: usize = 1;
 const SYS_YIELD: usize = 2;
 const SYS_WRITE: usize = 64;
+const SYS_GETPID: usize = 172;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let ret: isize;
@@ -33,6 +34,10 @@ pub fn sys_yield() -> isize {
 
 pub fn write(fd: usize, s: &str) -> isize {
     syscall(SYS_WRITE, [fd, s.as_ptr() as usize, s.len()])
+}
+
+pub fn getpid() -> isize {
+    syscall(SYS_GETPID, [0,0,0])
 }
 pub fn sys_exit(code: i32) -> ! {
     syscall(SYS_EXIT, [code as usize, 0, 0]);
