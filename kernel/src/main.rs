@@ -3,6 +3,7 @@
 
 mod console;
 mod lang_items;
+mod loader;
 mod mm;
 mod sbi;
 mod syscall;

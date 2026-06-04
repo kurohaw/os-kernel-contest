@@ -1,6 +1,6 @@
 use crate::trap::TrapContext;
 
-pub const APP_NUM: usize = 2;
+pub const APP_NUM: usize = crate::loader::APP_NUM;
 
 const USER_STACK_SIZE: usize = 4096 * 2;
 
@@ -24,7 +24,7 @@ pub fn init_user_context(app_id: usize) -> usize {
     let cx_addr = user_stack_top - core::mem::size_of::<TrapContext>();
 
     let cx = unsafe { &mut *(cx_addr as *mut TrapContext) };
-    *cx = TrapContext::app_init_context(user_entry(app_id), user_stack_top);
+    *cx = TrapContext::app_init_context(crate::loader::app_entry(app_id), user_stack_top);
 
     cx_addr
 }
@@ -40,51 +40,5 @@ fn user_stack_top(app_id: usize) -> usize {
         0 => core::ptr::addr_of!(USER_STACK_0) as usize + USER_STACK_SIZE,
         1 => core::ptr::addr_of!(USER_STACK_1) as usize + USER_STACK_SIZE,
         _ => panic!("invaild app id {}", app_id),
-    }
-}
-
-fn user_entry(app_id: usize) -> usize {
-    match app_id {
-        0 => user_entry_0 as usize,
-        1 => user_entry_1 as usize,
-        _ => panic!("invalid app id {}", app_id),
-    }
-}
-
-#[no_mangle]
-#[link_section = ".user.text"]
-pub extern "C" fn user_entry_0() -> ! {
-    unsafe {
-        core::arch::asm!(
-            "li a7, 0",
-            "li a0, 100",
-            "ecall",
-            "li a7, 2",
-            "ecall",
-            "li a7, 1",
-            "li a0, 0",
-            "ecall",
-            "j .",
-            options(noreturn),
-        );
-    }
-}
-
-#[no_mangle]
-#[link_section = ".user.text"]
-pub extern "C" fn user_entry_1() -> ! {
-    unsafe {
-        core::arch::asm!(
-            "li a7, 0",
-            "li a0, 200",
-            "ecall",
-            "li a7, 2",
-            "ecall",
-            "li a7, 1",
-            "li a0, 1",
-            "ecall",
-            "j .",
-            options(noreturn),
-        );
     }
 }
