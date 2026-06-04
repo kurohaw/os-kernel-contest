@@ -73,13 +73,17 @@ fn run_task(task_id: usize) -> ! {
         CURRENT = task_id;
         TASKS[task_id].status = TaskStatus::Running;
 
+        let trap_cx_addr = TASKS[task_id].trap_cx_addr;
+        let satp_token = TASKS[task_id].satp_token;
+
         crate::println!(
-            "run task {}, user_satp={:#x}",
+            "run task {}, switch_satp={:#x}",
             task_id,
             TASKS[task_id].satp_token,
         );
 
-        crate::trap::restore(TASKS[task_id].trap_cx_addr);
+        crate::mm::activate_satp(satp_token);
+        crate::trap::restore(trap_cx_addr);
     }
 }
 

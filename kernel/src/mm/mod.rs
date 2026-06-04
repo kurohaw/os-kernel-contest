@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 mod address;
 mod frame_allocator;
 mod memory_set;
@@ -28,5 +30,12 @@ pub fn init() {
     unsafe {
         KERNEL_SPACE = Some(kernel_space);
         KERNEL_SPACE.as_ref().unwrap().activate();
+    }
+}
+
+pub fn activate_satp(token: usize) {
+    unsafe {
+        asm!("csrw satp, {}", in(reg) token);
+        asm!("sfence.vma");
     }
 }

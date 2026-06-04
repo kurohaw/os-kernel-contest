@@ -93,6 +93,8 @@ impl MemorySet {
             fn sdata();
             fn edata();
             fn ebss();
+            fn suser_stack();
+            fn euser_stack();
             fn ekernel();
         }
 
@@ -100,7 +102,7 @@ impl MemorySet {
             page_table: PageTable::new(),
         };
 
-        let (user_stack_bottom, user_stack_top) = crate::user::user_stack_range(app_id);
+        let _ = app_id;
 
         unsafe {
             memory_set.map_identical_range(
@@ -139,8 +141,8 @@ impl MemorySet {
             );
 
             memory_set.map_identical_range(
-                user_stack_bottom,
-                user_stack_top,
+                suser_stack as *const () as usize,
+                euser_stack as *const () as usize,
                 PTEFlags::R | PTEFlags::W | PTEFlags::U,
                 ".user.stack",
             );
