@@ -1,6 +1,6 @@
 pub const PAGE_SIZE: usize = 4096;
 
-const MEMORY_END: usize = 0x8800_0000;
+pub const MEMORY_END: usize = 0x8800_0000;
 
 pub struct FrameTracker {
     ppn: usize,

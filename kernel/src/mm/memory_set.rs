@@ -1,6 +1,7 @@
 use core::arch::asm;
 
 use super::{PageTable, PageTableEntry, PTEFlags, PhysAddr, VirtAddr};
+use super::frame_allocator::MEMORY_END;
 
 pub struct MemorySet {
     page_table: PageTable,
@@ -20,6 +21,7 @@ impl MemorySet {
             fn ebss();
             fn suser_stack();
             fn euser_stack();
+            fn ekernel();
         }
 
         let memory_set = Self {
@@ -67,8 +69,14 @@ impl MemorySet {
                 euser_stack as *const () as usize,
                 PTEFlags::R | PTEFlags::W | PTEFlags::U,
                 ".user.stack",
-            )
+            );
 
+            memory_set.map_identical_range(
+                ekernel as *const () as usize,
+                MEMORY_END,
+                PTEFlags::R | PTEFlags::W,
+                ".memory",
+            );
         }
 
         memory_set
@@ -85,6 +93,7 @@ impl MemorySet {
             fn sdata();
             fn edata();
             fn ebss();
+            fn ekernel();
         }
 
         let memory_set = Self {
@@ -134,6 +143,13 @@ impl MemorySet {
                 user_stack_top,
                 PTEFlags::R | PTEFlags::W | PTEFlags::U,
                 ".user.stack",
+            );
+
+            memory_set.map_identical_range(
+                ekernel as *const () as usize,
+                MEMORY_END,
+                PTEFlags::R | PTEFlags::W,
+                ".memory",
             );
         }
 

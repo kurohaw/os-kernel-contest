@@ -3,6 +3,7 @@ mod context;
 use core::arch::global_asm;
 
 use context::TaskContext;
+use crate::mm::MemorySet;
 
 global_asm!(include_str!("switch.S"));
 
@@ -15,25 +16,28 @@ pub enum TaskStatus {
     Exited,
 }
 
-#[derive(Clone, Copy)]
 pub struct TaskControlBlock {
     pub status: TaskStatus,
     pub trap_cx_addr: usize,
     pub task_cx: TaskContext,
+    pub memory_set: Option<MemorySet>,
+    pub satp_token: usize,
 }
 
 impl TaskControlBlock {
     pub const fn zero_init() -> Self {
-        Self {
-            status: TaskStatus::Exited,
-            trap_cx_addr: 0,
-            task_cx: TaskContext::zero_init(),
-        }
+    Self {
+        status: TaskStatus::Exited,
+        trap_cx_addr: 0,
+        task_cx: TaskContext::zero_init(),
+        memory_set: None,
+        satp_token: 0,
     }
 }
+}
 
-static mut TASKS: [TaskControlBlock; MAX_TASKS] = 
-    [TaskControlBlock::zero_init(); MAX_TASKS];
+static mut TASKS: [TaskControlBlock; MAX_TASKS] =
+    [const { TaskControlBlock::zero_init() }; MAX_TASKS];
 
 static mut CURRENT: usize = 0;
 
@@ -42,11 +46,18 @@ pub fn init() {
 
     while i < MAX_TASKS {
         unsafe {
+            let memory_set = MemorySet::new_user(i);
+            let satp_token = memory_set.satp_token();
+
             TASKS[i] = TaskControlBlock {
                 status: TaskStatus::Ready,
                 trap_cx_addr: crate::user::init_user_context(i),
                 task_cx: TaskContext::zero_init(),
+                memory_set: Some(memory_set),
+                satp_token,
             };
+
+            crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
         }
 
         i += 1;
@@ -62,7 +73,12 @@ fn run_task(task_id: usize) -> ! {
         CURRENT = task_id;
         TASKS[task_id].status = TaskStatus::Running;
 
-        crate::println!("run task {}", task_id);
+        crate::println!(
+            "run task {}, user_satp={:#x}",
+            task_id,
+            TASKS[task_id].satp_token,
+        );
+
         crate::trap::restore(TASKS[task_id].trap_cx_addr);
     }
 }
