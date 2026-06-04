@@ -29,6 +29,12 @@ pub fn init_user_context(app_id: usize) -> usize {
     cx_addr
 }
 
+pub fn user_stack_range(app_id: usize) -> (usize, usize) {
+    let top = user_stack_top(app_id);
+    let bottom = top - USER_STACK_SIZE;
+    (bottom, top)
+}
+
 fn user_stack_top(app_id: usize) -> usize {
     match app_id {
         0 => core::ptr::addr_of!(USER_STACK_0) as usize + USER_STACK_SIZE,

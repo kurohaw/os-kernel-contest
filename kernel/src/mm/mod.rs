@@ -18,6 +18,13 @@ pub fn init() {
     let kernel_space = MemorySet::new_kernel();
     kernel_space.self_check();
 
+    let mut app_id = 0;
+    while app_id < crate::user::APP_NUM {
+        let user_space = MemorySet::new_user(app_id);
+        user_space.self_check_user(app_id);
+        app_id += 1;
+    }
+
     unsafe {
         KERNEL_SPACE = Some(kernel_space);
         KERNEL_SPACE.as_ref().unwrap().activate();

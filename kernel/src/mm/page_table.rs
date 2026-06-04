@@ -91,6 +91,10 @@ impl PageTableEntry {
     pub fn executable(self) -> bool {
         self.flags().contains(PTEFlags::X)
     }
+
+    pub fn user(self) -> bool {
+        self.flags().contains(PTEFlags::U)
+    }
 }
 
 const PTE_COUNT: usize = PAGE_SIZE / core::mem::size_of::<PageTableEntry>();

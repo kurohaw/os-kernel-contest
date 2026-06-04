@@ -74,6 +74,72 @@ impl MemorySet {
         memory_set
     }
 
+    pub fn new_user(app_id: usize) -> Self {
+        extern "C" {
+            fn stext();
+            fn etext();
+            fn srodata();
+            fn erodata();
+            fn suser_text();
+            fn euser_text();
+            fn sdata();
+            fn edata();
+            fn ebss();
+        }
+
+        let memory_set = Self {
+            page_table: PageTable::new(),
+        };
+
+        let (user_stack_bottom, user_stack_top) = crate::user::user_stack_range(app_id);
+
+        unsafe {
+            memory_set.map_identical_range(
+                stext as *const () as usize,
+                etext as *const () as usize,
+                PTEFlags::R | PTEFlags::X,
+                ".text",
+            );
+
+            memory_set.map_identical_range(
+                sdata as *const () as usize,
+                edata as *const () as usize,
+                PTEFlags::R | PTEFlags::W,
+                ".data",
+            );
+
+            memory_set.map_identical_range(
+                srodata as *const ()  as usize,
+                erodata as *const ()  as usize,
+                PTEFlags::R,
+                ".rodata",
+            );
+
+            memory_set.map_identical_range(
+                suser_text as *const () as usize,
+                euser_text as *const () as usize,
+                PTEFlags::R | PTEFlags::X | PTEFlags::U,
+                ".user.text",
+            );
+
+            memory_set.map_identical_range(
+                edata as *const () as usize,
+                ebss as *const () as usize,
+                PTEFlags::R | PTEFlags::W,
+                ".bss",
+            );
+
+            memory_set.map_identical_range(
+                user_stack_bottom,
+                user_stack_top,
+                PTEFlags::R | PTEFlags::W | PTEFlags::U,
+                ".user.stack",
+            );
+        }
+
+        memory_set
+    }
+ 
     fn map_identical_range(&self, start: usize, end: usize, flags: PTEFlags, name: &str) {
         if start == end {
             return;
@@ -147,9 +213,57 @@ impl MemorySet {
         crate::println!("kernel memory set satp token: {:#x}", self.satp_token());
         crate::println!("kernel memory set test passed");
     }
+
+    pub fn self_check_user(&self, app_id: usize) {
+    extern "C" {
+        fn stext();
+        fn suser_text();
+    }
+
+    let (user_stack_bottom, _) = crate::user::user_stack_range(app_id);
+
+    unsafe {
+        let kernel_text = self
+            .translate(VirtAddr(stext as *const () as usize))
+            .expect("user address space should map kernel text");
+
+        assert!(kernel_text.readable());
+        assert!(kernel_text.executable());
+        assert!(!kernel_text.user());
+
+        let user_text = self
+            .translate(VirtAddr(suser_text as *const () as usize))
+            .expect("user address space should map user text");
+
+        assert!(user_text.readable());
+        assert!(user_text.executable());
+        assert!(user_text.user());
+
+        let user_stack = self
+            .translate(VirtAddr(user_stack_bottom))
+            .expect("user address space should map user stack");
+
+        assert!(user_stack.readable());
+        assert!(user_stack.writable());
+        assert!(user_stack.user());
+    }
+
+    crate::println!(
+        "user memory set test passed: app_id={}, satp={:#x}",
+        app_id,
+        self.satp_token(),
+    );
+}
 }
 
 pub fn self_check() {
     let kernel_space = MemorySet::new_kernel();
     kernel_space.self_check();
+
+    let mut app_id = 0;
+    while app_id < crate::user::APP_NUM {
+        let user_space = MemorySet::new_user(app_id);
+        user_space.self_check_user(app_id);
+        app_id += 1;
+    }
 }
