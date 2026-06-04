@@ -238,9 +238,8 @@ Rust user shell
 | 用户程序 | 已能进入 shell | 运行基础程序并记录结果 |
 | 测试 | 尚未接官方测试 | 建立 syscall 和测试矩阵 |
 
-## 下一步任务
+## 当前状态说明
 
-1. 在 shell 中运行 `hello_world`、`yield`、`forktest_simple`。
-2. 把运行结果记录到 `docs/progress.md`。
-3. 继续阅读 `trap/mod.rs`、`trap/context.rs`、`syscall/mod.rs`。
-4. 建立 `docs/phoenix-gap.md`，对标 Phoenix 的模块完整度。
+本文是 2026-05-18 阅读 rCore baseline 时形成的启动流程笔记，主要用于理解参考工程，不再作为当前开发计划。
+
+当前自建内核已经完成最小启动、trap、syscall、多任务、分页、用户地址空间切换和独立用户程序加载。后续计划以 `docs/progress.md` 和 `docs/local-kernel-roadmap.md` 为准。
