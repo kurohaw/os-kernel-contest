@@ -27,11 +27,11 @@ pub fn app_data(app_id: usize) -> &'static [u8] {
     }
 }
 pub fn app_entry(app_id: usize) -> usize {
-    match app_id {
-        0 => user_entry_0 as usize,
-        1 => user_entry_1 as usize,
-        _ => panic!("invalid app id {}", app_id),
+    if app_id >= APP_NUM {
+        panic!("invalid app id {}", app_id);
     }
+
+    USER_APP_BASE
 }
 
 #[no_mangle]

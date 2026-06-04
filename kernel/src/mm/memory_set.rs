@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-use super::{PageTable, PageTableEntry, PTEFlags, PhysAddr, VirtAddr};
+use super::{alloc_frame, PageTable, PageTableEntry, PTEFlags, PhysAddr, PhysPageNum, VirtAddr, PAGE_SIZE};
 use super::frame_allocator::MEMORY_END;
 
 pub struct MemorySet {
@@ -102,8 +102,6 @@ impl MemorySet {
             page_table: PageTable::new(),
         };
 
-        let _ = app_id;
-
         unsafe {
             memory_set.map_identical_range(
                 stext as *const () as usize,
@@ -153,11 +151,54 @@ impl MemorySet {
                 PTEFlags::R | PTEFlags::W,
                 ".memory",
             );
+
+            memory_set.load_user_app(app_id);
         }
 
         memory_set
     }
- 
+    
+    fn load_user_app(&self, app_id:usize) {
+        let data = crate::loader::app_data(app_id);
+        let start_va = crate::loader::USER_APP_BASE;
+
+        let mut offset = 0;
+        while offset < data.len() {
+            let frame = alloc_frame().expect("failed to allocate user app frame");
+            let page_va = start_va + offset;
+            let copy_len = {
+                let remaining = data.len() - offset;
+                if remaining < PAGE_SIZE {
+                    remaining
+                } else {
+                    PAGE_SIZE
+                }
+            };
+
+            self.page_table.map(
+                VirtAddr(page_va).floor(),
+                PhysPageNum(frame.ppn()),
+                PTEFlags::R | PTEFlags::W | PTEFlags::X | PTEFlags::U,
+            );
+
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    data.as_ptr().add(offset),
+                    frame.start_pa() as *mut u8,
+                    copy_len,
+                );
+            }
+
+            offset += PAGE_SIZE;
+        }
+
+        crate::println!(
+            "user app loaded: app_id={}, va={:#x}, bytes={}",
+            app_id,
+            start_va,
+            data.len(),
+        );
+    }
     fn map_identical_range(&self, start: usize, end: usize, flags: PTEFlags, name: &str) {
         if start == end {
             return;
@@ -213,7 +254,6 @@ impl MemorySet {
         extern "C" {
             fn stext();
             fn srodata();
-            fn suser_text();
             fn sdata();
             fn edata();
             fn suser_stack();
@@ -222,7 +262,6 @@ impl MemorySet {
         unsafe {
             self.check_kernel_mapping(stext as *const () as usize, true, false, true);
             self.check_kernel_mapping(srodata as *const () as usize, true, false, false);
-            self.check_kernel_mapping(suser_text as *const () as usize, true, false, true);
             self.check_kernel_mapping(sdata as *const () as usize, true, true, false);
             self.check_kernel_mapping(edata as *const () as usize, true, true, false);
             self.check_kernel_mapping(suser_stack as *const () as usize,true, true, false);
@@ -235,7 +274,6 @@ impl MemorySet {
     pub fn self_check_user(&self, app_id: usize) {
     extern "C" {
         fn stext();
-        fn suser_text();
     }
 
     let (user_stack_bottom, _) = crate::user::user_stack_range(app_id);
@@ -249,13 +287,13 @@ impl MemorySet {
         assert!(kernel_text.executable());
         assert!(!kernel_text.user());
 
-        let user_text = self
-            .translate(VirtAddr(suser_text as *const () as usize))
-            .expect("user address space should map user text");
-
-        assert!(user_text.readable());
-        assert!(user_text.executable());
-        assert!(user_text.user());
+        let app_entry = self
+            .translate(VirtAddr(crate::loader::USER_APP_BASE))
+            .expect("user address space should map user app entry");
+        
+        assert!(app_entry.readable());
+        assert!(app_entry.executable());
+        assert!(app_entry.user());
 
         let user_stack = self
             .translate(VirtAddr(user_stack_bottom))
