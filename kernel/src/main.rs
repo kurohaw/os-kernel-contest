@@ -22,6 +22,8 @@ pub fn rust_main() -> ! {
     println!("Hello kernel");
     println!("kernel started");
 
+    loader::init();
+
     mm::init();
 
     trap::init();

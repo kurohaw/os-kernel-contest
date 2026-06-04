@@ -4,6 +4,7 @@ KERNEL_ELF := target/$(TARGET)/$(MODE)/kernel
 KERNEL_BIN := $(KERNEL_ELF).bin
 BOOTLOADER := ../rCore-Tutorial-v3-main/bootloader/rustsbi-qemu.bin
 KERNEL_ENTRY_PA := 0x80200000
+USER_DIR := ../user
 
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
@@ -15,6 +16,7 @@ env:
 	cargo install cargo-binutils
 
 build:
+	$(MAKE) -C $(USER_DIR) build
 	cargo build --release
 	$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
 
