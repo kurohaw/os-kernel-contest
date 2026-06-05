@@ -5,6 +5,7 @@ use core::panic::PanicInfo;
 const SYS_TEST: usize = 0;
 const SYS_EXIT: usize = 1;
 const SYS_YIELD: usize = 2;
+const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_GETPID: usize = 172;
 
@@ -30,6 +31,10 @@ pub fn sys_test(value: usize) -> isize {
 
 pub fn sys_yield() -> isize {
     syscall(SYS_YIELD, [0, 0, 0])
+}
+
+pub fn read(fd: usize, buf: &mut [u8]) -> isize {
+    syscall(SYS_READ, [fd, buf.as_mut_ptr() as usize, buf.len()])
 }
 
 pub fn write(fd: usize, s: &str) -> isize {

@@ -91,12 +91,13 @@ fn run_task(task_id: usize) -> ! {
     }
 }
 
-pub fn suspend_current_and_run_next() {
+pub fn suspend_current_and_run_next(trap_cx_addr: usize) {
     let current = unsafe { CURRENT };
 
     crate::println!("task {} yield", current);
 
     unsafe {
+        TASKS[current].trap_cx_addr = trap_cx_addr;
         TASKS[current].status = TaskStatus::Ready;
     }
 

@@ -113,7 +113,7 @@ fn handle_environment_call(cx: &mut TrapContext) {
     cx.x[10] = ret as usize;
 
     if id == crate::syscall::SYS_YIELD {
-        crate::task::suspend_current_and_run_next();
+    crate::task::suspend_current_and_run_next(cx as *mut TrapContext as usize);
     }
 }
 fn decode_trap(scause: usize) -> Trap {

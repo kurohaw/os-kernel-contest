@@ -12,6 +12,13 @@ pub extern "C" fn _start() -> ! {
         user::write(1, "app0: getpid wrong\n");
     }
 
+    let mut buf = [0u8; 8];
+    if user::read(0, &mut buf) == 0 {
+        user::write(1, "app0: read eof ok\n");
+    } else {
+        user::write(1, "app0: read wrong\n");
+    }
+
     user::sys_yield();
     user::sys_exit(0);
 }
