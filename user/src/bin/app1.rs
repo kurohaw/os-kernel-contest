@@ -59,6 +59,25 @@ pub extern "C" fn _start() -> ! {
         user::write(1, "app1: fstat invalid wrong\n");
     }
 
+    let dev_null = user::open(b"/dev/null\0", 0);
+    if dev_null == 3 {
+        user::write(1, "app1: open dev/null ok\n");
+    } else {
+        user::write(1, "app1: open dev/null wrong\n");
+    }
+
+    if dev_null >= 0 && user::close(dev_null as usize) == 0 {
+        user::write(1, "app1: close dev/null ok\n");
+    } else {
+        user::write(1, "app1: close dev/null wrong\n");
+    }
+
+    if user::open(b"/missing\0", 0) == -1 {
+        user::write(1, "app1: open missing ok\n");
+    } else {
+        user::write(1, "app1: open missing wrong\n");
+    }
+
     user::sys_yield();
     user::sys_exit(1);
 }

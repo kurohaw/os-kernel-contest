@@ -107,7 +107,7 @@ fn handle_environment_call(cx: &mut TrapContext) {
     cx.sepc += 4;
 
     let id = cx.x[17];
-    let args = [cx.x[10], cx.x[11], cx.x[12]];
+    let args = [cx.x[10], cx.x[11], cx.x[12], cx.x[13]];
 
     let ret = crate::syscall::syscall(id, args);
     cx.x[10] = ret as usize;
