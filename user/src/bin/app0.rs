@@ -96,6 +96,38 @@ pub extern "C" fn _start() -> ! {
         user::write(1, "app0: open missing wrong\n");
     }
 
+    let hello_fd = user::open(b"/hello.txt\0", 0);
+    if hello_fd >= 3 {
+        user::write(1, "app0: open hello ok\n");
+    } else {
+        user::write(1, "app0: open hello wrong\n");
+    }
+
+    let mut file_buf = [0u8; 32];
+    let read_len = if hello_fd >= 0 {
+        user::read(hello_fd as usize, &mut file_buf)
+    } else {
+        -1
+    };
+
+    if read_len == 18 && file_buf[0] == b'h' && file_buf[17] == b'\n' {
+        user::write(1, "app0: read hello ok\n");
+    } else {
+        user::write(1, "app0: read hello wrong\n");
+    }
+
+    if hello_fd >= 0 && user::read(hello_fd as usize, &mut file_buf) == 0 {
+        user::write(1, "app0: read hello eof ok\n");
+    } else {
+        user::write(1, "app0: read hello eof wrong\n");
+    }
+
+    if hello_fd >= 0 && user::close(hello_fd as usize) == 0 {
+        user::write(1, "app0: close hello ok\n");
+    } else {
+        user::write(1, "app0: close hello wrong\n");
+    }
+
     user::sys_yield();
     user::sys_exit(0);
 }
