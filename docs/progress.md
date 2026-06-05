@@ -9,8 +9,8 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest`；GitLab: `gitlab.eduxiji.net/T2026102569910192/oskernel2025-sudo_win_the_cscc` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 建立基础文件描述符表 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall 和最小 `openat` syscall |
+| 当前目标 | 准备实现基础文件读取 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall 和基础文件描述符表 |
 
 ## 2026-05-18 rCore baseline
 
@@ -519,6 +519,25 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 
 最小 `openat` 已经完成，当前可以打开 `/dev/null` 并返回稳定 fd；下一步需要从固定 fd 过渡到基础文件描述符表，为真实文件读取做准备。
 
+## 2026-06-05 基础文件描述符表
+
+### 今日目标
+
+将 `/dev/null` 从固定 fd 过渡到基础文件描述符表，支持动态分配和释放 fd。
+
+### 修改内容
+
+- 在 `fs` 模块中新增动态 fd 表。
+- 新增 `FileKind::DevNull`，用 fd 表记录打开的文件对象类型。
+- `openat("/dev/null")` 改为从 fd 表中分配空闲 fd。
+- `close(fd)` 对动态 fd 执行释放，重复关闭已释放 fd 返回失败。
+- `read/write/fstat` 通过 fd 表识别动态 fd。
+- 修改 `app0` 和 `app1`，验证连续分配、关闭和重复关闭动态 fd。
+
+### 结论
+
+基础文件描述符表已经完成，fd 不再只依赖固定编号；下一步可以开始加入一个只读内嵌文件，验证 `openat + read + close` 的真实文件读取路径。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -540,9 +559,10 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 15 | 最小 `close` syscall | `close(0/1/2)` 返回成功，非法 fd 返回失败 | 已完成 |
 | 16 | 最小 `fstat` syscall | `fstat(0/1/2, stat)` 返回成功并清零 stat buffer | 已完成 |
 | 17 | 最小 `openat` syscall | 能处理基础路径并返回稳定 fd 或错误 | 已完成 |
-| 18 | 基础文件描述符表 | fd 不再只依赖固定编号，支持后续文件对象管理 | 下一步 |
-| 19 | 基础 syscall 扩展 | 继续补齐真实文件读取 | 未开始 |
-| 20 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
+| 18 | 基础文件描述符表 | fd 不再只依赖固定编号，支持后续文件对象管理 | 已完成 |
+| 19 | 基础文件读取 | 打开内嵌只读文件后可以通过 `read` 读取内容 | 下一步 |
+| 20 | 基础 syscall 扩展 | 继续补齐更多文件相关 syscall | 未开始 |
+| 21 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
 
 ## 提交计划
 
@@ -575,4 +595,5 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 25 | 最小 `close` syscall | 已完成 |
 | 26 | 最小 `fstat` syscall | 已验证，待提交 |
 | 27 | 最小 `openat` syscall | 已验证，待提交 |
-| 28 | 基础文件描述符表 | 下一步 |
+| 28 | 基础文件描述符表 | 已验证，待提交 |
+| 29 | 基础文件读取 | 下一步 |
