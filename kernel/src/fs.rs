@@ -22,3 +22,10 @@ pub fn write(fd: usize, buf: usize, len: usize) -> isize {
 
     len as isize
 }
+
+pub fn close(fd: usize) -> isize {
+    match fd {
+        STDIN | STDOUT | STDERR => 0,
+        _ => -1,
+    }
+}

@@ -34,6 +34,18 @@ pub extern "C" fn _start() -> ! {
         user::write(1, "app1: brk set wrong\n");
     }
 
+    if user::close(0) == 0 {
+        user::write(1, "app1: close stdin ok\n");
+    } else {
+        user::write(1, "app1: close stdin wrong\n");
+    }
+
+    if user::close(99) == -1 {
+        user::write(1, "app1: close invalid ok\n");
+    } else {
+        user::write(1, "app1: close invalid wrong\n");
+    }
+
     user::sys_yield();
     user::sys_exit(1);
 }
