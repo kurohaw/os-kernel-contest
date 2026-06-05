@@ -9,8 +9,8 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest`；GitLab: `gitlab.eduxiji.net/T2026102569910192/oskernel2025-sudo_win_the_cscc` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 实现最小 `brk` syscall |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall 和最小 `read` syscall |
+| 当前目标 | 建立基础文件描述符层 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall 和最小 `brk` syscall |
 
 ## 2026-05-18 rCore baseline
 
@@ -424,6 +424,25 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 
 用户程序已经可以调用最小 `read`，并且任务在 yield 后可以从正确用户态位置恢复；下一步实现最小 `brk`，为用户态堆边界和后续分配器适配做准备。
 
+## 2026-06-05 brk syscall
+
+### 今日目标
+
+实现最小 `brk(addr)`，让用户程序可以查询和设置当前任务的堆边界。
+
+### 修改内容
+
+- 在 `loader` 中新增 `USER_HEAP_BASE` 和 `USER_HEAP_SIZE`。
+- 在 `TaskControlBlock` 中新增 `heap_bottom` 和 `heap_end`。
+- 新增 `set_current_brk()`，支持 `brk(0)` 查询和有限范围内设置堆边界。
+- 在内核 syscall 分发表中新增 `SYS_BRK = 214`。
+- 在用户库中新增 `brk(addr)` 封装。
+- 修改 `app0` 和 `app1`，验证 `brk` 查询和设置结果。
+
+### 结论
+
+最小 `brk` 状态管理已经完成；当前尚未真实映射新增堆页，下一步先建立基础文件描述符层，把 `read/write` 从 syscall 模块中拆出，为 `close/fstat/open` 做准备。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -440,9 +459,10 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 10 | `write` syscall | 用户程序能通过 `write` 输出字符串 | 已完成 |
 | 11 | `getpid` syscall | 用户程序能取得当前任务编号 | 已完成 |
 | 12 | 最小 `read` syscall | 用户程序能调用 `read(0, buf, len)` 并得到稳定返回值 | 已完成 |
-| 13 | 最小 `brk` syscall | 用户程序能查询当前堆边界并得到稳定返回值 | 下一步 |
-| 14 | 基础 syscall 扩展 | 继续补齐文件描述符等比赛常用 syscall | 未开始 |
-| 15 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
+| 13 | 最小 `brk` syscall | 用户程序能查询当前堆边界并得到稳定返回值 | 已完成 |
+| 14 | 基础文件描述符层 | `read/write` 通过 fd 模块处理 stdin/stdout/stderr | 下一步 |
+| 15 | 基础 syscall 扩展 | 继续补齐 `close`、`fstat`、`open` 等比赛常用 syscall | 未开始 |
+| 16 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
 
 ## 提交计划
 
@@ -470,4 +490,5 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 20 | `write` syscall | 已完成 |
 | 21 | `getpid` syscall | 已验证，待提交 |
 | 22 | 最小 `read` syscall 与 yield 恢复修复 | 已验证，待提交 |
-| 23 | 最小 `brk` syscall | 下一步 |
+| 23 | 最小 `brk` syscall | 已验证，待提交 |
+| 24 | 基础文件描述符层 | 下一步 |

@@ -4,6 +4,7 @@ pub const SYS_YIELD: usize = 2;
 pub const SYS_READ: usize = 63;
 pub const SYS_WRITE: usize = 64;
 pub const SYS_GETPID: usize = 172;
+pub const SYS_BRK: usize = 214;
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -13,6 +14,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYS_READ => sys_read(args[0], args[1], args[2]),
         SYS_WRITE => sys_write(args[0], args[1], args[2]),
         SYS_GETPID => sys_getpid(),
+        SYS_BRK => sys_brk(args[0]),
         _ => {
             crate::println!("unsupported syscall: id={}", id);
             -1
@@ -57,4 +59,8 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> isize {
 
 fn sys_getpid() -> isize {
     crate::task::current_task_id() as isize
+}
+
+fn sys_brk(addr: usize) -> isize {
+    crate::task::set_current_brk(addr) as isize
 }

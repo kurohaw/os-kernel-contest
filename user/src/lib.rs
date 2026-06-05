@@ -8,6 +8,7 @@ const SYS_YIELD: usize = 2;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_GETPID: usize = 172;
+const SYS_BRK: usize = 214;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let ret: isize;
@@ -39,6 +40,10 @@ pub fn read(fd: usize, buf: &mut [u8]) -> isize {
 
 pub fn write(fd: usize, s: &str) -> isize {
     syscall(SYS_WRITE, [fd, s.as_ptr() as usize, s.len()])
+}
+
+pub fn brk(addr: usize) -> isize {
+    syscall(SYS_BRK, [addr, 0, 0])
 }
 
 pub fn getpid() -> isize {

@@ -22,6 +22,8 @@ pub struct TaskControlBlock {
     pub task_cx: TaskContext,
     pub memory_set: Option<MemorySet>,
     pub satp_token: usize,
+    pub heap_bottom: usize,
+    pub heap_end: usize,
 }
 
 impl TaskControlBlock {
@@ -32,6 +34,8 @@ impl TaskControlBlock {
         task_cx: TaskContext::zero_init(),
         memory_set: None,
         satp_token: 0,
+        heap_bottom: 0,
+        heap_end: 0,
     }
 }
 }
@@ -55,6 +59,8 @@ pub fn init() {
                 task_cx: TaskContext::zero_init(),
                 memory_set: Some(memory_set),
                 satp_token,
+                heap_bottom: crate::loader::USER_HEAP_BASE,
+                heap_end: crate::loader::USER_HEAP_BASE,
             };
 
             crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
@@ -70,6 +76,30 @@ pub fn run_first_task() -> ! {
 
 pub fn current_task_id() -> usize {
     unsafe { CURRENT }
+}
+
+pub fn current_brk() -> usize {
+    unsafe { TASKS[CURRENT].heap_end }
+}
+
+pub fn set_current_brk(new_brk: usize) -> usize {
+    unsafe {
+        let current = CURRENT;
+        let old_brk = TASKS[current].heap_end;
+        let heap_bottom = TASKS[current].heap_bottom;
+        let heap_top = heap_bottom + crate::loader::USER_HEAP_SIZE;
+
+        if new_brk == 0 {
+            return old_brk;
+        }
+
+        if new_brk < heap_bottom || new_brk > heap_top {
+            return old_brk;
+        }
+
+        TASKS[current].heap_end = new_brk;
+        TASKS[current].heap_end
+    }
 }
 
 fn run_task(task_id: usize) -> ! {

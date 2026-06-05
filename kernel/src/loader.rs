@@ -1,5 +1,7 @@
 pub const APP_NUM: usize = 2;
 pub const USER_APP_BASE: usize = 0x10000;
+pub const USER_HEAP_BASE: usize = 0x20000;
+pub const USER_HEAP_SIZE: usize = 0x10000;
 
 pub fn init() {
     let mut app_id = 0;
