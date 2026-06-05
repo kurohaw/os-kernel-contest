@@ -8,8 +8,11 @@ const SYS_YIELD: usize = 2;
 const SYS_CLOSE: usize = 57;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
+const SYS_FSTAT: usize = 80;
 const SYS_GETPID: usize = 172;
 const SYS_BRK: usize = 214;
+
+pub const STAT_SIZE: usize = 128;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let ret: isize;
@@ -37,6 +40,10 @@ pub fn sys_yield() -> isize {
 
 pub fn close(fd: usize) -> isize {
     syscall(SYS_CLOSE, [fd, 0, 0])
+}
+
+pub fn fstat(fd: usize, buf: &mut [u8; STAT_SIZE]) -> isize {
+    syscall(SYS_FSTAT, [fd, buf.as_mut_ptr() as usize, 0])
 }
 
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {

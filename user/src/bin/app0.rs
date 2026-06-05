@@ -40,10 +40,24 @@ pub extern "C" fn _start() -> ! {
     }
 
     if user::close(99) == -1 {
-        user::write(1, "app0: close invaild ok\n");
+        user::write(1, "app0: close invalid ok\n");
     } else {
-        user::write(1, "app0: close invaild wrong\n");
+        user::write(1, "app0: close invalid wrong\n");
     }
+
+    let mut stat = [0u8; user::STAT_SIZE];
+    if user::fstat(1, &mut stat) == 0 {
+        user::write(1, "app0: fstat stdout ok\n");
+    } else {
+        user::write(1, "app0: fstat stdout wrong\n");
+    }
+
+    if user::fstat(99, &mut stat) == -1 {
+        user::write(1, "app0: fstat invalid ok\n");
+    } else {
+        user::write(1, "app0: fstat invalid wrong\n");
+    }
+
     user::sys_yield();
     user::sys_exit(0);
 }
