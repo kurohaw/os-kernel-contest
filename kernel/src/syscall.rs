@@ -35,26 +35,12 @@ fn sys_yield() -> isize {
     0
 }
 
-fn sys_read(fd: usize, _buf: usize, _len: usize) -> isize {
-    if fd != 0 {
-        return -1;
-    }
-
-    0
+fn sys_read(fd: usize, buf: usize, len: usize) -> isize {
+    crate::fs::read(fd, buf, len)
 }
 
 fn sys_write(fd: usize, buf: usize, len: usize) -> isize {
-    if fd != 1 && fd != 2 {
-        return -1;
-    }
-
-    let bytes = unsafe { core::slice::from_raw_parts(buf as *const u8, len) };
-
-    for &byte in bytes {
-        crate::sbi::console_putchar(byte as usize);
-    }
-
-    len as isize
+    crate::fs::write(fd, buf, len)
 } 
 
 fn sys_getpid() -> isize {

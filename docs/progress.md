@@ -9,8 +9,8 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest`；GitLab: `gitlab.eduxiji.net/T2026102569910192/oskernel2025-sudo_win_the_cscc` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 建立基础文件描述符层 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall 和最小 `brk` syscall |
+| 当前目标 | 实现最小 `close` syscall |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall 和基础文件描述符层 |
 
 ## 2026-05-18 rCore baseline
 
@@ -443,6 +443,25 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 
 最小 `brk` 状态管理已经完成；当前尚未真实映射新增堆页，下一步先建立基础文件描述符层，把 `read/write` 从 syscall 模块中拆出，为 `close/fstat/open` 做准备。
 
+## 2026-06-05 基础文件描述符层
+
+### 今日目标
+
+建立最小 `fs` 模块，把 `read/write` 的 stdin/stdout/stderr 处理从 syscall 分发层拆出。
+
+### 修改内容
+
+- 新增 `kernel/src/fs.rs`。
+- 定义 `STDIN`、`STDOUT`、`STDERR`。
+- 将 `read(fd, buf, len)` 移入 `fs` 模块，当前 `STDIN` 返回 `0`。
+- 将 `write(fd, buf, len)` 移入 `fs` 模块，当前 `STDOUT/STDERR` 输出到 SBI console。
+- 在 `main.rs` 中接入 `mod fs;`。
+- `syscall.rs` 中的 `sys_read()` 和 `sys_write()` 改为调用 `crate::fs`。
+
+### 结论
+
+基础文件描述符层已经建立；下一步实现最小 `close` syscall，为后续 `fstat/open` 和文件描述符表扩展做准备。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -460,9 +479,10 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 11 | `getpid` syscall | 用户程序能取得当前任务编号 | 已完成 |
 | 12 | 最小 `read` syscall | 用户程序能调用 `read(0, buf, len)` 并得到稳定返回值 | 已完成 |
 | 13 | 最小 `brk` syscall | 用户程序能查询当前堆边界并得到稳定返回值 | 已完成 |
-| 14 | 基础文件描述符层 | `read/write` 通过 fd 模块处理 stdin/stdout/stderr | 下一步 |
-| 15 | 基础 syscall 扩展 | 继续补齐 `close`、`fstat`、`open` 等比赛常用 syscall | 未开始 |
-| 16 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
+| 14 | 基础文件描述符层 | `read/write` 通过 fd 模块处理 stdin/stdout/stderr | 已完成 |
+| 15 | 最小 `close` syscall | `close(0/1/2)` 返回成功，非法 fd 返回失败 | 下一步 |
+| 16 | 基础 syscall 扩展 | 继续补齐 `fstat`、`open` 等比赛常用 syscall | 未开始 |
+| 17 | 测试矩阵 | 建立官方测例通过情况记录 | 未开始 |
 
 ## 提交计划
 
@@ -491,4 +511,5 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 21 | `getpid` syscall | 已验证，待提交 |
 | 22 | 最小 `read` syscall 与 yield 恢复修复 | 已验证，待提交 |
 | 23 | 最小 `brk` syscall | 已验证，待提交 |
-| 24 | 基础文件描述符层 | 下一步 |
+| 24 | 基础文件描述符层 | 已验证，待提交 |
+| 25 | 最小 `close` syscall | 下一步 |

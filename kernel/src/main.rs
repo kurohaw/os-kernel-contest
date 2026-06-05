@@ -2,6 +2,7 @@
 #![no_main]
 
 mod console;
+mod fs;
 mod lang_items;
 mod loader;
 mod mm;
