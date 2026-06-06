@@ -17,7 +17,6 @@ const AT_GID: usize = 13;
 const AT_EGID: usize = 14;
 const AT_SECURE: usize = 23;
 const AT_RANDOM: usize = 25;
-const EXTERNAL_ARGV0: &[u8] = b"external\0";
 
 #[repr(align(16))]
 struct UserStack {
@@ -47,7 +46,7 @@ pub fn init_user_context(app_id: usize) -> usize {
     *cx = TrapContext::app_init_context(crate::loader::app_entry(app_id), user_sp);
 
     if app_id == 0 && crate::loader::has_external_app() {
-        cx.x[10] = 1;
+        cx.x[10] = crate::loader::external_arg_count();
         cx.x[11] = user_sp + core::mem::size_of::<usize>();
     }
 
@@ -70,14 +69,24 @@ fn user_stack_top(app_id: usize) -> usize {
 
 fn init_external_user_stack(stack_top: usize) -> usize {
     let mut sp = stack_top;
+    let argc = crate::loader::external_arg_count();
+    let mut argv_ptrs = [0usize; crate::loader::EXTERNAL_ARG_MAX];
 
     sp = push_bytes(sp, &[0u8; 16]);
     let random_ptr = sp;
 
-    sp = push_bytes(sp, EXTERNAL_ARGV0);
-    let argv0_ptr = sp;
+    let mut index = argc;
+    while index > 0 {
+        index -= 1;
+        sp = push_cstr(sp, crate::loader::external_arg(index));
+        argv_ptrs[index] = sp;
+    }
 
+    let pointer_bytes = (argc + 3) * core::mem::size_of::<usize>();
     sp &= !0xf;
+    if pointer_bytes & 0xf != 0 {
+        sp -= core::mem::size_of::<usize>();
+    }
 
     sp = push_aux(sp, AT_NULL, 0);
     sp = push_aux(sp, AT_RANDOM, random_ptr);
@@ -96,8 +105,14 @@ fn init_external_user_stack(stack_top: usize) -> usize {
 
     sp = push_usize(sp, 0);
     sp = push_usize(sp, 0);
-    sp = push_usize(sp, argv0_ptr);
-    sp = push_usize(sp, 1);
+
+    index = argc;
+    while index > 0 {
+        index -= 1;
+        sp = push_usize(sp, argv_ptrs[index]);
+    }
+
+    sp = push_usize(sp, argc);
 
     sp
 }
@@ -121,4 +136,12 @@ fn push_bytes(sp: usize, bytes: &[u8]) -> usize {
         core::ptr::copy_nonoverlapping(bytes.as_ptr(), next_sp as *mut u8, bytes.len());
     }
     next_sp
+}
+
+fn push_cstr(sp: usize, bytes: &[u8]) -> usize {
+    let sp = sp - 1;
+    unsafe {
+        (sp as *mut u8).write(0);
+    }
+    push_bytes(sp, bytes)
 }

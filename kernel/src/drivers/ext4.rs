@@ -16,11 +16,14 @@ const GROUP_DESC_PARSE_SIZE: usize = 64;
 const EXT4_NAME_MAX: usize = 255;
 const TEST_SCRIPT_SUFFIX: &[u8] = b"_testcode.sh";
 const SCRIPT_BUFFER_SIZE: usize = 16 * 1024;
+const SCRIPT_PATH_MAX: usize = 128;
+const MAX_SCRIPT_DEPTH: usize = 2;
 const GROUP_MARKER_PREFIX: &[u8] = b"#### OS COMP TEST GROUP ";
 const GROUP_START_PREFIX: &[u8] = b"#### OS COMP TEST GROUP START ";
 const MARKER_END: &[u8] = b"####";
 
 static mut SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
+static mut NESTED_SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
 static mut MOUNTED_FS: Option<Ext4Fs> = None;
 
 #[derive(Clone, Copy)]
@@ -402,7 +405,7 @@ fn handle_test_script(fs: &Ext4Fs, inode_no: u32, name: &[u8], found: &mut usize
         return;
     }
 
-    if try_load_first_elf_from_script(fs, script) {
+    if try_load_first_command_from_script(fs, script, &[], 0) {
         emit_group_start_from_script_or_fallback(name, script);
         set_external_group_from_script_name(name);
         return;
@@ -413,36 +416,120 @@ fn handle_test_script(fs: &Ext4Fs, inode_no: u32, name: &[u8], found: &mut usize
     }
 }
 
-fn try_load_first_elf_from_script(fs: &Ext4Fs, script: &[u8]) -> bool {
+fn try_load_first_command_from_script(
+    fs: &Ext4Fs,
+    script: &[u8],
+    initial_cwd: &[u8],
+    depth: usize,
+) -> bool {
     if crate::loader::has_external_app() {
         return false;
     }
 
-    let mut index = 0usize;
-    while index + 2 <= script.len() {
-        if script[index] == b'.' && script[index + 1] == b'/' {
-            let path_start = index + 2;
-            let path_end = find_token_end(script, path_start);
-            let path = &script[path_start..path_end];
+    let mut cwd = [0u8; SCRIPT_PATH_MAX];
+    let mut cwd_len = copy_path(initial_cwd, &mut cwd);
+    let mut line_start = 0usize;
 
-            if is_root_candidate_path(path) && try_load_root_elf(fs, path) {
-                return true;
-            }
+    while line_start < script.len() {
+        let line_end = find_line_end(script, line_start);
+        let line = &script[line_start..line_end];
 
-            index = path_end;
-        } else {
-            index += 1;
+        if try_load_command_from_line(fs, line, &mut cwd, &mut cwd_len, depth) {
+            return true;
         }
+
+        line_start = line_end + 1;
     }
 
     false
 }
 
-fn try_load_root_elf(fs: &Ext4Fs, name: &[u8]) -> bool {
-    let info = match lookup_root_file(fs, name) {
+fn try_load_command_from_line(
+    fs: &Ext4Fs,
+    line: &[u8],
+    cwd: &mut [u8; SCRIPT_PATH_MAX],
+    cwd_len: &mut usize,
+    depth: usize,
+) -> bool {
+    let (cmd_start, cmd_end, next_index) = match next_token(line, 0) {
+        Some(token) => token,
+        None => return false,
+    };
+
+    let command = &line[cmd_start..cmd_end];
+    if command.is_empty() || command[0] == b'#' {
+        return false;
+    }
+
+    if command == b"cd" {
+        if let Some((arg_start, arg_end, _)) = next_token(line, next_index) {
+            let mut next_cwd = [0u8; SCRIPT_PATH_MAX];
+            let next_len = resolve_path(&cwd[..*cwd_len], &line[arg_start..arg_end], &mut next_cwd);
+            cwd.fill(0);
+            cwd[..next_len].copy_from_slice(&next_cwd[..next_len]);
+            *cwd_len = next_len;
+        }
+        return false;
+    }
+
+    if is_busybox_echo(command, line, next_index) {
+        return false;
+    }
+
+    let mut path = [0u8; SCRIPT_PATH_MAX];
+    let path_len = resolve_path(&cwd[..*cwd_len], command, &mut path);
+    if path_len == 0 {
+        return false;
+    }
+
+    let path_slice = &path[..path_len];
+    if path_slice.ends_with(b".sh") {
+        return try_load_nested_script(fs, path_slice, &cwd[..*cwd_len], depth + 1);
+    }
+
+    try_load_elf_path(fs, path_slice, line, next_index)
+}
+
+fn try_load_nested_script(fs: &Ext4Fs, path: &[u8], cwd: &[u8], depth: usize) -> bool {
+    if depth > MAX_SCRIPT_DEPTH {
+        return false;
+    }
+
+    let info = match lookup_path(fs, path) {
         Ok(Some(info)) => info,
         _ => return false,
     };
+
+    if info.size == 0 || info.size as usize > SCRIPT_BUFFER_SIZE {
+        return false;
+    }
+
+    let read_len = info.size as usize;
+    let script = unsafe {
+        core::slice::from_raw_parts_mut(addr_of_mut!(NESTED_SCRIPT_BUFFER) as *mut u8, read_len)
+    };
+
+    if read_root_file_into(fs, info, script).is_err() {
+        return false;
+    }
+
+    try_load_first_command_from_script(fs, script, cwd, depth)
+}
+
+fn try_load_elf_path(
+    fs: &Ext4Fs,
+    path: &[u8],
+    line: &[u8],
+    mut next_index: usize,
+) -> bool {
+    let info = match lookup_path(fs, path) {
+        Ok(Some(info)) => info,
+        _ => return false,
+    };
+
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+        return false;
+    }
 
     if info.size == 0 || info.size as usize > crate::loader::EXTERNAL_APP_MAX_SIZE {
         return false;
@@ -459,40 +546,150 @@ fn try_load_root_elf(fs: &Ext4Fs, name: &[u8]) -> bool {
         return false;
     }
 
+    crate::loader::clear_external_args();
+    crate::loader::push_external_arg(path);
+    while let Some((arg_start, arg_end, next)) = next_token(line, next_index) {
+        crate::loader::push_external_arg(&line[arg_start..arg_end]);
+        next_index = next;
+    }
+
     crate::print!("loader: selected external ELF ");
-    print_name(name);
+    print_name(path);
     crate::println!();
     crate::loader::set_external_app(read_len);
 
     true
 }
 
-fn lookup_root_file(fs: &Ext4Fs, target: &[u8]) -> Result<Option<FileInfo>, &'static str> {
-    let inode_table = read_inode_table_block(fs, EXT4_ROOT_INO)?;
-    let mut inode = [0u8; INODE_PARSE_SIZE];
-    read_inode(fs, inode_table, EXT4_ROOT_INO, &mut inode)?;
+fn is_busybox_echo(command: &[u8], line: &[u8], next_index: usize) -> bool {
+    if !path_basename_eq(command, b"busybox") {
+        return false;
+    }
 
-    let root_size = inode_size(&inode);
-    let found_inode_no = if le_u32(&inode, 32) & EXT4_EXTENTS_FL != 0 {
-        find_in_extent_tree(fs, &inode[40..100], root_size, target)?
+    if let Some((arg_start, arg_end, _)) = next_token(line, next_index) {
+        &line[arg_start..arg_end] == b"echo"
     } else {
-        find_in_direct_blocks(fs, &inode[40..88], root_size, target)?
+        false
+    }
+}
+
+fn path_basename_eq(path: &[u8], name: &[u8]) -> bool {
+    let mut start = 0usize;
+    let mut index = 0usize;
+    while index < path.len() {
+        if path[index] == b'/' {
+            start = index + 1;
+        }
+        index += 1;
+    }
+
+    &path[start..] == name
+}
+
+fn find_line_end(buffer: &[u8], start: usize) -> usize {
+    let mut index = start;
+    while index < buffer.len() && buffer[index] != b'\n' && buffer[index] != 0 {
+        index += 1;
+    }
+    index
+}
+
+fn next_token(buffer: &[u8], mut index: usize) -> Option<(usize, usize, usize)> {
+    while index < buffer.len() {
+        let byte = buffer[index];
+        if byte == b' ' || byte == b'\t' || byte == b'\r' || byte == b';' {
+            index += 1;
+        } else {
+            break;
+        }
+    }
+
+    if index >= buffer.len() || buffer[index] == b'#' || buffer[index] == 0 {
+        return None;
+    }
+
+    let quote = if buffer[index] == b'"' || buffer[index] == b'\'' {
+        let quote = buffer[index];
+        index += 1;
+        quote
+    } else {
+        0
     };
 
-    let inode_no = match found_inode_no {
-        Some(inode_no) => inode_no,
-        None => return Ok(None),
-    };
+    let start = index;
+    while index < buffer.len() {
+        let byte = buffer[index];
+        if quote != 0 {
+            if byte == quote {
+                break;
+            }
+        } else if byte == b' '
+            || byte == b'\t'
+            || byte == b'\r'
+            || byte == b'\n'
+            || byte == b';'
+            || byte == b'|'
+            || byte == 0
+        {
+            break;
+        }
 
-    let file_inode_table = read_inode_table_block(fs, inode_no)?;
-    let mut file_inode = [0u8; INODE_PARSE_SIZE];
-    read_inode(fs, file_inode_table, inode_no, &mut file_inode)?;
+        index += 1;
+    }
 
-    Ok(Some(FileInfo {
-        inode_no,
-        size: inode_size(&file_inode),
-        mode: le_u16(&file_inode, 0),
-    }))
+    let end = index;
+    if quote != 0 && index < buffer.len() {
+        index += 1;
+    }
+
+    Some((start, end, index))
+}
+
+fn copy_path(input: &[u8], output: &mut [u8; SCRIPT_PATH_MAX]) -> usize {
+    let copy_len = core::cmp::min(input.len(), SCRIPT_PATH_MAX);
+    output[..copy_len].copy_from_slice(&input[..copy_len]);
+    copy_len
+}
+
+fn resolve_path(cwd: &[u8], path: &[u8], output: &mut [u8; SCRIPT_PATH_MAX]) -> usize {
+    let mut source = path;
+    let mut len = 0usize;
+
+    if source.starts_with(b"/") {
+        source = trim_leading_slashes(source);
+    } else {
+        while source.starts_with(b"./") {
+            source = &source[2..];
+        }
+
+        if !cwd.is_empty() {
+            len = append_path_part(output, len, cwd);
+        }
+    }
+
+    append_path_part(output, len, source)
+}
+
+fn append_path_part(output: &mut [u8; SCRIPT_PATH_MAX], mut len: usize, part: &[u8]) -> usize {
+    if part.is_empty() {
+        return len;
+    }
+
+    if len > 0 && len < SCRIPT_PATH_MAX {
+        output[len] = b'/';
+        len += 1;
+    }
+
+    let copy_len = core::cmp::min(part.len(), SCRIPT_PATH_MAX - len);
+    output[len..len + copy_len].copy_from_slice(&part[..copy_len]);
+    len + copy_len
+}
+
+fn trim_leading_slashes(mut path: &[u8]) -> &[u8] {
+    while path.starts_with(b"/") {
+        path = &path[1..];
+    }
+    path
 }
 
 fn lookup_path(fs: &Ext4Fs, path: &[u8]) -> Result<Option<FileInfo>, &'static str> {
@@ -1110,36 +1307,6 @@ fn remaining_block_len(file_size: u64, file_offset: u64, block_size: usize) -> u
 
 fn is_test_script(name: &[u8]) -> bool {
     name.ends_with(TEST_SCRIPT_SUFFIX)
-}
-
-fn find_token_end(buffer: &[u8], start: usize) -> usize {
-    let mut index = start;
-    while index < buffer.len() {
-        let byte = buffer[index];
-        if byte == 0
-            || byte == b' '
-            || byte == b'\n'
-            || byte == b'\r'
-            || byte == b'\t'
-            || byte == b'"'
-            || byte == b'\''
-            || byte == b';'
-            || byte == b'|'
-        {
-            break;
-        }
-
-        index += 1;
-    }
-
-    index
-}
-
-fn is_root_candidate_path(path: &[u8]) -> bool {
-    !path.is_empty()
-        && !path.ends_with(TEST_SCRIPT_SUFFIX)
-        && !path.ends_with(b".sh")
-        && !contains_byte(path, b'/')
 }
 
 fn contains_byte(buffer: &[u8], target: u8) -> bool {

@@ -3,15 +3,21 @@ pub const USER_APP_BASE: usize = 0x10000;
 pub const USER_HEAP_BASE: usize = 0x20000;
 pub const USER_HEAP_SIZE: usize = 16 * 1024 * 1024;
 pub const EXTERNAL_APP_MAX_SIZE: usize = 4 * 1024 * 1024;
+pub const EXTERNAL_ARG_MAX: usize = 8;
 const EXTERNAL_GROUP_MAX_LEN: usize = 32;
+const EXTERNAL_ARG_MAX_LEN: usize = 64;
 const ELF_PT_LOAD: u32 = 1;
 const ELF_PH_SIZE: usize = 56;
 const USER_PAGE_SIZE: usize = 4096;
 
 static mut EXTERNAL_APP: [u8; EXTERNAL_APP_MAX_SIZE] = [0; EXTERNAL_APP_MAX_SIZE];
 static mut EXTERNAL_GROUP: [u8; EXTERNAL_GROUP_MAX_LEN] = [0; EXTERNAL_GROUP_MAX_LEN];
+static mut EXTERNAL_ARGV: [[u8; EXTERNAL_ARG_MAX_LEN]; EXTERNAL_ARG_MAX] =
+    [[0; EXTERNAL_ARG_MAX_LEN]; EXTERNAL_ARG_MAX];
+static mut EXTERNAL_ARG_LEN: [usize; EXTERNAL_ARG_MAX] = [0; EXTERNAL_ARG_MAX];
 static mut EXTERNAL_APP_LEN: usize = 0;
 static mut EXTERNAL_GROUP_LEN: usize = 0;
+static mut EXTERNAL_ARG_COUNT: usize = 0;
 static mut EXTERNAL_APP_READY: bool = false;
 
 pub fn init() {
@@ -56,6 +62,69 @@ pub fn set_external_app(len: usize) {
     }
 
     crate::println!("loader: external ELF ready, bytes={}", len);
+}
+
+pub fn clear_external_args() {
+    unsafe {
+        EXTERNAL_ARG_COUNT = 0;
+        let arg_len = core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(EXTERNAL_ARG_LEN) as *mut usize,
+            EXTERNAL_ARG_MAX,
+        );
+        arg_len.fill(0);
+    }
+}
+
+pub fn push_external_arg(arg: &[u8]) -> bool {
+    unsafe {
+        if EXTERNAL_ARG_COUNT >= EXTERNAL_ARG_MAX {
+            return false;
+        }
+
+        let index = EXTERNAL_ARG_COUNT;
+        let copy_len = core::cmp::min(arg.len(), EXTERNAL_ARG_MAX_LEN);
+        let argv = core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(EXTERNAL_ARGV) as *mut u8,
+            EXTERNAL_ARG_MAX * EXTERNAL_ARG_MAX_LEN,
+        );
+        let start = index * EXTERNAL_ARG_MAX_LEN;
+        argv[start..start + EXTERNAL_ARG_MAX_LEN].fill(0);
+        argv[start..start + copy_len].copy_from_slice(&arg[..copy_len]);
+
+        EXTERNAL_ARG_LEN[index] = copy_len;
+        EXTERNAL_ARG_COUNT += 1;
+        true
+    }
+}
+
+pub fn external_arg_count() -> usize {
+    let count = unsafe { EXTERNAL_ARG_COUNT };
+    if count == 0 {
+        1
+    } else {
+        count
+    }
+}
+
+pub fn external_arg(index: usize) -> &'static [u8] {
+    let count = unsafe { EXTERNAL_ARG_COUNT };
+    if count == 0 {
+        if index == 0 {
+            b"external"
+        } else {
+            b""
+        }
+    } else if index < count {
+        let len = unsafe { EXTERNAL_ARG_LEN[index] };
+        unsafe {
+            core::slice::from_raw_parts(
+                core::ptr::addr_of!(EXTERNAL_ARGV[index]) as *const u8,
+                len,
+            )
+        }
+    } else {
+        b""
+    }
 }
 
 pub fn set_external_group(group: &[u8]) {

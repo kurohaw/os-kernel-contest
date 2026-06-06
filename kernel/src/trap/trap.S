@@ -88,5 +88,5 @@ __restore:
     ld x30, 30 * 8(sp)
     ld x31, 31 * 8(sp)
 
-    addi sp, sp, 34 * 8
+    ld x2, 2 * 8(sp)
     sret

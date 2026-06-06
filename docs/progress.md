@@ -10,7 +10,7 @@
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
 | 当前目标 | 打通官方测试入口和最小 Linux ABI |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 多级普通文件 `openat/read/fstat`、`brk` 增长映射真实用户堆页 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 多级普通文件 `openat/read/fstat`、`brk` 增长映射真实用户堆页、最小脚本下钻和 argv |
 
 ## 2026-05-18 rCore baseline
 
@@ -910,6 +910,62 @@ all tasks exited
 
 用户态已经可以读取测试盘子目录普通文件。下一步应做最小脚本执行器：解析 `cd`、读取嵌套 `.sh`、把多个 ELF 命令排队串行运行，并给外部 ELF 构造真实 argv。
 
+## 2026-06-06 最小脚本下钻与 argv
+
+### 今日目标
+
+对齐官方 basic 脚本形态：顶层 `basic_testcode.sh` 会先调用 `./busybox echo` 输出组标记，再 `cd ./basic`，然后执行嵌套 `./run-all.sh`。当前目标是先不实现完整 shell，而是从这些脚本中定位第一个真实 ELF 并传入 argv。
+
+### 修改内容
+
+- `loader` 新增外部 argv 存储，最多保留 8 个参数，每个参数最多 64 字节。
+- 外部用户栈改为按 loader argv 构造 `argc/argv`，默认仍回退为 `argv[0]="external"`。
+- 修复 `trap.S::__restore`：从 `TrapContext.x[2]` 恢复用户 sp，而不是假定 trap context 顶部就是用户 sp。这是 libc 从初始栈读取 argc/argv/auxv 的必要条件。
+- `ext4` 脚本解析新增：
+  - 跳过 `busybox echo ...`。
+  - 处理 `cd path`。
+  - 遇到 `.sh` 时读取嵌套脚本。
+  - 遇到真实 ELF 时加载并把命令行 token 写入 argv。
+
+### 验证结果
+
+`make all` 通过。
+
+本地构造官方 basic 风格脚本：
+
+```text
+./busybox echo "#### OS COMP TEST GROUP START script ####"
+cd ./basic
+./run-all.sh
+cd ..
+./busybox echo "#### OS COMP TEST GROUP END script ####"
+```
+
+嵌套 `basic/run-all.sh` 内容：
+
+```text
+./argshow one two
+```
+
+官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+loader: selected external ELF basic/argshow
+#### OS COMP TEST GROUP START script ####
+argshow: start
+one
+two
+task 0 exited with code 0
+#### OS COMP TEST GROUP END script ####
+all tasks exited
+```
+
+无测试盘回归仍通过。
+
+### 结论
+
+脚本入口已经能从官方 basic 风格结构下钻到第一个真实 ELF，并正确传递 argv。下一步是把“第一个 ELF”扩展成“多个 ELF 队列串行执行”，否则 `run-all.sh` 后续测例仍不会运行。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -944,7 +1000,8 @@ all tasks exited
 | 28 | EXT4 文件读取接入 syscall | `openat/read` 能读取测试盘普通文件 | 已完成（根目录只读） |
 | 29 | 真实堆页映射 | `brk` 增长后能访问新增用户页 | 已完成（增长映射） |
 | 30 | 路径解析扩展 | 支持子目录、相对路径和目录 fd | 已完成（多级普通文件） |
-| 31 | 最小脚本执行器 | 支持 `cd`、嵌套 `.sh`、多 ELF 串行和 argv | 下一步 |
+| 31 | 最小脚本执行器 | 支持 `cd`、嵌套 `.sh`、多 ELF 串行和 argv | 已完成（首个 ELF + argv） |
+| 32 | 多 ELF 串行队列 | 一个测试组内多个 ELF 依次运行并延迟输出 END | 下一步 |
 
 ## 提交计划
 
@@ -989,3 +1046,4 @@ all tasks exited
 | 37 | EXT4 文件读取接入 syscall | 已完成 |
 | 38 | brk 真实堆页映射 | 已完成 |
 | 39 | EXT4 多级路径读取 | 已完成 |
+| 40 | 最小脚本下钻与 argv | 已完成 |

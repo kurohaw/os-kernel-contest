@@ -113,6 +113,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载 `app0` ELF 后正常运行 | `argc=1`、`argv[0]`、空 `envp`、基础 `auxv` |
 | EXT4 syscall 读取 | 最小支持 | 临时外部 ELF `ext4read` 打开并读取根目录 `data.txt` | 只读根目录普通文件 |
 | EXT4 子目录路径 | 最小支持 | 临时外部 ELF `subpath` 打开并读取 `dir/data.txt` | 只读普通文件 |
+| 脚本下钻和 argv | 最小支持 | 顶层脚本 `busybox echo` + `cd ./basic` + 嵌套 `./run-all.sh`，最终运行 `basic/argshow one two` | 只定位第一个真实 ELF |
 
 ## 当前限制
 
@@ -124,7 +125,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
 | 文件系统 | `openat/read/fstat` 已能读取 EXT4 多级普通文件；尚未支持写入、目录 fd、挂载点和完整 Linux 路径语义 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
-| ELF loader | 已支持最小 `argc/argv/envp/auxv`；尚未支持动态链接器、解释器路径、脚本参数、多个 ELF 串行运行 |
+| ELF loader | 已支持脚本命令 argv、空 `envp` 和基础 `auxv`；尚未支持动态链接器、解释器路径、多个 ELF 串行运行 |
 
 ## 下一步待测
 
@@ -132,5 +133,5 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
 | 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
-| 进程模型 | fork/exec/wait/waitpid | 未开始 |
+| 进程模型 | 多 ELF 串行、fork/exec/wait/waitpid | 下一步 |
 | 文件系统 | 支持目录 fd、挂载点和更多 pseudo path | 下一步 |
