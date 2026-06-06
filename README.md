@@ -39,9 +39,10 @@
 - 从测试盘读取 RISC-V ELF，按 `PT_LOAD` segment 映射并进入用户态运行。
 - 外部 ELF 最小启动栈：`argc=1`、`argv[0]`、空 `envp` 和基础 `auxv`。
 - 外部 ELF 通过 `openat/read/fstat` 读取 EXT4 根目录普通文件。
+- EXT4 只读路径解析支持多级子目录普通文件。
 - `brk` 增长时映射真实用户堆页，外部程序可以写入新增堆区。
 
-当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以让外部 ELF 读取同盘根目录普通文件、增长并写入用户堆。下一阶段目标是让官方 basic/busybox ELF 通过 libc 启动早期路径，重点补路径解析、进程模型和 Linux ABI syscall。
+当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以让外部 ELF 读取同盘子目录普通文件、增长并写入用户堆。下一阶段目标是让官方 basic/busybox ELF 通过 libc 启动早期路径，重点补脚本执行器、进程模型和 Linux ABI syscall。
 
 QEMU 中可以看到类似：
 

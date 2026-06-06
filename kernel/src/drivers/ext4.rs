@@ -7,6 +7,7 @@ const EXT4_EXTENTS_FL: u32 = 0x0008_0000;
 const EXT4_EXTENT_MAGIC: u16 = 0xf30a;
 const EXT4_ROOT_INO: u32 = 2;
 const EXT4_S_IFDIR: u16 = 0x4000;
+const EXT4_S_IFREG: u16 = 0x8000;
 const EXT4_MODE_TYPE_MASK: u16 = 0xf000;
 const MAX_BLOCK_SIZE: usize = 4096;
 const MIN_INODE_SIZE: usize = 128;
@@ -35,6 +36,7 @@ struct Ext4Fs {
 struct FileInfo {
     inode_no: u32,
     size: u64,
+    mode: u16,
 }
 
 #[derive(Clone, Copy)]
@@ -66,10 +68,13 @@ pub fn init() {
     }
 }
 
-pub fn open_root(path: &[u8]) -> Option<Ext4File> {
+pub fn open_path(path: &[u8]) -> Option<Ext4File> {
     let fs = mounted_fs()?;
-    let name = normalize_root_path(path)?;
-    let info = lookup_root_file(&fs, name).ok().flatten()?;
+    let info = lookup_path(&fs, path).ok().flatten()?;
+
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+        return None;
+    }
 
     Some(Ext4File {
         inode_no: info.inode_no,
@@ -486,7 +491,112 @@ fn lookup_root_file(fs: &Ext4Fs, target: &[u8]) -> Result<Option<FileInfo>, &'st
     Ok(Some(FileInfo {
         inode_no,
         size: inode_size(&file_inode),
+        mode: le_u16(&file_inode, 0),
     }))
+}
+
+fn lookup_path(fs: &Ext4Fs, path: &[u8]) -> Result<Option<FileInfo>, &'static str> {
+    let mut index = 0usize;
+    let mut current_inode_no = EXT4_ROOT_INO;
+    let mut saw_component = false;
+
+    while index < path.len() {
+        while index < path.len() && path[index] == b'/' {
+            index += 1;
+        }
+
+        if index >= path.len() {
+            break;
+        }
+
+        let component_start = index;
+        while index < path.len() && path[index] != b'/' {
+            index += 1;
+        }
+
+        let component = &path[component_start..index];
+        if component.is_empty() || component == b"." {
+            continue;
+        }
+
+        saw_component = true;
+        if component == b".." {
+            current_inode_no = EXT4_ROOT_INO;
+            continue;
+        }
+
+        let child_inode_no = match lookup_child_inode(fs, current_inode_no, component)? {
+            Some(inode_no) => inode_no,
+            None => return Ok(None),
+        };
+
+        let mut next_index = index;
+        while next_index < path.len() && path[next_index] == b'/' {
+            next_index += 1;
+        }
+
+        let child = read_file_info(fs, child_inode_no)?;
+        if next_index >= path.len() {
+            return Ok(Some(child));
+        }
+
+        if child.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFDIR {
+            return Ok(None);
+        }
+
+        current_inode_no = child_inode_no;
+        index = next_index;
+    }
+
+    if saw_component {
+        read_file_info(fs, current_inode_no).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+fn lookup_child_inode(
+    fs: &Ext4Fs,
+    parent_inode_no: u32,
+    target: &[u8],
+) -> Result<Option<u32>, &'static str> {
+    if target.is_empty() || contains_byte(target, 0) {
+        return Ok(None);
+    }
+
+    let mut parent_inode = [0u8; INODE_PARSE_SIZE];
+    read_inode_by_no(fs, parent_inode_no, &mut parent_inode)?;
+
+    if le_u16(&parent_inode, 0) & EXT4_MODE_TYPE_MASK != EXT4_S_IFDIR {
+        return Ok(None);
+    }
+
+    let parent_size = inode_size(&parent_inode);
+    if le_u32(&parent_inode, 32) & EXT4_EXTENTS_FL != 0 {
+        find_in_extent_tree(fs, &parent_inode[40..100], parent_size, target)
+    } else {
+        find_in_direct_blocks(fs, &parent_inode[40..88], parent_size, target)
+    }
+}
+
+fn read_file_info(fs: &Ext4Fs, inode_no: u32) -> Result<FileInfo, &'static str> {
+    let mut inode = [0u8; INODE_PARSE_SIZE];
+    read_inode_by_no(fs, inode_no, &mut inode)?;
+
+    Ok(FileInfo {
+        inode_no,
+        size: inode_size(&inode),
+        mode: le_u16(&inode, 0),
+    })
+}
+
+fn read_inode_by_no(
+    fs: &Ext4Fs,
+    inode_no: u32,
+    inode: &mut [u8],
+) -> Result<(), &'static str> {
+    let inode_table = read_inode_table_block(fs, inode_no)?;
+    read_inode(fs, inode_table, inode_no, inode)
 }
 
 fn read_fs_block(fs: &Ext4Fs, block_no: u64, buffer: &mut [u8]) -> Result<(), &'static str> {
@@ -1041,28 +1151,6 @@ fn contains_byte(buffer: &[u8], target: u8) -> bool {
         index += 1;
     }
     false
-}
-
-fn normalize_root_path(path: &[u8]) -> Option<&[u8]> {
-    let mut path = path;
-
-    if path.starts_with(b"/") {
-        path = &path[1..];
-    }
-
-    if path.starts_with(b"./") {
-        path = &path[2..];
-    }
-
-    if path.is_empty()
-        || path == b"."
-        || path == b".."
-        || contains_byte(path, b'/')
-    {
-        return None;
-    }
-
-    Some(path)
 }
 
 fn is_elf(buffer: &[u8]) -> bool {

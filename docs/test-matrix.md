@@ -60,7 +60,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | test | 0 | 已支持 | `app0/app1` 调用 `sys_test` | 自定义测试 syscall |
 | exit | 1 | 已支持 | `app0/app1` 正常退出 | 支持退出码打印 |
 | yield | 2 | 已支持 | 两个任务轮转运行 | 已修复 yield 后恢复 `TrapContext` |
-| openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt`、EXT4 根目录普通文件 | 不存在路径返回 `-1` |
+| openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt`、EXT4 普通文件 | 支持多级只读路径，不存在路径返回 `-1` |
 | close | 57 | 最小支持 | 关闭标准 fd 和动态 fd | 重复关闭动态 fd 返回 `-1` |
 | read | 63 | 最小支持 | 读取 `/hello.txt` | stdin 当前返回 `0` |
 | write | 64 | 已支持 | stdout/stderr 输出字符串 | `/dev/null` 写入直接丢弃 |
@@ -94,7 +94,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `/dev/null` | 成功 | 返回 0 | 返回写入长度 | 成功 | 动态 fd |
 | `/hello.txt` | 成功 | 返回内嵌内容 | 不支持 | 成功 | 只读内嵌文件 |
 | `/missing` | 返回 -1 | 不适用 | 不适用 | 不适用 | 不存在路径 |
-| 测试盘根目录普通文件 | 成功 | 按 fd offset 读取 EXT4 内容 | 不支持 | 成功 | 本地 `ext4read` ELF 读取 `data.txt` 通过 |
+| 测试盘普通文件 | 成功 | 按 fd offset 读取 EXT4 内容 | 不支持 | 成功 | 本地 `ext4read` 读取 `data.txt`、`subpath` 读取 `dir/data.txt` 通过 |
 
 ## 官方测试盘入口状态
 
@@ -112,6 +112,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | ELF 输出包裹 | 已支持 | START 在外部 ELF 前输出，END 在 task exit 后输出 | 单外部 ELF 路径 |
 | 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载 `app0` ELF 后正常运行 | `argc=1`、`argv[0]`、空 `envp`、基础 `auxv` |
 | EXT4 syscall 读取 | 最小支持 | 临时外部 ELF `ext4read` 打开并读取根目录 `data.txt` | 只读根目录普通文件 |
+| EXT4 子目录路径 | 最小支持 | 临时外部 ELF `subpath` 打开并读取 `dir/data.txt` | 只读普通文件 |
 
 ## 当前限制
 
@@ -119,9 +120,9 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 |---|---|
 | `brk` | 增长时映射用户零页；缩小时暂不回收页 |
 | `read` | stdin 暂时直接返回 0 |
-| `openat` | 识别 `/dev/null`、`/hello.txt` 和 EXT4 根目录普通文件；尚未支持子目录和完整路径解析 |
+| `openat` | 识别 `/dev/null`、`/hello.txt` 和 EXT4 多级普通文件；尚未支持目录 fd 和挂载点语义 |
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
-| 文件系统 | `openat/read/fstat` 已能读取 EXT4 根目录普通文件；尚未支持子目录、写入、目录 fd、挂载点和完整路径解析 |
+| 文件系统 | `openat/read/fstat` 已能读取 EXT4 多级普通文件；尚未支持写入、目录 fd、挂载点和完整 Linux 路径语义 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
 | ELF loader | 已支持最小 `argc/argv/envp/auxv`；尚未支持动态链接器、解释器路径、脚本参数、多个 ELF 串行运行 |
 
@@ -132,4 +133,4 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
 | 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
-| 文件系统 | 支持子目录、相对路径、目录 fd 和更多 pseudo path | 下一步 |
+| 文件系统 | 支持目录 fd、挂载点和更多 pseudo path | 下一步 |

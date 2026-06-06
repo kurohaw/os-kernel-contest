@@ -9,7 +9,7 @@
 - 当前重点不是继续零散补自测 syscall，而是先打通官方测例入口：virtio-blk、EXT4、测试脚本扫描、ELF 用户程序加载。
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。原因判断为官方测例入口尚未打通，而不是单个 syscall 失败。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
-- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 根目录扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记，并从测试盘读取/加载一个 RISC-V ELF 进入用户态，构造最小 `argc/argv/envp/auxv` 启动栈，让外部 ELF 通过 `openat/read/fstat` 读取 EXT4 根目录普通文件，并在 `brk` 增长时映射真实用户堆页。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记，并从测试盘读取/加载一个 RISC-V ELF 进入用户态，构造最小 `argc/argv/envp/auxv` 启动栈，让外部 ELF 通过 `openat/read/fstat` 读取 EXT4 普通文件（含子目录路径），并在 `brk` 增长时映射真实用户堆页。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明
@@ -104,9 +104,9 @@ all tasks exited
 
 - 无测试盘时仍运行内嵌 `app0/app1` 作为回归；挂载测试盘且脚本中能找到根目录 ELF 时，会改为运行外部 ELF。
 - `brk` 增长时会映射用户零页；缩小时暂不回收页。
-- 文件系统支持 `/dev/null`、内嵌只读 `/hello.txt`，以及测试盘 EXT4 根目录普通文件的只读 `openat/read/fstat`。
+- 文件系统支持 `/dev/null`、内嵌只读 `/hello.txt`，以及测试盘 EXT4 普通文件的只读 `openat/read/fstat`，路径解析已支持多级子目录。
 - fd 表仍是全局表，尚未按进程隔离。
-- virtio-blk 与 EXT4 目前支持只读根目录扫描测试脚本、读取脚本内容、输出测试组 START/END 标记、从根目录读取第一个 ELF，以及对用户态暴露根目录普通文件读取。
+- virtio-blk 与 EXT4 目前支持只读扫描测试脚本、读取脚本内容、输出测试组 START/END 标记、读取第一个 ELF，以及对用户态暴露普通文件读取。
 - ELF loader 目前只支持把整个 ELF 读入 4 MiB 内核缓冲并映射 `PT_LOAD` 段；已构造最小 `argc=1`、`argv[0]`、空 `envp` 和基础 `auxv`，但尚未支持动态链接器、解释器路径、脚本参数或多程序串行执行。
 - 尚未实现 fork/exec/wait/waitpid、真实路径解析和 per-process 文件描述符表。
 - 尚未真正支持 LoongArch。
@@ -114,9 +114,9 @@ all tasks exited
 ## 下一步优先级
 
 1. 用官方 basic/busybox ELF 运行结果反推缺失 Linux ABI/syscall。
-2. 补 per-process fd table 和更完整路径解析，支持脚本/程序访问子目录文件。
-3. 补 fork/exec/wait/waitpid，逐步支持 shell 脚本和 busybox 测试。
-4. 用官方 basic/busybox 运行日志继续补缺失 Linux syscall。
+2. 做最小脚本执行器：支持 `cd`、读取嵌套 `.sh`、排队运行多个 ELF，并把参数写进 argv。
+3. 补 per-process fd table，避免多程序串行时 fd 状态串扰。
+4. 补 fork/exec/wait/waitpid，逐步支持 busybox shell 方式运行测试。
 
 不要在测试盘入口没打通前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。
 

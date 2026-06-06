@@ -114,7 +114,7 @@ pub fn openat(_dirfd: usize, path: usize, _flags: usize, _mode: usize) -> isize 
         alloc_fd(FileKind::DevNull, 0, 0).map_or(-1, |fd| fd as isize)
     } else if path_bytes == HELLO_PATH {
         alloc_fd(FileKind::Hello, 0, HELLO_CONTENT.len() as u64).map_or(-1, |fd| fd as isize)
-    } else if let Some(file) = crate::drivers::ext4::open_root(path_bytes) {
+    } else if let Some(file) = crate::drivers::ext4::open_path(path_bytes) {
         alloc_fd(FileKind::Ext4, file.inode_no, file.size).map_or(-1, |fd| fd as isize)
     } else {
         -1
