@@ -41,14 +41,14 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 截图中的汇总结果显示，`basic`、`busybox`、`cyclictest`、`iozone`、`iperf`、`libcbench`、`libctest`、`lmbench`、`ltp`、`lua`、`netperf` 在 glibc/musl 与 rv/la 维度下均为 0。
 
-当前判断：这不是单个 syscall 的失败，而是官方测例入口尚未打通。当前内核仍运行内嵌的 `app0/app1` 自测程序，尚未具备加载并调度官方 glibc/musl/busybox 等 Linux ABI 用户程序的完整路径。
+当前判断：0 分主要来自官方测例入口和 Linux ABI 尚未完整打通。当前内核已经可以从测试盘读取根目录脚本、定位脚本中的根目录 ELF、映射 `PT_LOAD` 并进入外部用户程序，但尚未具备运行官方 glibc/musl/busybox 等 Linux ABI 用户程序的完整路径。
 
 优先级应调整为：
 
 | 优先级 | 方向 | 目标 |
 |---:|---|---|
-| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘、读取根目录脚本并输出官方组标记；下一步解析脚本中的 ELF 路径 |
-| 2 | ELF 与地址空间 | 从固定裸二进制加载过渡到 ELF segment 映射、entry/sp/auxv 初始化 |
+| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘、读取根目录脚本、输出官方组标记，并从脚本定位根目录 ELF |
+| 2 | ELF 与地址空间 | 已从固定裸二进制过渡到 ELF segment 映射、entry 和最小启动栈初始化 |
 | 3 | 进程模型 | 补齐 `execve`、`fork/clone`、`wait4`、`exit_group` 等 basic/busybox 常用路径 |
 | 4 | 文件系统接口 | 在现有 EXT4 根目录扫描基础上支持打开/读取测试脚本和 ELF 文件 |
 | 5 | syscall 矩阵 | 用官方 basic 失败日志反推最小 syscall 集，而不是只按自测程序扩展 |
@@ -109,6 +109,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 官方组标记输出 | 已支持 | 脚本内 marker 原样输出；无 marker 时按文件名前缀生成 START/END | 暂时跳过测试组执行 |
 | ELF 文件加载 | 最小支持 | 本地 EXT4 镜像加载根目录 `app0` ELF 并运行 | 支持 ELF64 `PT_LOAD`，暂用 4 MiB 缓冲 |
 | ELF 输出包裹 | 已支持 | START 在外部 ELF 前输出，END 在 task exit 后输出 | 单外部 ELF 路径 |
+| 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载 `app0` ELF 后正常运行 | `argc=1`、`argv[0]`、空 `envp`、基础 `auxv` |
 
 ## 当前限制
 
@@ -120,7 +121,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
 | 文件系统 | 已能只读扫描 EXT4 根目录测试脚本，但 `openat/read` 尚未接入 EXT4 文件内容 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
-| ELF loader | 尚未支持动态链接器、argv/envp/auxv、解释器路径、多个 ELF 串行运行 |
+| ELF loader | 已支持最小 `argc/argv/envp/auxv`；尚未支持动态链接器、解释器路径、脚本参数、多个 ELF 串行运行 |
 
 ## 下一步待测
 

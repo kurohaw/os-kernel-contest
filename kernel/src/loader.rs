@@ -4,6 +4,8 @@ pub const USER_HEAP_BASE: usize = 0x20000;
 pub const USER_HEAP_SIZE: usize = 0x10000;
 pub const EXTERNAL_APP_MAX_SIZE: usize = 4 * 1024 * 1024;
 const EXTERNAL_GROUP_MAX_LEN: usize = 32;
+const ELF_PT_LOAD: u32 = 1;
+const ELF_PH_SIZE: usize = 56;
 
 static mut EXTERNAL_APP: [u8; EXTERNAL_APP_MAX_SIZE] = [0; EXTERNAL_APP_MAX_SIZE];
 static mut EXTERNAL_GROUP: [u8; EXTERNAL_GROUP_MAX_LEN] = [0; EXTERNAL_GROUP_MAX_LEN];
@@ -59,8 +61,10 @@ pub fn set_external_group(group: &[u8]) {
     let copy_len = core::cmp::min(group.len(), EXTERNAL_GROUP_MAX_LEN);
 
     unsafe {
-        let group_buffer =
-            core::slice::from_raw_parts_mut(core::ptr::addr_of_mut!(EXTERNAL_GROUP) as *mut u8, EXTERNAL_GROUP_MAX_LEN);
+        let group_buffer = core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(EXTERNAL_GROUP) as *mut u8,
+            EXTERNAL_GROUP_MAX_LEN,
+        );
         group_buffer.fill(0);
         group_buffer[..copy_len].copy_from_slice(&group[..copy_len]);
         EXTERNAL_GROUP_LEN = copy_len;
@@ -89,6 +93,65 @@ pub fn external_app_entry() -> usize {
     le_u64(data, 24) as usize
 }
 
+pub fn external_app_phoff() -> usize {
+    let data = external_app_data();
+    if data.len() < 64 {
+        return 0;
+    }
+
+    le_u64(data, 32) as usize
+}
+
+pub fn external_app_phdr_vaddr() -> usize {
+    let data = external_app_data();
+    let phoff = external_app_phoff();
+    let phentsize = external_app_phentsize();
+    let phnum = external_app_phnum();
+
+    if phoff == 0 || phentsize < ELF_PH_SIZE {
+        return 0;
+    }
+
+    let mut index = 0usize;
+    while index < phnum {
+        let offset = phoff + index * phentsize;
+        if offset + ELF_PH_SIZE > data.len() {
+            return 0;
+        }
+
+        if le_u32(data, offset) == ELF_PT_LOAD {
+            let file_offset = le_u64(data, offset + 8) as usize;
+            let vaddr = le_u64(data, offset + 16) as usize;
+            if vaddr < file_offset {
+                return 0;
+            }
+            return vaddr - file_offset + phoff;
+        }
+
+        index += 1;
+    }
+
+    0
+}
+
+pub fn external_app_phentsize() -> usize {
+    let data = external_app_data();
+    if data.len() < 64 {
+        return 0;
+    }
+
+    le_u16(data, 54) as usize
+}
+
+pub fn external_app_phnum() -> usize {
+    let data = external_app_data();
+    if data.len() < 64 {
+        return 0;
+    }
+
+    le_u16(data, 56) as usize
+}
+
 pub fn print_external_group_end() {
     let group_len = unsafe { EXTERNAL_GROUP_LEN };
     if group_len == 0 {
@@ -96,10 +159,7 @@ pub fn print_external_group_end() {
     }
 
     let group = unsafe {
-        core::slice::from_raw_parts(
-            core::ptr::addr_of!(EXTERNAL_GROUP) as *const u8,
-            group_len,
-        )
+        core::slice::from_raw_parts(core::ptr::addr_of!(EXTERNAL_GROUP) as *const u8, group_len)
     };
 
     crate::print!("#### OS COMP TEST GROUP END ");
@@ -132,6 +192,19 @@ fn le_u64(buffer: &[u8], offset: usize) -> u64 {
         buffer[offset + 6],
         buffer[offset + 7],
     ])
+}
+
+fn le_u32(buffer: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+    ])
+}
+
+fn le_u16(buffer: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([buffer[offset], buffer[offset + 1]])
 }
 
 #[no_mangle]

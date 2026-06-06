@@ -745,6 +745,45 @@ all tasks exited
 
 测试入口已经推进到“从官方风格 EXT4 测试盘读取 ELF 并进入用户态”。下一步重点不再是入口，而是官方 Linux ABI 兼容：argv/envp/auxv、真实文件路径读取、更多 syscall、进程模型和脚本串行执行。
 
+## 2026-06-06 外部 ELF 初始栈
+
+### 今日目标
+
+为测试盘加载的外部 ELF 构造 Linux 风格初始用户栈，减少 glibc/musl 或 busybox 在启动早期因为缺失 `argc/argv/envp/auxv` 直接崩溃的概率。
+
+### 修改内容
+
+- `user::init_user_context(0)` 在外部 ELF ready 时不再直接使用空栈顶，而是写入：
+  - `argc = 1`
+  - `argv[0] = "external"`
+  - 空 `envp`
+  - 基础 auxv：`AT_PHDR`、`AT_PHENT`、`AT_PHNUM`、`AT_PAGESZ`、`AT_ENTRY`、`AT_RANDOM` 等。
+- `loader` 新增外部 ELF program header 元信息读取能力。
+- `AT_PHDR` 使用用户地址空间中的 program header 虚拟地址，而不是 ELF 文件偏移。
+
+### 验证结果
+
+`make all` 通过。
+
+带本地 EXT4 测试盘的官方风格 QEMU 路径通过，关键输出保持：
+
+```text
+loader: selected external ELF app0
+loader: external ELF ready, bytes=43128
+#### OS COMP TEST GROUP START basic ####
+external ELF loaded: entry=0x10000, phnum=4, bytes=43128
+app0: hello from write
+task 0 exited with code 0
+#### OS COMP TEST GROUP END basic ####
+all tasks exited
+```
+
+无测试盘回归仍通过，继续运行内嵌 `app0/app1` 并关机。
+
+### 结论
+
+外部 ELF 已经具备最小 Linux 启动栈。下一步应优先做真实 EXT4 文件读写路径、真实 `brk` 堆页映射，以及官方 basic/busybox 缺失 syscall 追踪。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -775,7 +814,8 @@ all tasks exited
 | 24 | 真实堆页映射 | `brk` 增长后能访问新映射用户页 | 未开始 |
 | 25 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
 | 26 | ELF 加载入口 | 从脚本定位 ELF 并加载第一个官方 basic 程序 | 已完成（本地 ELF 验证） |
-| 27 | Linux ABI 启动参数 | 构造 argv/envp/auxv，让 libc 程序能过启动早期 | 下一步 |
+| 27 | Linux ABI 启动参数 | 构造 argv/envp/auxv，让 libc 程序能过启动早期 | 已完成（最小） |
+| 28 | EXT4 文件读取接入 syscall | `openat/read` 能读取测试盘普通文件 | 下一步 |
 
 ## 提交计划
 
@@ -816,3 +856,4 @@ all tasks exited
 | 33 | EXT4 根目录测试脚本扫描 | 已完成 |
 | 34 | EXT4 脚本内容读取与组标记输出 | 已完成 |
 | 35 | 外部 ELF 读取与运行 | 已完成 |
+| 36 | 外部 ELF 初始栈 | 已完成 |
