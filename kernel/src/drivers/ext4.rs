@@ -17,6 +17,8 @@ const EXT4_NAME_MAX: usize = 255;
 const TEST_SCRIPT_SUFFIX: &[u8] = b"_testcode.sh";
 const SCRIPT_BUFFER_SIZE: usize = 16 * 1024;
 const SCRIPT_PATH_MAX: usize = 128;
+const SCRIPT_COMMAND_MAX: usize = 64;
+const SCRIPT_ARG_MAX_LEN: usize = 64;
 const MAX_SCRIPT_DEPTH: usize = 2;
 const GROUP_MARKER_PREFIX: &[u8] = b"#### OS COMP TEST GROUP ";
 const GROUP_START_PREFIX: &[u8] = b"#### OS COMP TEST GROUP START ";
@@ -25,6 +27,31 @@ const MARKER_END: &[u8] = b"####";
 static mut SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
 static mut NESTED_SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
 static mut MOUNTED_FS: Option<Ext4Fs> = None;
+static mut SCRIPT_COMMANDS: [ScriptCommand; SCRIPT_COMMAND_MAX] =
+    [const { ScriptCommand::zero() }; SCRIPT_COMMAND_MAX];
+static mut SCRIPT_COMMAND_COUNT: usize = 0;
+static mut SCRIPT_COMMAND_NEXT: usize = 0;
+
+#[derive(Clone, Copy)]
+struct ScriptCommand {
+    path: [u8; SCRIPT_PATH_MAX],
+    path_len: usize,
+    args: [[u8; SCRIPT_ARG_MAX_LEN]; crate::loader::EXTERNAL_ARG_MAX],
+    arg_len: [usize; crate::loader::EXTERNAL_ARG_MAX],
+    argc: usize,
+}
+
+impl ScriptCommand {
+    const fn zero() -> Self {
+        Self {
+            path: [0; SCRIPT_PATH_MAX],
+            path_len: 0,
+            args: [[0; SCRIPT_ARG_MAX_LEN]; crate::loader::EXTERNAL_ARG_MAX],
+            arg_len: [0; crate::loader::EXTERNAL_ARG_MAX],
+            argc: 0,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 struct Ext4Fs {
@@ -104,6 +131,30 @@ pub fn read_file_at(
     read_inode(&fs, inode_table, file.inode_no, &mut inode)?;
 
     copy_inode_range(&fs, &inode, offset as u64, output)
+}
+
+pub fn load_next_queued_external() -> bool {
+    let fs = match mounted_fs() {
+        Some(fs) => fs,
+        None => return false,
+    };
+
+    loop {
+        let index = unsafe {
+            if SCRIPT_COMMAND_NEXT >= SCRIPT_COMMAND_COUNT {
+                return false;
+            }
+
+            let index = SCRIPT_COMMAND_NEXT;
+            SCRIPT_COMMAND_NEXT += 1;
+            index
+        };
+
+        let command = unsafe { SCRIPT_COMMANDS[index] };
+        if load_script_command(&fs, command) {
+            return true;
+        }
+    }
 }
 
 fn set_mounted_fs(fs: Ext4Fs) {
@@ -426,25 +477,40 @@ fn try_load_first_command_from_script(
         return false;
     }
 
+    clear_script_command_queue();
+    if !collect_commands_from_script(fs, script, initial_cwd, depth) {
+        return false;
+    }
+
+    load_next_queued_external()
+}
+
+fn collect_commands_from_script(
+    fs: &Ext4Fs,
+    script: &[u8],
+    initial_cwd: &[u8],
+    depth: usize,
+) -> bool {
     let mut cwd = [0u8; SCRIPT_PATH_MAX];
     let mut cwd_len = copy_path(initial_cwd, &mut cwd);
     let mut line_start = 0usize;
+    let mut queued = false;
 
     while line_start < script.len() {
         let line_end = find_line_end(script, line_start);
         let line = &script[line_start..line_end];
 
-        if try_load_command_from_line(fs, line, &mut cwd, &mut cwd_len, depth) {
-            return true;
+        if collect_command_from_line(fs, line, &mut cwd, &mut cwd_len, depth) {
+            queued = true;
         }
 
         line_start = line_end + 1;
     }
 
-    false
+    queued
 }
 
-fn try_load_command_from_line(
+fn collect_command_from_line(
     fs: &Ext4Fs,
     line: &[u8],
     cwd: &mut [u8; SCRIPT_PATH_MAX],
@@ -484,13 +550,13 @@ fn try_load_command_from_line(
 
     let path_slice = &path[..path_len];
     if path_slice.ends_with(b".sh") {
-        return try_load_nested_script(fs, path_slice, &cwd[..*cwd_len], depth + 1);
+        return collect_nested_script(fs, path_slice, &cwd[..*cwd_len], depth + 1);
     }
 
-    try_load_elf_path(fs, path_slice, line, next_index)
+    enqueue_elf_command(fs, path_slice, line, next_index)
 }
 
-fn try_load_nested_script(fs: &Ext4Fs, path: &[u8], cwd: &[u8], depth: usize) -> bool {
+fn collect_nested_script(fs: &Ext4Fs, path: &[u8], cwd: &[u8], depth: usize) -> bool {
     if depth > MAX_SCRIPT_DEPTH {
         return false;
     }
@@ -513,15 +579,79 @@ fn try_load_nested_script(fs: &Ext4Fs, path: &[u8], cwd: &[u8], depth: usize) ->
         return false;
     }
 
-    try_load_first_command_from_script(fs, script, cwd, depth)
+    collect_commands_from_script(fs, script, cwd, depth)
 }
 
-fn try_load_elf_path(
+fn enqueue_elf_command(
     fs: &Ext4Fs,
     path: &[u8],
     line: &[u8],
     mut next_index: usize,
 ) -> bool {
+    let command_index = unsafe {
+        if SCRIPT_COMMAND_COUNT >= SCRIPT_COMMAND_MAX {
+            return false;
+        }
+
+        SCRIPT_COMMAND_COUNT
+    };
+
+    let info = match lookup_path(fs, path) {
+        Ok(Some(info)) => info,
+        _ => return false,
+    };
+
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+        return false;
+    }
+
+    if info.size == 0 || info.size as usize > crate::loader::EXTERNAL_APP_MAX_SIZE {
+        return false;
+    }
+
+    let command = unsafe { &mut *core::ptr::addr_of_mut!(SCRIPT_COMMANDS[command_index]) };
+    *command = ScriptCommand::zero();
+    command.path_len = copy_path(path, &mut command.path);
+    push_script_command_arg(command, path);
+    while let Some((arg_start, arg_end, next)) = next_token(line, next_index) {
+        push_script_command_arg(command, &line[arg_start..arg_end]);
+        next_index = next;
+    }
+
+    unsafe {
+        SCRIPT_COMMAND_COUNT += 1;
+    }
+
+    true
+}
+
+fn clear_script_command_queue() {
+    unsafe {
+        SCRIPT_COMMAND_COUNT = 0;
+        SCRIPT_COMMAND_NEXT = 0;
+    }
+}
+
+fn push_script_command_arg(command: &mut ScriptCommand, arg: &[u8]) -> bool {
+    if command.argc >= crate::loader::EXTERNAL_ARG_MAX {
+        return false;
+    }
+
+    let index = command.argc;
+    let copy_len = core::cmp::min(arg.len(), SCRIPT_ARG_MAX_LEN);
+    command.args[index].fill(0);
+    command.args[index][..copy_len].copy_from_slice(&arg[..copy_len]);
+    command.arg_len[index] = copy_len;
+    command.argc += 1;
+    true
+}
+
+fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
+    if command.path_len == 0 {
+        return false;
+    }
+
+    let path = &command.path[..command.path_len];
     let info = match lookup_path(fs, path) {
         Ok(Some(info)) => info,
         _ => return false,
@@ -547,10 +677,11 @@ fn try_load_elf_path(
     }
 
     crate::loader::clear_external_args();
-    crate::loader::push_external_arg(path);
-    while let Some((arg_start, arg_end, next)) = next_token(line, next_index) {
-        crate::loader::push_external_arg(&line[arg_start..arg_end]);
-        next_index = next;
+    let mut index = 0usize;
+    while index < command.argc {
+        let len = command.arg_len[index];
+        crate::loader::push_external_arg(&command.args[index][..len]);
+        index += 1;
     }
 
     crate::print!("loader: selected external ELF ");

@@ -59,7 +59,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 |---|---:|---|---|---|
 | test | 0 | 已支持 | `app0/app1` 调用 `sys_test` | 自定义测试 syscall |
 | exit | 1 | 已支持 | `app0/app1` 正常退出 | 支持退出码打印 |
-| yield | 2 | 已支持 | 两个任务轮转运行 | 已修复 yield 后恢复 `TrapContext` |
+| yield | 2 | 已支持 | 两个任务轮转运行；单任务 yield 后继续运行当前任务 | 已修复 yield 后恢复 `TrapContext`，并避免外部单任务 yield panic |
 | openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt`、EXT4 普通文件 | 支持多级只读路径，不存在路径返回 `-1` |
 | close | 57 | 最小支持 | 关闭标准 fd 和动态 fd | 重复关闭动态 fd 返回 `-1` |
 | read | 63 | 最小支持 | 读取 `/hello.txt` | stdin 当前返回 `0` |
@@ -109,11 +109,12 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 脚本内容读取 | 已支持 | 本地镜像读取 `basic_testcode.sh` 和 `lua_testcode.sh` | 当前最多读取 16 KiB |
 | 官方组标记输出 | 已支持 | 脚本内 marker 原样输出；无 marker 时按文件名前缀生成 START/END | 暂时跳过测试组执行 |
 | ELF 文件加载 | 最小支持 | 本地 EXT4 镜像加载根目录 `app0` ELF 并运行 | 支持 ELF64 `PT_LOAD`，暂用 4 MiB 缓冲 |
-| ELF 输出包裹 | 已支持 | START 在外部 ELF 前输出，END 在 task exit 后输出 | 单外部 ELF 路径 |
-| 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载 `app0` ELF 后正常运行 | `argc=1`、`argv[0]`、空 `envp`、基础 `auxv` |
+| ELF 输出包裹 | 已支持 | START 在外部 ELF 队列前输出，END 在队列全部退出后输出 | 一个测试组内串行运行 |
+| 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载外部 ELF 后正常运行 | 脚本命令 `argc/argv`、空 `envp`、基础 `auxv` |
 | EXT4 syscall 读取 | 最小支持 | 临时外部 ELF `ext4read` 打开并读取根目录 `data.txt` | 只读根目录普通文件 |
 | EXT4 子目录路径 | 最小支持 | 临时外部 ELF `subpath` 打开并读取 `dir/data.txt` | 只读普通文件 |
-| 脚本下钻和 argv | 最小支持 | 顶层脚本 `busybox echo` + `cd ./basic` + 嵌套 `./run-all.sh`，最终运行 `basic/argshow one two` | 只定位第一个真实 ELF |
+| 脚本下钻和 argv | 最小支持 | 顶层脚本 `busybox echo` + `cd ./basic` + 嵌套 `./run-all.sh`，最终运行 `basic/argshow one two` | 支持固定队列内多个真实 ELF 串行 |
+| 多 ELF 串行队列 | 最小支持 | 本地 `run-all.sh` 连续执行 `./argshow one` 和 `./argshow two three`，两次退出后才输出 END | 队列上限 64 条，仍非完整 shell |
 
 ## 当前限制
 
@@ -125,7 +126,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
 | 文件系统 | `openat/read/fstat` 已能读取 EXT4 多级普通文件；尚未支持写入、目录 fd、挂载点和完整 Linux 路径语义 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
-| ELF loader | 已支持脚本命令 argv、空 `envp` 和基础 `auxv`；尚未支持动态链接器、解释器路径、多个 ELF 串行运行 |
+| ELF loader | 已支持脚本命令 argv、空 `envp`、基础 `auxv` 和多个 ELF 串行队列；尚未支持动态链接器、解释器路径 |
 
 ## 下一步待测
 
@@ -133,5 +134,5 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
 | 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
-| 进程模型 | 多 ELF 串行、fork/exec/wait/waitpid | 下一步 |
+| 进程模型 | fork/exec/wait/waitpid、per-process fd table | 下一步 |
 | 文件系统 | 支持目录 fd、挂载点和更多 pseudo path | 下一步 |

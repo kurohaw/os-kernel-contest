@@ -59,38 +59,42 @@ pub fn init() {
             continue;
         }
 
-        unsafe {
-            let memory_set = MemorySet::new_user(i);
-            let satp_token = memory_set.satp_token();
-            let heap_bottom = if use_external_app && i == 0 {
-                crate::loader::external_app_heap_base()
-            } else {
-                crate::loader::USER_HEAP_BASE
-            };
-
-            TASKS[i] = TaskControlBlock {
-                status: TaskStatus::Ready,
-                trap_cx_addr: crate::user::init_user_context(i),
-                task_cx: TaskContext::zero_init(),
-                memory_set: Some(memory_set),
-                satp_token,
-                heap_bottom,
-                heap_end: heap_bottom,
-            };
-
-            if use_external_app {
-                crate::println!(
-                    "task {} external user space ready: satp={:#x}, heap={:#x}",
-                    i,
-                    satp_token,
-                    heap_bottom,
-                );
-            } else {
-                crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
-            }
-        }
+        init_task(i, use_external_app);
 
         i += 1;
+    }
+}
+
+fn init_task(task_id: usize, use_external_app: bool) {
+    unsafe {
+        let memory_set = MemorySet::new_user(task_id);
+        let satp_token = memory_set.satp_token();
+        let heap_bottom = if use_external_app && task_id == 0 {
+            crate::loader::external_app_heap_base()
+        } else {
+            crate::loader::USER_HEAP_BASE
+        };
+
+        TASKS[task_id] = TaskControlBlock {
+            status: TaskStatus::Ready,
+            trap_cx_addr: crate::user::init_user_context(task_id),
+            task_cx: TaskContext::zero_init(),
+            memory_set: Some(memory_set),
+            satp_token,
+            heap_bottom,
+            heap_end: heap_bottom,
+        };
+
+        if use_external_app {
+            crate::println!(
+                "task {} external user space ready: satp={:#x}, heap={:#x}",
+                task_id,
+                satp_token,
+                heap_bottom,
+            );
+        } else {
+            crate::println!("task {} user space ready: satp={:#x}", task_id, satp_token);
+        }
     }
 }
 
@@ -172,6 +176,12 @@ pub fn suspend_current_and_run_next(trap_cx_addr: usize) {
         run_task(next);
     }
 
+    unsafe {
+        if TASKS[current].status == TaskStatus::Ready {
+            run_task(current);
+        }
+    }
+
     panic!("no ready task after yield");
 }
 
@@ -186,6 +196,11 @@ pub fn exit_current(code: i32) -> ! {
 
     if let Some(next) = find_next_ready() {
         run_task(next);
+    }
+
+    if crate::loader::has_external_app() && crate::drivers::ext4::load_next_queued_external() {
+        init_task(0, true);
+        run_task(0);
     }
 
     if crate::loader::has_external_app() {

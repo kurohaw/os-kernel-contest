@@ -2,7 +2,7 @@ use crate::trap::TrapContext;
 
 pub const APP_NUM: usize = crate::loader::APP_NUM;
 
-const USER_STACK_SIZE: usize = 4096 * 2;
+const USER_STACK_SIZE: usize = 4096 * 16;
 const AT_NULL: usize = 0;
 const AT_PHDR: usize = 3;
 const AT_PHENT: usize = 4;

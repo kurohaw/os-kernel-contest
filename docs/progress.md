@@ -10,7 +10,7 @@
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
 | 当前目标 | 打通官方测试入口和最小 Linux ABI |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 多级普通文件 `openat/read/fstat`、`brk` 增长映射真实用户堆页、最小脚本下钻和 argv |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 多级普通文件 `openat/read/fstat`、`brk` 增长映射真实用户堆页、最小脚本下钻和 argv、多 ELF 串行队列 |
 
 ## 2026-05-18 rCore baseline
 
@@ -966,6 +966,66 @@ all tasks exited
 
 脚本入口已经能从官方 basic 风格结构下钻到第一个真实 ELF，并正确传递 argv。下一步是把“第一个 ELF”扩展成“多个 ELF 队列串行执行”，否则 `run-all.sh` 后续测例仍不会运行。
 
+## 2026-06-06 多 ELF 串行队列
+
+### 今日目标
+
+继续贴近官方 `run-all.sh` 形态：一个测试组内通常包含多条 ELF 命令。当前目标不是实现完整 shell，而是把已经解析出的真实 ELF 命令保存成固定队列，按顺序加载、运行、退出后继续下一条，直到队列耗尽后再输出测试组 END。
+
+### 修改内容
+
+- `drivers::ext4` 新增脚本命令队列，最多记录 64 条命令；每条命令保存路径和最多 8 个 argv token。
+- 脚本解析从“遇到第一个 ELF 立即加载”改为“扫描脚本和嵌套脚本，收集所有可识别 ELF 命令”。
+- `load_next_queued_external()` 每次从 EXT4 读取下一条命令对应 ELF，刷新 loader 当前 ELF 缓冲和 argv。
+- `task` 在外部 task 退出后，如果队列仍有 ELF，就重建 task 0 的用户地址空间并继续运行；队列耗尽后才输出 `#### OS COMP TEST GROUP END ... ####` 和 `all tasks exited`。
+- 单任务 `yield` 时如果没有其它 ready task，会继续运行当前任务，避免外部单任务程序调用 yield 后 panic。
+- 临时把共享的用户/trap 栈从 8 KiB 提升到 64 KiB，避免当前“陷入后仍借用户栈跑内核”的实现被 EXT4/队列调用链压穿。后续仍应补真正的独立内核栈。
+
+### 验证结果
+
+`make all` 等价构建链路通过。
+
+本地构造官方 basic 风格脚本：
+
+```text
+./busybox echo "#### OS COMP TEST GROUP START script ####"
+cd ./basic
+./run-all.sh
+cd ..
+./busybox echo "#### OS COMP TEST GROUP END script ####"
+```
+
+嵌套 `basic/run-all.sh` 内容：
+
+```text
+./argshow one
+./argshow two three
+```
+
+官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+loader: selected external ELF basic/argshow
+argshow: start
+one
+task 0 exited with code 0
+loader: selected external ELF basic/argshow
+argshow: start
+two
+three
+task 0 exited with code 0
+#### OS COMP TEST GROUP END script ####
+all tasks exited
+```
+
+无测试盘回归仍通过：`app0/app1` 自测完成并主动关机。
+
+额外用单外部 ELF `app0` 验证 `yield`：外部 task 0 调用 yield 后能恢复自己继续运行，并正常输出组 END 和 `all tasks exited`。
+
+### 结论
+
+脚本执行器已经能跑一个测试组内的多个真实 ELF。下一步应直接使用官方 basic/busybox ELF 运行日志来补缺失 syscall 和 ABI 行为，而不是继续造本地自测。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -1000,8 +1060,9 @@ all tasks exited
 | 28 | EXT4 文件读取接入 syscall | `openat/read` 能读取测试盘普通文件 | 已完成（根目录只读） |
 | 29 | 真实堆页映射 | `brk` 增长后能访问新增用户页 | 已完成（增长映射） |
 | 30 | 路径解析扩展 | 支持子目录、相对路径和目录 fd | 已完成（多级普通文件） |
-| 31 | 最小脚本执行器 | 支持 `cd`、嵌套 `.sh`、多 ELF 串行和 argv | 已完成（首个 ELF + argv） |
-| 32 | 多 ELF 串行队列 | 一个测试组内多个 ELF 依次运行并延迟输出 END | 下一步 |
+| 31 | 最小脚本执行器 | 支持 `cd`、嵌套 `.sh`、多 ELF 串行和 argv | 已完成 |
+| 32 | 多 ELF 串行队列 | 一个测试组内多个 ELF 依次运行并延迟输出 END | 已完成（固定队列） |
+| 33 | 官方 basic/busybox 运行追踪 | 用官方 ELF 日志反推缺失 syscall/ABI | 下一步 |
 
 ## 提交计划
 
@@ -1047,3 +1108,4 @@ all tasks exited
 | 38 | brk 真实堆页映射 | 已完成 |
 | 39 | EXT4 多级路径读取 | 已完成 |
 | 40 | 最小脚本下钻与 argv | 已完成 |
+| 41 | 多 ELF 串行队列 | 已完成 |

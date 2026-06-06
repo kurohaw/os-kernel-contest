@@ -37,13 +37,13 @@
 - QEMU virtio-blk 扇区读取。
 - 无分区 EXT4 测试盘根目录扫描，识别并读取 `*_testcode.sh`，输出官方测试组 START/END 标记。
 - 从测试盘读取 RISC-V ELF，按 `PT_LOAD` segment 映射并进入用户态运行。
-- 外部 ELF 最小启动栈：`argc=1`、`argv[0]`、空 `envp` 和基础 `auxv`。
+- 外部 ELF 最小启动栈：脚本命令 `argc/argv`、空 `envp` 和基础 `auxv`。
 - 外部 ELF 通过 `openat/read/fstat` 读取 EXT4 根目录普通文件。
 - EXT4 只读路径解析支持多级子目录普通文件。
 - `brk` 增长时映射真实用户堆页，外部程序可以写入新增堆区。
-- 最小脚本下钻：跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，定位第一个真实 ELF 并构造 argv。
+- 最小脚本执行器：跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把多个真实 ELF 命令排队串行运行并构造 argv。
 
-当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以从官方 basic 风格脚本下钻到子目录脚本，加载第一个真实 ELF、传入 argv、读取子目录文件并写入用户堆。下一阶段目标是把脚本执行器扩展成多 ELF 串行队列，并继续补进程模型和 Linux ABI syscall。
+当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以从官方 basic 风格脚本下钻到子目录脚本，按队列串行运行多个真实 ELF、传入 argv、读取子目录文件并写入用户堆。下一阶段目标是用官方 basic/busybox ELF 运行日志反推缺失 Linux ABI syscall，并继续补进程模型。
 
 QEMU 中可以看到类似：
 
