@@ -81,6 +81,17 @@ pub fn close(fd: usize) -> isize {
     }
 }
 
+pub fn reset_for_external_program() {
+    reset_cwd_from_loader();
+    unsafe {
+        FD_TABLE.fill(None);
+        MEMORY_FILES.fill([0; MEMORY_FILE_CAP]);
+        PIPE_BUFFER.fill(0);
+        PIPE_LEN = 0;
+        PIPE_READ_OFFSET = 0;
+    }
+}
+
 pub fn fstat(fd: usize, stat_buf: usize) -> isize {
     if !is_valid_fd(fd) {
         return -1;
@@ -192,6 +203,37 @@ pub fn chdir(path: usize) -> isize {
     }
 
     0
+}
+
+pub fn resolve_current_path(path: &[u8], output: &mut [u8; MAX_PATH_LEN]) -> usize {
+    let mut source = path;
+    while source.starts_with(b"./") {
+        source = &source[2..];
+    }
+
+    if source.starts_with(b"/") {
+        let copy_len = core::cmp::min(source.len() - 1, MAX_PATH_LEN);
+        output[..copy_len].copy_from_slice(&source[1..1 + copy_len]);
+        return copy_len;
+    }
+
+    let cwd = current_cwd();
+    if cwd.is_empty() {
+        let copy_len = core::cmp::min(source.len(), MAX_PATH_LEN);
+        output[..copy_len].copy_from_slice(&source[..copy_len]);
+        return copy_len;
+    }
+
+    let mut len = core::cmp::min(cwd.len(), MAX_PATH_LEN);
+    output[..len].copy_from_slice(&cwd[..len]);
+    if len < MAX_PATH_LEN && !source.is_empty() {
+        output[len] = b'/';
+        len += 1;
+    }
+
+    let copy_len = core::cmp::min(source.len(), MAX_PATH_LEN - len);
+    output[len..len + copy_len].copy_from_slice(&source[..copy_len]);
+    len + copy_len
 }
 
 pub fn dup(fd: usize) -> isize {
@@ -360,11 +402,18 @@ fn close_dynamic_fd(fd: usize) -> isize {
     }
 
     unsafe {
-        if FD_TABLE[fd].is_some() {
-            FD_TABLE[fd] = None;
-            0
-        } else {
-            -1
+        match FD_TABLE[fd] {
+            Some(descriptor)
+                if descriptor.kind == FileKind::PipeRead
+                    || descriptor.kind == FileKind::PipeWrite =>
+            {
+                0
+            }
+            Some(_) => {
+                FD_TABLE[fd] = None;
+                0
+            }
+            None => -1,
         }
     }
 }
@@ -651,7 +700,7 @@ fn is_dot_path(path: &[u8]) -> bool {
     path == b"." || path == b"./" || path == b"./mnt" || path == b"mnt" || path.ends_with(b"/mnt")
 }
 
-fn copy_user_cstr(ptr: usize, output: &mut [u8]) -> Option<usize> {
+pub fn copy_user_cstr(ptr: usize, output: &mut [u8]) -> Option<usize> {
     let mut i = 0;
 
     while i < output.len() {

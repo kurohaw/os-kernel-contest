@@ -157,6 +157,20 @@ pub fn load_next_queued_external() -> bool {
     }
 }
 
+pub fn load_external_elf_path(path: &[u8]) -> bool {
+    let fs = match mounted_fs() {
+        Some(fs) => fs,
+        None => return false,
+    };
+
+    let info = match lookup_path(&fs, path) {
+        Ok(Some(info)) => info,
+        _ => return false,
+    };
+
+    load_external_file(&fs, path, info, false)
+}
+
 fn set_mounted_fs(fs: Ext4Fs) {
     unsafe {
         MOUNTED_FS = Some(fs);
@@ -657,6 +671,18 @@ fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
         _ => return false,
     };
 
+    crate::loader::clear_external_args();
+    let mut index = 0usize;
+    while index < command.argc {
+        let len = command.arg_len[index];
+        crate::loader::push_external_arg(&command.args[index][..len]);
+        index += 1;
+    }
+
+    load_external_file(fs, path, info, true)
+}
+
+fn load_external_file(fs: &Ext4Fs, path: &[u8], info: FileInfo, announce: bool) -> bool {
     if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
         return false;
     }
@@ -677,17 +703,11 @@ fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
     }
 
     set_external_cwd_from_path(path);
-    crate::loader::clear_external_args();
-    let mut index = 0usize;
-    while index < command.argc {
-        let len = command.arg_len[index];
-        crate::loader::push_external_arg(&command.args[index][..len]);
-        index += 1;
+    if announce {
+        crate::print!("loader: selected external ELF ");
+        print_name(path);
+        crate::println!();
     }
-
-    crate::print!("loader: selected external ELF ");
-    print_name(path);
-    crate::println!();
     crate::loader::set_external_app(read_len);
 
     true

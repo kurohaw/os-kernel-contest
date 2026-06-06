@@ -7,7 +7,7 @@ pub extern "C" fn _start() -> ! {
     user::write(1, "app1: hello from write\n");
     user::sys_test(200);
 
-    if user::getpid() == 1 {
+    if user::getpid() == 2 {
         user::write(1, "app1: getpid ok\n");
     } else {
         user::write(1, "app1: getpid wrong\n");

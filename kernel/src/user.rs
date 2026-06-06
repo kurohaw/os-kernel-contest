@@ -1,6 +1,7 @@
 use crate::trap::TrapContext;
 
 pub const APP_NUM: usize = crate::loader::APP_NUM;
+pub const MAX_USER_TASKS: usize = 16;
 
 const USER_STACK_SIZE: usize = 4096 * 16;
 const AT_NULL: usize = 0;
@@ -19,19 +20,14 @@ const AT_SECURE: usize = 23;
 const AT_RANDOM: usize = 25;
 
 #[repr(align(16))]
+#[derive(Clone, Copy)]
 struct UserStack {
     data: [u8; USER_STACK_SIZE],
 }
 
 #[link_section = ".user.stack"]
-static mut USER_STACK_0: UserStack = UserStack {
-    data: [0; USER_STACK_SIZE],
-};
-
-#[link_section = ".user.stack"]
-static mut USER_STACK_1: UserStack = UserStack {
-    data: [0; USER_STACK_SIZE],
-};
+static mut USER_STACKS: [UserStack; MAX_USER_TASKS] =
+    [UserStack { data: [0; USER_STACK_SIZE] }; MAX_USER_TASKS];
 
 pub fn init_user_context(app_id: usize) -> usize {
     let user_stack_top = user_stack_top(app_id);
@@ -59,12 +55,16 @@ pub fn user_stack_range(app_id: usize) -> (usize, usize) {
     (bottom, top)
 }
 
+pub fn trap_context_addr(task_id: usize) -> usize {
+    user_stack_top(task_id) - core::mem::size_of::<TrapContext>()
+}
+
 fn user_stack_top(app_id: usize) -> usize {
-    match app_id {
-        0 => core::ptr::addr_of!(USER_STACK_0) as usize + USER_STACK_SIZE,
-        1 => core::ptr::addr_of!(USER_STACK_1) as usize + USER_STACK_SIZE,
-        _ => panic!("invaild app id {}", app_id),
+    if app_id >= MAX_USER_TASKS {
+        panic!("invaild app id {}", app_id);
     }
+
+    unsafe { core::ptr::addr_of!(USER_STACKS[app_id]) as usize + USER_STACK_SIZE }
 }
 
 fn init_external_user_stack(stack_top: usize) -> usize {

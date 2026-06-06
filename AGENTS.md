@@ -5,11 +5,12 @@
 ## 当前项目状态
 
 - 当前仓库：`D:\os-kernel-contest`。
-- 当前阶段：初赛开发期，优先目标是接入官方测试磁盘扫描。
-- 当前重点不是继续零散补自测 syscall，而是先打通官方测例入口：virtio-blk、EXT4、测试脚本扫描、ELF 用户程序加载。
-- 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。原因判断为官方测例入口尚未打通，而不是单个 syscall 失败。
+- 当前阶段：初赛开发期，优先目标是打通官方测试和最小 Linux ABI。
+- 当前重点不是继续零散补自测 syscall，而是用官方 ELF/脚本实际运行结果反推缺失 ABI，再逐组推进 basic、busybox、lua、libctest 等测试。
+- 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。历史原因判断为官方测例入口和 Linux ABI 当时尚未打通。
+- 2026-06-06 本地 official basic 结果：使用官方 `pre-2025` basic 源码手工编译 RISC-V ELF，打包为无分区 EXT4 镜像后，QEMU 运行日志经官方 `test_runner.py` 解析为 `102/102`。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
-- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页，以及 official basic 早期 Linux syscall 编号兼容。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页、official basic 常用 Linux syscall 编号兼容，以及最小 `clone/fork/execve/wait4/nanosleep` 路径。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明
@@ -85,6 +86,12 @@ all tasks exited
 
 出现 `all tasks exited` 后，QEMU 应主动退出。
 
+官方 basic 本地通过标准：
+
+- QEMU 输出完整 `#### OS COMP TEST GROUP START basic ####` 与 `#### OS COMP TEST GROUP END basic ####`。
+- 官方 `test_runner.py` 解析日志得到 `TOTAL 102 / 102`。
+- 无测试盘的 `app0/app1` 回归仍能正常退出，避免只为 official basic 破坏内置 smoke。
+
 ## 已支持与已知限制
 
 当前已支持的最小 syscall：
@@ -97,8 +104,20 @@ all tasks exited
 - `read = 63`
 - `write = 64`
 - `fstat = 80`
+- `exit/exit_group = 93/94`
+- `nanosleep = 101`
+- `sched_yield = 124`
+- `times = 153`
+- `uname = 160`
+- `gettimeofday = 169`
 - `getpid = 172`
+- `getppid = 173`
+- `clone/fork = 220`
 - `brk = 214`
+- `munmap = 215`
+- `mmap = 222`
+- `execve = 221`
+- `wait4 = 260`
 
 当前限制：
 
@@ -108,15 +127,16 @@ all tasks exited
 - fd 表仍是全局表，尚未按进程隔离。
 - virtio-blk 与 EXT4 目前支持只读扫描测试脚本、读取脚本内容、输出测试组 START/END 标记、记录脚本命令队列、串行读取 ELF，以及对用户态暴露普通文件读取。
 - ELF loader 目前只支持把整个 ELF 读入 4 MiB 内核缓冲并映射 `PT_LOAD` 段；已构造脚本命令 argv、空 `envp` 和基础 `auxv`，并支持一个测试组内多个外部 ELF 串行运行；但尚未支持动态链接器或解释器路径。
-- 尚未实现 fork/exec/wait/waitpid、真实路径解析和 per-process 文件描述符表。
+- `clone/fork/execve/wait4` 是为 official basic 打通的最小实现：clone/fork 共享地址空间，fork 复制用户栈，clone 使用每任务静态用户栈，wait4 通过重试 syscall 阻塞等待；这还不是完整进程隔离模型。
+- `nanosleep` 为最小 busy-wait/cap 实现，不保证真实 POSIX 时间精度。
 - 尚未真正支持 LoongArch。
 
 ## 下一步优先级
 
-1. 用官方 basic/busybox ELF 运行结果反推缺失 Linux ABI/syscall。
-2. 补 per-process fd table，避免多程序串行时 fd 状态串扰。
-3. 补 fork/exec/wait/waitpid，逐步支持 busybox shell 方式运行测试。
-4. 尽快在本地构建 official basic ELF 镜像，替代临时 Rust ELF 验证。
+1. 在官方平台重新提交，确认 `basic` 是否从 0 分变为本地一致的通过结果。
+2. 用官方 busybox/lua/libctest ELF 运行结果反推下一批缺失 Linux ABI/syscall。
+3. 补 per-process fd table，避免多程序、fork/exec、pipe/close 路径相互串扰。
+4. 将最小 clone/fork/exec/wait4 升级为更接近 Linux 的进程模型和父子资源模型。
 5. 尽快替换当前“陷入后借用户栈跑内核”的临时做法，补独立内核栈。
 
 不要在测试盘入口没打通前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。

@@ -239,12 +239,14 @@ impl MemorySet {
             index += 1;
         }
 
-        crate::println!(
-            "external ELF loaded: entry={:#x}, phnum={}, bytes={}",
-            entry,
-            phnum,
-            data.len(),
-        );
+        if !crate::loader::has_external_app() {
+            crate::println!(
+                "external ELF loaded: entry={:#x}, phnum={}, bytes={}",
+                entry,
+                phnum,
+                data.len(),
+            );
+        }
     }
 
     pub fn map_user_zero_range(&self, start: usize, end: usize) -> bool {
@@ -324,13 +326,15 @@ impl MemorySet {
             return;
         }
 
-        crate::println!(
-            "kernel map {}: {:#x}..{:#x}, flags={:#x}",
-            name,
-            start,
-            end,
-            (flags | PTEFlags::V).bits(),
-        );
+        if !crate::loader::has_external_app() {
+            crate::println!(
+                "kernel map {}: {:#x}..{:#x}, flags={:#x}",
+                name,
+                start,
+                end,
+                (flags | PTEFlags::V).bits(),
+            );
+        }
 
         self.page_table.map_range(
             VirtAddr(start),

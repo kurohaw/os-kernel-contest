@@ -3,6 +3,7 @@ use core::arch::{asm, global_asm};
 global_asm!(include_str!("trap.S"));
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct TrapContext {
     pub x: [usize; 32],
     pub sstatus: usize,
@@ -98,7 +99,6 @@ pub extern "C" fn trap_handler(cx: &mut TrapContext) {
 }
 
 fn handle_timer_interrupt() {
-    crate::println!("timer tick");
     crate::timer::set_next_trigger();
 }
 
@@ -108,6 +108,38 @@ fn handle_environment_call(cx: &mut TrapContext) {
 
     let id = cx.x[17];
     let args = [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]];
+
+    if id == crate::syscall::SYS_CLONE {
+        let ret = crate::task::clone_current(cx, args[0], args[1]);
+        cx.x[10] = ret as usize;
+        if ret > 0 {
+            crate::task::run_next_ready_after_syscall(cx as *mut TrapContext as usize);
+        }
+        return;
+    }
+
+    if id == crate::syscall::SYS_EXECVE {
+        let ret = crate::syscall::sys_execve(args[0], args[1], args[2]);
+        if ret == 0 {
+            crate::task::exec_current();
+        }
+        cx.x[10] = ret as usize;
+        return;
+    }
+
+    if id == crate::syscall::SYS_WAIT4 {
+        let ret = crate::task::wait_child(args[0], args[1]);
+        if ret >= 0 {
+            cx.x[10] = ret as usize;
+            return;
+        }
+        if crate::task::has_waitable_child(args[0]) {
+            cx.sepc -= 4;
+            crate::task::run_next_ready_after_syscall(cx as *mut TrapContext as usize);
+        }
+        cx.x[10] = ret as usize;
+        return;
+    }
 
     let ret = crate::syscall::syscall(id, args);
     cx.x[10] = ret as usize;

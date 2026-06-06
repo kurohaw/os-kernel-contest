@@ -63,8 +63,6 @@ pub fn set_external_app(len: usize) {
         EXTERNAL_APP_LEN = len;
         EXTERNAL_APP_READY = len > 0;
     }
-
-    crate::println!("loader: external ELF ready, bytes={}", len);
 }
 
 pub fn clear_external_args() {

@@ -52,18 +52,18 @@ pub fn syscall(id: usize, args: [usize; 6]) -> isize {
         SYS_READ => sys_read(args[0], args[1], args[2]),
         SYS_WRITE => sys_write(args[0], args[1], args[2]),
         SYS_FSTAT => sys_fstat(args[0], args[1]),
-        SYS_NANOSLEEP => 0,
+        SYS_NANOSLEEP => sys_nanosleep(args[0], args[1]),
         SYS_TIMES => sys_times(args[0]),
         SYS_UNAME => sys_uname(args[0]),
         SYS_GETTIMEOFDAY => sys_gettimeofday(args[0]),
         SYS_GETPID => sys_getpid(),
-        SYS_GETPPID => 1,
+        SYS_GETPPID => sys_getppid(),
         SYS_BRK => sys_brk(args[0]),
         SYS_MUNMAP => 0,
         SYS_CLONE => -1,
-        SYS_EXECVE => -1,
+        SYS_EXECVE => sys_execve(args[0], args[1], args[2]),
         SYS_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5]),
-        SYS_WAIT4 => -1,
+        SYS_WAIT4 => sys_wait4(args[0], args[1], args[2]),
         _ => {
             crate::println!("unsupported syscall: id={}", id);
             -1
@@ -137,7 +137,11 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> isize {
 } 
 
 fn sys_getpid() -> isize {
-    crate::task::current_task_id() as isize
+    crate::task::current_pid() as isize
+}
+
+fn sys_getppid() -> isize {
+    crate::task::current_ppid() as isize
 }
 
 fn sys_brk(addr: usize) -> isize {
@@ -153,6 +157,27 @@ fn sys_gettimeofday(tv: usize) -> isize {
     unsafe {
         (tv as *mut u64).write((usec / 1_000_000) as u64);
         ((tv + 8) as *mut u64).write((usec % 1_000_000) as u64);
+    }
+
+    0
+}
+
+fn sys_nanosleep(req: usize, _rem: usize) -> isize {
+    if req == 0 {
+        return -1;
+    }
+
+    let sec = unsafe { (req as *const u64).read() };
+    let usec = unsafe { ((req + 8) as *const u64).read() };
+    let requested = sec
+        .saturating_mul(1_000_000)
+        .saturating_add(usec);
+    let requested_us = core::cmp::min(requested, usize::MAX as u64) as usize;
+    let delay_us = core::cmp::max(1_000, core::cmp::min(requested_us, 10_000));
+    let deadline = crate::timer::get_time_us().saturating_add(delay_us);
+
+    while crate::timer::get_time_us() < deadline {
+        core::hint::spin_loop();
     }
 
     0
@@ -190,6 +215,63 @@ fn sys_uname(buf: usize) -> isize {
     }
 
     0
+}
+
+pub fn sys_execve(path: usize, argv: usize, _envp: usize) -> isize {
+    if path == 0 {
+        return -1;
+    }
+
+    let mut path_buffer = [0u8; 128];
+    let path_len = match crate::fs::copy_user_cstr(path, &mut path_buffer) {
+        Some(len) => len,
+        None => return -1,
+    };
+
+    let mut full_path = [0u8; 128];
+    let full_len = crate::fs::resolve_current_path(&path_buffer[..path_len], &mut full_path);
+    if full_len == 0 {
+        return -1;
+    }
+
+    if !crate::drivers::ext4::load_external_elf_path(&full_path[..full_len]) {
+        return -1;
+    }
+
+    push_exec_args(argv, &path_buffer[..path_len]);
+    0
+}
+
+fn push_exec_args(argv: usize, fallback: &[u8]) {
+    crate::loader::clear_external_args();
+
+    let mut pushed = 0usize;
+    if argv != 0 {
+        let mut index = 0usize;
+        while index < crate::loader::EXTERNAL_ARG_MAX {
+            let arg_ptr = unsafe { (argv as *const usize).add(index).read() };
+            if arg_ptr == 0 {
+                break;
+            }
+
+            let mut arg_buffer = [0u8; 64];
+            if let Some(arg_len) = crate::fs::copy_user_cstr(arg_ptr, &mut arg_buffer) {
+                if crate::loader::push_external_arg(&arg_buffer[..arg_len]) {
+                    pushed += 1;
+                }
+            }
+
+            index += 1;
+        }
+    }
+
+    if pushed == 0 {
+        crate::loader::push_external_arg(fallback);
+    }
+}
+
+fn sys_wait4(pid: usize, status_ptr: usize, _options: usize) -> isize {
+    crate::task::wait_child(pid, status_ptr)
 }
 
 fn sys_mmap(addr: usize, len: usize, _prot: usize, _flags: usize, fd: usize, offset: usize) -> isize {
