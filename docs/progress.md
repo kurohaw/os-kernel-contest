@@ -10,7 +10,7 @@
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
 | 当前目标 | 接入官方测试磁盘扫描 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF |
 
 ## 2026-05-18 rCore baseline
 
@@ -695,6 +695,56 @@ ext4: found 2 test script(s)
 
 官方测试入口已经能做到“识别测试盘、找到脚本、读取脚本内容、输出测试组起止标记”。下一步应从脚本内容中解析要运行的 ELF 路径和参数，并开始实现从 EXT4 读取 ELF、映射 ELF segment、构造用户栈和进入官方测试程序。
 
+## 2026-06-06 外部 ELF 读取与运行
+
+### 今日目标
+
+继续打通官方测试入口：从测试脚本中发现 `./xxx` 形式的可执行文件，从 EXT4 根目录读取 ELF 文件，按 program header 映射 `PT_LOAD` 段，并进入用户态运行。
+
+### 修改内容
+
+- `loader` 新增 4 MiB 外部 ELF 缓冲区，以及外部 ELF ready 状态。
+- `ext4` 扫描脚本时会查找 `./xxx` root candidate，确认目标文件 ELF magic 后读入 loader 缓冲。
+- `MemorySet::new_user(0)` 在外部 ELF ready 时改为加载 ELF：
+  - 解析 ELF64 header。
+  - 遍历 program header。
+  - 映射 `PT_LOAD` 段到用户页表。
+  - 按 `p_flags` 转换用户页权限。
+  - 支持 `.bss` 零填充。
+- `loader::app_entry(0)` 在外部 ELF ready 时返回 ELF `e_entry`。
+- `task::init()` 在外部 ELF ready 时只初始化 task0，避免外部测试结束后继续运行内嵌 app1。
+- 测试组 END 标记延迟到外部 task 退出后输出，保证输出顺序为 START、程序输出、END。
+
+### 验证结果
+
+`make all` 通过。
+
+本地 EXT4 测试镜像中包含：
+
+- 根目录 `app0`：由 `user/target/riscv64gc-unknown-none-elf/release/app0` 复制得到的 RISC-V ELF。
+- 根目录 `basic_testcode.sh`：包含 START marker、`./app0`、END marker。
+
+使用官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+loader: selected external ELF app0
+loader: external ELF ready, bytes=43128
+#### OS COMP TEST GROUP START basic ####
+external ELF loaded: entry=0x10000, phnum=4, bytes=43128
+task 0 external user space ready: satp=...
+app0: hello from write
+...
+task 0 exited with code 0
+#### OS COMP TEST GROUP END basic ####
+all tasks exited
+```
+
+无测试盘回归仍通过，继续运行内嵌 `app0/app1` 并关机。
+
+### 结论
+
+测试入口已经推进到“从官方风格 EXT4 测试盘读取 ELF 并进入用户态”。下一步重点不再是入口，而是官方 Linux ABI 兼容：argv/envp/auxv、真实文件路径读取、更多 syscall、进程模型和脚本串行执行。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -724,7 +774,8 @@ ext4: found 2 test script(s)
 | 23 | 官方脚本入口 | 串行运行或按格式跳过 `xxxxx_testcode.sh` 测试点 | 已完成（暂时跳过） |
 | 24 | 真实堆页映射 | `brk` 增长后能访问新映射用户页 | 未开始 |
 | 25 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
-| 26 | ELF 加载入口 | 从脚本定位 ELF 并加载第一个官方 basic 程序 | 下一步 |
+| 26 | ELF 加载入口 | 从脚本定位 ELF 并加载第一个官方 basic 程序 | 已完成（本地 ELF 验证） |
+| 27 | Linux ABI 启动参数 | 构造 argv/envp/auxv，让 libc 程序能过启动早期 | 下一步 |
 
 ## 提交计划
 
@@ -764,3 +815,4 @@ ext4: found 2 test script(s)
 | 32 | virtio-blk 扇区读取 | 已完成 |
 | 33 | EXT4 根目录测试脚本扫描 | 已完成 |
 | 34 | EXT4 脚本内容读取与组标记输出 | 已完成 |
+| 35 | 外部 ELF 读取与运行 | 已完成 |

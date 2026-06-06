@@ -36,8 +36,9 @@
 - 官方 RISC-V 提交入口：根目录 `make all` 生成 `kernel-rv` 和临时 `kernel-la`。
 - QEMU virtio-blk 扇区读取。
 - 无分区 EXT4 测试盘根目录扫描，识别并读取 `*_testcode.sh`，输出官方测试组 START/END 标记。
+- 从测试盘读取 RISC-V ELF，按 `PT_LOAD` segment 映射并进入用户态运行。
 
-当前用户程序仍是内嵌最小测试程序。下一阶段目标是从官方 `*_testcode.sh` 中解析待运行程序路径，并接入盘上 ELF 测试程序加载。
+当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF。下一阶段目标是让官方 basic/busybox ELF 通过 libc 启动早期路径，重点补 argv/envp/auxv、真实文件读取和 Linux ABI syscall。
 
 QEMU 中可以看到类似：
 

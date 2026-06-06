@@ -107,7 +107,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `*_testcode.sh` 发现 | 已支持 | 本地镜像发现 2 个脚本 | 打印文件名并继续读取脚本内容 |
 | 脚本内容读取 | 已支持 | 本地镜像读取 `basic_testcode.sh` 和 `lua_testcode.sh` | 当前最多读取 16 KiB |
 | 官方组标记输出 | 已支持 | 脚本内 marker 原样输出；无 marker 时按文件名前缀生成 START/END | 暂时跳过测试组执行 |
-| ELF 文件加载 | 未开始 | 待验证 | 下一步之后 |
+| ELF 文件加载 | 最小支持 | 本地 EXT4 镜像加载根目录 `app0` ELF 并运行 | 支持 ELF64 `PT_LOAD`，暂用 4 MiB 缓冲 |
+| ELF 输出包裹 | 已支持 | START 在外部 ELF 前输出，END 在 task exit 后输出 | 单外部 ELF 路径 |
 
 ## 当前限制
 
@@ -119,12 +120,13 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
 | 文件系统 | 已能只读扫描 EXT4 根目录测试脚本，但 `openat/read` 尚未接入 EXT4 文件内容 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
+| ELF loader | 尚未支持动态链接器、argv/envp/auxv、解释器路径、多个 ELF 串行运行 |
 
 ## 下一步待测
 
 | 方向 | 目标 | 状态 |
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 未开始 |
-| 官方测例 | 从 `*_testcode.sh` 内容中解析待运行 ELF 路径和参数 | 下一步 |
+| 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
-| 文件系统 | 将 EXT4 文件内容读取接入 ELF loader | 下一步 |
+| 文件系统 | 将 `openat/read` 接入 EXT4 真实文件 | 下一步 |

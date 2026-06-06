@@ -4,6 +4,12 @@ use super::{alloc_frame, PageTable, PageTableEntry, PTEFlags, PhysAddr, PhysPage
 use super::frame_allocator::MEMORY_END;
 
 const MMIO_RANGES: &[(usize, usize)] = &[(0x1000_0000, 0x9000)];
+const ELF_MAGIC: &[u8; 4] = b"\x7fELF";
+const ELF_PT_LOAD: u32 = 1;
+const ELF_PH_SIZE: usize = 56;
+const ELF_PF_X: u32 = 1;
+const ELF_PF_W: u32 = 2;
+const ELF_PF_R: u32 = 4;
 
 pub struct MemorySet {
     page_table: PageTable,
@@ -158,7 +164,11 @@ impl MemorySet {
 
             memory_set.map_mmio_ranges();
 
-            memory_set.load_user_app(app_id);
+            if app_id == 0 && crate::loader::has_external_app() {
+                memory_set.load_external_elf();
+            } else {
+                memory_set.load_user_app(app_id);
+            }
         }
 
         memory_set
@@ -205,6 +215,82 @@ impl MemorySet {
             data.len(),
         );
     }
+
+    fn load_external_elf(&self) {
+        let data = crate::loader::external_app_data();
+        assert!(is_elf(data), "external app should be a valid ELF");
+
+        let entry = le_u64(data, 24) as usize;
+        let phoff = le_u64(data, 32) as usize;
+        let phentsize = le_u16(data, 54) as usize;
+        let phnum = le_u16(data, 56) as usize;
+
+        assert!(phentsize >= ELF_PH_SIZE, "unsupported ELF program header size");
+
+        let mut index = 0usize;
+        while index < phnum {
+            let offset = phoff + index * phentsize;
+            assert!(offset + ELF_PH_SIZE <= data.len(), "invalid ELF program header");
+
+            if le_u32(data, offset) == ELF_PT_LOAD {
+                self.load_elf_segment(data, offset);
+            }
+
+            index += 1;
+        }
+
+        crate::println!(
+            "external ELF loaded: entry={:#x}, phnum={}, bytes={}",
+            entry,
+            phnum,
+            data.len(),
+        );
+    }
+
+    fn load_elf_segment(&self, elf: &[u8], ph_offset: usize) {
+        let flags = le_u32(elf, ph_offset + 4);
+        let file_offset = le_u64(elf, ph_offset + 8) as usize;
+        let vaddr = le_u64(elf, ph_offset + 16) as usize;
+        let filesz = le_u64(elf, ph_offset + 32) as usize;
+        let memsz = le_u64(elf, ph_offset + 40) as usize;
+
+        if memsz == 0 {
+            return;
+        }
+
+        assert!(file_offset + filesz <= elf.len(), "ELF segment exceeds file");
+
+        let segment_start = round_down(vaddr, PAGE_SIZE);
+        let segment_end = round_up(vaddr + memsz, PAGE_SIZE);
+        let mut page_va = segment_start;
+
+        while page_va < segment_end {
+            let frame = alloc_frame().expect("failed to allocate ELF segment frame");
+            self.page_table.map(
+                VirtAddr(page_va).floor(),
+                PhysPageNum(frame.ppn()),
+                elf_pte_flags(flags),
+            );
+
+            let page_file_start = if page_va < vaddr { vaddr } else { page_va };
+            let page_file_end = core::cmp::min(page_va + PAGE_SIZE, vaddr + filesz);
+
+            if page_file_start < page_file_end {
+                let src_offset = file_offset + page_file_start - vaddr;
+                let dst_offset = page_file_start - page_va;
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        elf.as_ptr().add(src_offset),
+                        (frame.start_pa() + dst_offset) as *mut u8,
+                        page_file_end - page_file_start,
+                    );
+                }
+            }
+
+            page_va += PAGE_SIZE;
+        }
+    }
+
     fn map_identical_range(&self, start: usize, end: usize, flags: PTEFlags, name: &str) {
         if start == end {
             return;
@@ -334,4 +420,60 @@ pub fn self_check() {
         user_space.self_check_user(app_id);
         app_id += 1;
     }
+}
+
+fn is_elf(data: &[u8]) -> bool {
+    data.len() >= 64 && &data[..4] == ELF_MAGIC
+}
+
+fn elf_pte_flags(flags: u32) -> PTEFlags {
+    let mut pte_flags = PTEFlags::U;
+
+    if flags & ELF_PF_R != 0 {
+        pte_flags = pte_flags | PTEFlags::R;
+    }
+
+    if flags & ELF_PF_W != 0 {
+        pte_flags = pte_flags | PTEFlags::R | PTEFlags::W;
+    }
+
+    if flags & ELF_PF_X != 0 {
+        pte_flags = pte_flags | PTEFlags::X;
+    }
+
+    pte_flags
+}
+
+fn round_down(value: usize, align: usize) -> usize {
+    value & !(align - 1)
+}
+
+fn round_up(value: usize, align: usize) -> usize {
+    (value + align - 1) & !(align - 1)
+}
+
+fn le_u16(buffer: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([buffer[offset], buffer[offset + 1]])
+}
+
+fn le_u32(buffer: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+    ])
+}
+
+fn le_u64(buffer: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+        buffer[offset + 4],
+        buffer[offset + 5],
+        buffer[offset + 6],
+        buffer[offset + 7],
+    ])
 }

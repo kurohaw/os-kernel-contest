@@ -47,8 +47,18 @@ static mut CURRENT: usize = 0;
 
 pub fn init() {
     let mut i = 0;
+    let use_external_app = crate::loader::has_external_app();
 
     while i < MAX_TASKS {
+        if use_external_app && i > 0 {
+            unsafe {
+                TASKS[i] = TaskControlBlock::zero_init();
+            }
+
+            i += 1;
+            continue;
+        }
+
         unsafe {
             let memory_set = MemorySet::new_user(i);
             let satp_token = memory_set.satp_token();
@@ -63,7 +73,11 @@ pub fn init() {
                 heap_end: crate::loader::USER_HEAP_BASE,
             };
 
-            crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
+            if use_external_app {
+                crate::println!("task {} external user space ready: satp={:#x}", i, satp_token);
+            } else {
+                crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
+            }
         }
 
         i += 1;
@@ -149,6 +163,10 @@ pub fn exit_current(code: i32) -> ! {
 
     if let Some(next) = find_next_ready() {
         run_task(next);
+    }
+
+    if crate::loader::has_external_app() {
+        crate::loader::print_external_group_end();
     }
 
     crate::println!("all tasks exited");

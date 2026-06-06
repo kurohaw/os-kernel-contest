@@ -2,6 +2,14 @@ pub const APP_NUM: usize = 2;
 pub const USER_APP_BASE: usize = 0x10000;
 pub const USER_HEAP_BASE: usize = 0x20000;
 pub const USER_HEAP_SIZE: usize = 0x10000;
+pub const EXTERNAL_APP_MAX_SIZE: usize = 4 * 1024 * 1024;
+const EXTERNAL_GROUP_MAX_LEN: usize = 32;
+
+static mut EXTERNAL_APP: [u8; EXTERNAL_APP_MAX_SIZE] = [0; EXTERNAL_APP_MAX_SIZE];
+static mut EXTERNAL_GROUP: [u8; EXTERNAL_GROUP_MAX_LEN] = [0; EXTERNAL_GROUP_MAX_LEN];
+static mut EXTERNAL_APP_LEN: usize = 0;
+static mut EXTERNAL_GROUP_LEN: usize = 0;
+static mut EXTERNAL_APP_READY: bool = false;
 
 pub fn init() {
     let mut app_id = 0;
@@ -28,12 +36,102 @@ pub fn app_data(app_id: usize) -> &'static [u8] {
         _ => panic!("invalid app id {}", app_id),
     }
 }
+
+pub fn external_app_buffer_mut() -> &'static mut [u8] {
+    unsafe {
+        core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(EXTERNAL_APP) as *mut u8,
+            EXTERNAL_APP_MAX_SIZE,
+        )
+    }
+}
+
+pub fn set_external_app(len: usize) {
+    unsafe {
+        EXTERNAL_APP_LEN = len;
+        EXTERNAL_APP_READY = len > 0;
+    }
+
+    crate::println!("loader: external ELF ready, bytes={}", len);
+}
+
+pub fn set_external_group(group: &[u8]) {
+    let copy_len = core::cmp::min(group.len(), EXTERNAL_GROUP_MAX_LEN);
+
+    unsafe {
+        let group_buffer =
+            core::slice::from_raw_parts_mut(core::ptr::addr_of_mut!(EXTERNAL_GROUP) as *mut u8, EXTERNAL_GROUP_MAX_LEN);
+        group_buffer.fill(0);
+        group_buffer[..copy_len].copy_from_slice(&group[..copy_len]);
+        EXTERNAL_GROUP_LEN = copy_len;
+    }
+}
+
+pub fn has_external_app() -> bool {
+    unsafe { EXTERNAL_APP_READY }
+}
+
+pub fn external_app_data() -> &'static [u8] {
+    unsafe {
+        core::slice::from_raw_parts(
+            core::ptr::addr_of!(EXTERNAL_APP) as *const u8,
+            EXTERNAL_APP_LEN,
+        )
+    }
+}
+
+pub fn external_app_entry() -> usize {
+    let data = external_app_data();
+    if data.len() < 32 {
+        return USER_APP_BASE;
+    }
+
+    le_u64(data, 24) as usize
+}
+
+pub fn print_external_group_end() {
+    let group_len = unsafe { EXTERNAL_GROUP_LEN };
+    if group_len == 0 {
+        return;
+    }
+
+    let group = unsafe {
+        core::slice::from_raw_parts(
+            core::ptr::addr_of!(EXTERNAL_GROUP) as *const u8,
+            group_len,
+        )
+    };
+
+    crate::print!("#### OS COMP TEST GROUP END ");
+    for &byte in group {
+        crate::sbi::console_putchar(byte as usize);
+    }
+    crate::println!(" ####");
+}
+
 pub fn app_entry(app_id: usize) -> usize {
     if app_id >= APP_NUM {
         panic!("invalid app id {}", app_id);
     }
 
+    if app_id == 0 && has_external_app() {
+        return external_app_entry();
+    }
+
     USER_APP_BASE
+}
+
+fn le_u64(buffer: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes([
+        buffer[offset],
+        buffer[offset + 1],
+        buffer[offset + 2],
+        buffer[offset + 3],
+        buffer[offset + 4],
+        buffer[offset + 5],
+        buffer[offset + 6],
+        buffer[offset + 7],
+    ])
 }
 
 #[no_mangle]
