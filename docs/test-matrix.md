@@ -14,6 +14,26 @@ make run
 - `app0` 和 `app1` 都能完成 syscall 验证输出。
 - 最后出现 `all tasks exited`。
 
+## 官方评测快照
+
+| 时间 | 提交状态 | 总分 | 结论 |
+|---|---|---:|---|
+| 2026-06-06 12:01 | Accepted | 0.0 | 产物被评测系统接受，但所有官方测试套件均未得分 |
+
+截图中的汇总结果显示，`basic`、`busybox`、`cyclictest`、`iozone`、`iperf`、`libcbench`、`libctest`、`lmbench`、`ltp`、`lua`、`netperf` 在 glibc/musl 与 rv/la 维度下均为 0。
+
+当前判断：这不是单个 syscall 的失败，而是官方测例入口尚未打通。当前内核仍运行内嵌的 `app0/app1` 自测程序，尚未具备加载并调度官方 glibc/musl/busybox 等 Linux ABI 用户程序的完整路径。
+
+优先级应调整为：
+
+| 优先级 | 方向 | 目标 |
+|---:|---|---|
+| 1 | 官方测例入口 | 明确评测器传入的用户程序/镜像形式，并让内核能启动第一个官方 basic 程序 |
+| 2 | ELF 与地址空间 | 从固定裸二进制加载过渡到 ELF segment 映射、entry/sp/auxv 初始化 |
+| 3 | 进程模型 | 补齐 `execve`、`fork/clone`、`wait4`、`exit_group` 等 basic/busybox 常用路径 |
+| 4 | 文件系统接口 | 支持目录、真实文件读写、路径解析和 per-process fd table |
+| 5 | syscall 矩阵 | 用官方 basic 失败日志反推最小 syscall 集，而不是只按自测程序扩展 |
+
 ## 基础 syscall 状态
 
 | syscall | 编号 | 当前状态 | 验证方式 | 备注 |
