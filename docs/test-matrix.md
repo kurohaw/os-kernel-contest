@@ -15,6 +15,22 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 - `app0` 和 `app1` 都能完成 syscall 验证输出。
 - 最后出现 `all tasks exited`，随后 QEMU 主动退出。
 
+官方测试盘扫描验证命令：
+
+```bash
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default \
+  -drive file=/tmp/oskernel-ext4.img,if=none,format=raw,id=x0 \
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
+```
+
+本地无分区 EXT4 镜像包含 `basic_testcode.sh` 和 `lua_testcode.sh` 时，内核应输出：
+
+- `virtio-blk: ready`
+- `oscomp: found test script basic_testcode.sh`
+- `oscomp: found test script lua_testcode.sh`
+- `ext4: found 2 test script(s)`
+
 ## 官方评测快照
 
 | 时间 | 提交状态 | 总分 | 结论 |
@@ -29,10 +45,10 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 | 优先级 | 方向 | 目标 |
 |---:|---|---|
-| 1 | 官方测例入口 | 明确评测器传入的用户程序/镜像形式，并让内核能启动第一个官方 basic 程序 |
+| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘并列出根目录脚本；下一步读取脚本内容并输出官方组标记 |
 | 2 | ELF 与地址空间 | 从固定裸二进制加载过渡到 ELF segment 映射、entry/sp/auxv 初始化 |
 | 3 | 进程模型 | 补齐 `execve`、`fork/clone`、`wait4`、`exit_group` 等 basic/busybox 常用路径 |
-| 4 | 文件系统接口 | 支持目录、真实文件读写、路径解析和 per-process fd table |
+| 4 | 文件系统接口 | 在现有 EXT4 根目录扫描基础上支持打开/读取测试脚本和 ELF 文件 |
 | 5 | syscall 矩阵 | 用官方 basic 失败日志反推最小 syscall 集，而不是只按自测程序扩展 |
 
 ## 基础 syscall 状态
@@ -77,6 +93,19 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `/hello.txt` | 成功 | 返回内嵌内容 | 不支持 | 成功 | 只读内嵌文件 |
 | `/missing` | 返回 -1 | 不适用 | 不适用 | 不适用 | 不存在路径 |
 
+## 官方测试盘入口状态
+
+| 项目 | 当前状态 | 验证方式 | 备注 |
+|---|---|---|---|
+| virtio-blk 设备识别 | 已支持 | 官方风格 QEMU `-drive ... virtio-blk-device` | 支持 legacy virtio-mmio v1 |
+| 扇区读取 | 已支持 | 初始化时读取 sector 0 smoke test | 512 字节扇区接口 |
+| EXT4 superblock | 已支持 | 本地无分区 EXT4 镜像 | 支持 1K/2K/4K block size |
+| root inode | 已支持 | 读取 group descriptor 和 inode table | 当前只读 |
+| extent 目录块 | 最小支持 | 根目录扫描验证 | 支持 depth=0/1 |
+| `*_testcode.sh` 发现 | 已支持 | 本地镜像发现 2 个脚本 | 目前只打印文件名 |
+| 脚本内容读取 | 未开始 | 待验证 | 下一步 |
+| ELF 文件加载 | 未开始 | 待验证 | 下一步之后 |
+
 ## 当前限制
 
 | 模块 | 限制 |
@@ -85,7 +114,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `read` | stdin 暂时直接返回 0 |
 | `openat` | 只识别 `/dev/null` 和 `/hello.txt` |
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
-| 文件系统 | 当前只有内嵌只读文件，尚无真实目录和 inode |
+| 文件系统 | 已能只读扫描 EXT4 根目录测试脚本，但 `openat/read` 尚未接入 EXT4 文件内容 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
 
 ## 下一步待测
@@ -93,6 +122,6 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 方向 | 目标 | 状态 |
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 未开始 |
-| 官方测例 | 接入比赛测例并记录通过情况 | 未开始 |
+| 官方测例 | 读取 `*_testcode.sh` 内容并输出官方测试组标记 | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
-| 文件系统 | 扩展更多只读文件和路径处理 | 未开始 |
+| 文件系统 | 将 EXT4 文件内容读取接入脚本/ELF loader | 下一步 |

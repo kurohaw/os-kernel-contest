@@ -10,7 +10,7 @@
 
 ## 当前进度
 
-截至 2026-06-04，`kernel/` 已完成：
+截至 2026-06-06，`kernel/` 已完成：
 
 - QEMU + RustSBI 启动。
 - `_start -> rust_main` 启动链路。
@@ -32,8 +32,12 @@
 - 独立 `user/` 用户程序构建。
 - 用户程序二进制嵌入内核。
 - 用户程序加载到用户地址空间 `0x10000` 并运行。
+- 基础 syscall：`write`、`read`、`openat`、`close`、`fstat`、`getpid`、`brk` 等最小路径。
+- 官方 RISC-V 提交入口：根目录 `make all` 生成 `kernel-rv` 和临时 `kernel-la`。
+- QEMU virtio-blk 扇区读取。
+- 无分区 EXT4 测试盘根目录扫描，并识别 `*_testcode.sh`。
 
-当前用户程序仍是最小测试程序，下一阶段目标是补齐比赛常用基础 syscall，优先实现 `write`、`getpid`、`read` 等接口。
+当前用户程序仍是内嵌最小测试程序。下一阶段目标是读取官方 `*_testcode.sh` 内容，按官方格式输出测试组起止标记，并接入盘上 ELF 测试程序加载。
 
 QEMU 中可以看到类似：
 
@@ -54,11 +58,21 @@ all tasks exited
 在 WSL/bash 中执行：
 
 ```bash
-cd /mnt/d/os-kernel-contest/kernel
-make run
+cd /mnt/d/os-kernel-contest
+make all
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default -no-reboot
 ```
 
-`kernel/Makefile` 会先构建 `user/` 中的用户程序，再构建并运行内核。
+根目录 `Makefile` 会先构建 `user/` 中的用户程序，再构建内核并生成官方要求的产物。
+
+带 EXT4 测试盘的本地验证命令示例：
+
+```bash
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default \
+  -drive file=/tmp/oskernel-ext4.img,if=none,format=raw,id=x0 \
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
+```
 
 也可以只构建用户程序：
 

@@ -9,6 +9,7 @@
 - 当前重点不是继续零散补自测 syscall，而是先打通官方测例入口：virtio-blk、EXT4、测试脚本扫描、ELF 用户程序加载。
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。原因判断为官方测例入口尚未打通，而不是单个 syscall 失败。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，并从无分区 EXT4 根目录扫描 `*_testcode.sh` 脚本名。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明
@@ -105,22 +106,23 @@ all tasks exited
 - `brk` 只维护边界，尚未真实映射新增堆页。
 - 文件系统只有 `/dev/null` 和内嵌只读 `/hello.txt`。
 - fd 表仍是全局表，尚未按进程隔离。
-- 尚未实现 virtio-blk、EXT4、ELF loader、fork/exec/wait/waitpid、真实目录和路径解析。
+- virtio-blk 与 EXT4 目前只支持只读根目录扫描测试脚本，尚未读取脚本内容、解释脚本或从盘上加载 ELF。
+- 尚未实现官方 ELF loader、fork/exec/wait/waitpid、真实路径解析和 per-process 文件描述符表。
 - 尚未真正支持 LoongArch。
 
 ## 下一步优先级
 
-1. 实现或接入 virtio-blk 设备识别。
-2. 读取官方挂载的 EXT4 测试盘。
-3. 扫描根目录中的 `xxxxx_testcode.sh`。
-4. 按官方格式串行运行或暂时跳过测试组。
-5. 从官方 basic 用例的失败日志反推 ELF loader、进程模型和 syscall 最小集合。
+1. 读取 `xxxxx_testcode.sh` 内容，确认脚本中的官方测试组格式。
+2. 按官方格式串行运行或暂时跳过测试组。
+3. 从测试脚本定位第一个 basic ELF，接入 ELF segment 映射、entry、用户栈和参数。
+4. 从官方 basic 用例的失败日志反推 ELF loader、进程模型和 syscall 最小集合。
 
 不要在测试盘入口没打通前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。
 
 ## 协作与提交习惯
 
 - 每天开始开发前先执行 `git pull --rebase gitlab main`。
+- 当前用户要求：`git pull --rebase gitlab main` 由用户本人执行，Codex 不要自动执行；需要同步时只提醒用户。
 - 自己改完及时 commit，commit message 使用 Conventional Commits，描述部分可用中文。
 - push 前再执行一次 `git pull --rebase gitlab main`。
 - 不要随便对共享 `main` 分支使用 `git push --force`。

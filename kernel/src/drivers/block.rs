@@ -170,6 +170,10 @@ pub fn read_sector(sector: u64, buffer: &mut [u8]) -> bool {
     }
 }
 
+pub fn is_ready() -> bool {
+    unsafe { DEVICE.ready }
+}
+
 unsafe fn init_device(base: usize, version: u32) -> bool {
     mmio_write32(base, REG_STATUS, 0);
     set_status(base, STATUS_ACKNOWLEDGE);
