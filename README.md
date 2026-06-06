@@ -42,8 +42,9 @@
 - EXT4 只读路径解析支持多级子目录普通文件。
 - `brk` 增长时映射真实用户堆页，外部程序可以写入新增堆区。
 - 最小脚本执行器：跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把多个真实 ELF 命令排队串行运行并构造 argv。
+- Linux syscall 编号兼容层：支持 official basic 早期会用到的 `exit=93`、`sched_yield=124`、`gettimeofday=169`、`mmap=222` 等最小路径。
 
-当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以从官方 basic 风格脚本下钻到子目录脚本，按队列串行运行多个真实 ELF、传入 argv、读取子目录文件并写入用户堆。下一阶段目标是用官方 basic/busybox ELF 运行日志反推缺失 Linux ABI syscall，并继续补进程模型。
+当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以从官方 basic 风格脚本下钻到子目录脚本，按队列串行运行多个真实 ELF、传入 argv、读取子目录文件并写入用户堆。下一阶段目标是编译并运行官方 basic ELF，继续补 fork/exec/wait 等进程模型。
 
 QEMU 中可以看到类似：
 

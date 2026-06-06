@@ -62,11 +62,22 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | yield | 2 | 已支持 | 两个任务轮转运行；单任务 yield 后继续运行当前任务 | 已修复 yield 后恢复 `TrapContext`，并避免外部单任务 yield panic |
 | openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt`、EXT4 普通文件 | 支持多级只读路径，不存在路径返回 `-1` |
 | close | 57 | 最小支持 | 关闭标准 fd 和动态 fd | 重复关闭动态 fd 返回 `-1` |
+| pipe2 | 59 | 最小支持 | 临时 pipe buffer | 单全局 pipe buffer，非真实进程隔离 |
+| getdents64 | 61 | 最小支持 | 返回一个 `.` 目录项 | 仅用于 basic smoke |
 | read | 63 | 最小支持 | 读取 `/hello.txt` | stdin 当前返回 `0` |
 | write | 64 | 已支持 | stdout/stderr 输出字符串 | `/dev/null` 写入直接丢弃 |
 | fstat | 80 | 最小支持 | stdout、动态 fd 返回成功 | stat buffer 当前最小填充 |
+| exit/exit_group | 93/94 | 已支持 | 外部 ELF Linux 编号退出 | 兼容内嵌旧 `exit=1` |
+| nanosleep | 101 | stub | basic `sleep` 早期验证 | 立即返回 0 |
+| sched_yield | 124 | 已支持 | 单外部 task yield 后继续运行 | 兼容内嵌旧 `yield=2` |
+| times | 153 | 最小支持 | 填充 tms 并返回 tick | 近似时间 |
+| uname | 160 | 最小支持 | 填充 utsname 字符串 | 固定字符串 |
+| gettimeofday | 169 | 最小支持 | 临时 Linux-ID 外部 ELF 验证 | 基于 RISC-V time CSR |
 | getpid | 172 | 已支持 | app0 返回 0，app1 返回 1 | 当前 pid 等于 task id |
+| getppid | 173 | stub | 返回 1 | basic 只检查大于 0 |
 | brk | 214 | 最小支持 | 查询、增长堆边界并写入新增页 | 增长时映射零页，缩小时暂不回收 |
+| munmap | 215 | stub | basic munmap 早期验证 | 立即返回 0，不回收页 |
+| mmap | 222 | 最小支持 | 临时 Linux-ID 外部 ELF 验证内存文件映射 | 使用固定 mmap 区域，按需映射零页 |
 
 ## 用户程序验证点
 
@@ -95,6 +106,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `/hello.txt` | 成功 | 返回内嵌内容 | 不支持 | 成功 | 只读内嵌文件 |
 | `/missing` | 返回 -1 | 不适用 | 不适用 | 不适用 | 不存在路径 |
 | 测试盘普通文件 | 成功 | 按 fd offset 读取 EXT4 内容 | 不支持 | 成功 | 本地 `ext4read` 读取 `data.txt`、`subpath` 读取 `dir/data.txt` 通过 |
+| `O_CREATE` 内存文件 | 成功 | 可读已写入内容 | 写入内存 buffer | 成功 | 支持 basic close/mmap/unlink smoke |
 
 ## 官方测试盘入口状态
 
@@ -115,6 +127,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | EXT4 子目录路径 | 最小支持 | 临时外部 ELF `subpath` 打开并读取 `dir/data.txt` | 只读普通文件 |
 | 脚本下钻和 argv | 最小支持 | 顶层脚本 `busybox echo` + `cd ./basic` + 嵌套 `./run-all.sh`，最终运行 `basic/argshow one two` | 支持固定队列内多个真实 ELF 串行 |
 | 多 ELF 串行队列 | 最小支持 | 本地 `run-all.sh` 连续执行 `./argshow one` 和 `./argshow two three`，两次退出后才输出 END | 队列上限 64 条，仍非完整 shell |
+| Linux syscall 编号 smoke | 最小支持 | 临时外部 ELF 直接调用 `sched_yield/gettimeofday/openat/read/mmap/exit=93` | 验证 official basic 早期 ABI 入口 |
 
 ## 当前限制
 
@@ -123,7 +136,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `brk` | 增长时映射用户零页；缩小时暂不回收页 |
 | `read` | stdin 暂时直接返回 0 |
 | `openat` | 识别 `/dev/null`、`/hello.txt` 和 EXT4 多级普通文件；尚未支持目录 fd 和挂载点语义 |
-| 文件描述符表 | 当前是全局表，尚未按进程隔离 |
+| 文件描述符表 | 当前是全局表，尚未按进程隔离；内存文件和 pipe 也是全局简化实现 |
 | 文件系统 | `openat/read/fstat` 已能读取 EXT4 多级普通文件；尚未支持写入、目录 fd、挂载点和完整 Linux 路径语义 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
 | ELF loader | 已支持脚本命令 argv、空 `envp`、基础 `auxv` 和多个 ELF 串行队列；尚未支持动态链接器、解释器路径 |

@@ -1026,6 +1026,53 @@ all tasks exited
 
 脚本执行器已经能跑一个测试组内的多个真实 ELF。下一步应直接使用官方 basic/busybox ELF 运行日志来补缺失 syscall 和 ABI 行为，而不是继续造本地自测。
 
+## 2026-06-06 Linux syscall 编号兼容 smoke
+
+### 今日目标
+
+官方 basic 用户库使用 Linux/RISC-V syscall 编号，例如 `exit=93`、`sched_yield=124`、`gettimeofday=169` 和 `mmap=222`。此前内嵌自测仍使用早期自定义编号 `exit=1`、`yield=2`，会导致官方 ELF 进入用户态后无法正常退出或继续运行。本阶段目标是先补一层 Linux 编号兼容和 basic 早期所需的最小 stub。
+
+### 修改内容
+
+- trap/syscall 参数从 a0-a3 扩展到 a0-a5，支持 `mmap` 等 6 参数 syscall。
+- `syscall` 分发新增 Linux 编号：`exit/exit_group`、`sched_yield`、`gettimeofday`、`times`、`uname`、`getppid`、`mmap/munmap`、`nanosleep`、`dup/dup3`、`pipe2`、`getdents64`、`chdir/getcwd`、`mkdirat/unlinkat`、`mount/umount2` 等最小路径。
+- fd 表扩到 128，支持 `dup2(STDOUT, 100)`。
+- 文件层新增简化的 `Console`、`Directory`、`Memory`、`PipeRead/PipeWrite` fd 类型；`O_CREATE` 可创建内存文件，供 close/mmap/unlink 等 basic smoke 使用。
+- loader 保存外部 ELF 当前目录；`fs::openat` 对相对路径先尝试当前目录下的 EXT4 文件，因此 `basic/open` 可读取 `basic/text.txt`。
+- `mmap` 使用固定 mmap 区域按需映射用户零页，并可把 fd 内容复制到映射区。
+
+### 验证结果
+
+`cargo build --release` 内核构建通过。
+
+临时编译外部 ELF `linuxids`，直接使用 Linux syscall 编号调用：
+
+- `write=64`
+- `sched_yield=124`
+- `gettimeofday=169`
+- `openat/read` 读取 `./text.txt`
+- `openat(O_CREATE)/write/mmap=222`
+- `exit=93`
+
+官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+loader: selected external ELF basic/linuxids
+#### OS COMP TEST GROUP START basic ####
+linuxids: start
+task 0 yield
+linuxids: time ok
+TEXT-OK
+mmap-ok
+task 0 exited with code 0
+#### OS COMP TEST GROUP END basic ####
+all tasks exited
+```
+
+### 结论
+
+official basic 的早期 Linux syscall 编号入口已经不再是硬阻塞。下一步需要在本地准备 official basic 的真实 ELF 镜像，观察从 `brk/chdir/.../yield` 队列实际跑到哪里，再补 fork/exec/wait、真实目录语义和 per-process fd。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -1062,7 +1109,8 @@ all tasks exited
 | 30 | 路径解析扩展 | 支持子目录、相对路径和目录 fd | 已完成（多级普通文件） |
 | 31 | 最小脚本执行器 | 支持 `cd`、嵌套 `.sh`、多 ELF 串行和 argv | 已完成 |
 | 32 | 多 ELF 串行队列 | 一个测试组内多个 ELF 依次运行并延迟输出 END | 已完成（固定队列） |
-| 33 | 官方 basic/busybox 运行追踪 | 用官方 ELF 日志反推缺失 syscall/ABI | 下一步 |
+| 33 | Linux syscall 编号兼容 smoke | 外部 ELF 使用 Linux 编号能 yield、读文件、mmap、exit | 已完成（早期 smoke） |
+| 34 | 官方 basic/busybox 运行追踪 | 用官方 ELF 日志反推缺失 syscall/ABI | 下一步 |
 
 ## 提交计划
 
@@ -1109,3 +1157,4 @@ all tasks exited
 | 39 | EXT4 多级路径读取 | 已完成 |
 | 40 | 最小脚本下钻与 argv | 已完成 |
 | 41 | 多 ELF 串行队列 | 已完成 |
+| 42 | Linux syscall 编号兼容 smoke | 已完成 |

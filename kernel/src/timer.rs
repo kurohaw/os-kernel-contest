@@ -7,10 +7,14 @@ pub fn set_next_trigger() {
     crate::sbi::set_timer(get_time() + CLOCK_FREQ / TICKS_PER_SEC);
 }
 
-fn get_time() -> usize{
+pub fn get_time() -> usize{
     let time;
     unsafe{
         asm!("csrr {}, time", out(reg) time);
     }
     time
+}
+
+pub fn get_time_us() -> usize {
+    get_time() / (CLOCK_FREQ / 1_000_000)
 }

@@ -107,13 +107,13 @@ fn handle_environment_call(cx: &mut TrapContext) {
     cx.sepc += 4;
 
     let id = cx.x[17];
-    let args = [cx.x[10], cx.x[11], cx.x[12], cx.x[13]];
+    let args = [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]];
 
     let ret = crate::syscall::syscall(id, args);
     cx.x[10] = ret as usize;
 
-    if id == crate::syscall::SYS_YIELD {
-    crate::task::suspend_current_and_run_next(cx as *mut TrapContext as usize);
+    if id == crate::syscall::SYS_YIELD || id == crate::syscall::SYS_SCHED_YIELD {
+        crate::task::suspend_current_and_run_next(cx as *mut TrapContext as usize);
     }
 }
 fn decode_trap(scause: usize) -> Trap {

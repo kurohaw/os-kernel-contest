@@ -8,6 +8,7 @@ use crate::mm::MemorySet;
 global_asm!(include_str!("switch.S"));
 
 const MAX_TASKS: usize = crate::user::APP_NUM;
+const MMAP_BASE: usize = 0x4000_0000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskStatus {
@@ -24,6 +25,7 @@ pub struct TaskControlBlock {
     pub satp_token: usize,
     pub heap_bottom: usize,
     pub heap_end: usize,
+    pub mmap_end: usize,
 }
 
 impl TaskControlBlock {
@@ -36,6 +38,7 @@ impl TaskControlBlock {
         satp_token: 0,
         heap_bottom: 0,
         heap_end: 0,
+        mmap_end: MMAP_BASE,
     }
 }
 }
@@ -67,6 +70,10 @@ pub fn init() {
 
 fn init_task(task_id: usize, use_external_app: bool) {
     unsafe {
+        if use_external_app && task_id == 0 {
+            crate::fs::reset_cwd_from_loader();
+        }
+
         let memory_set = MemorySet::new_user(task_id);
         let satp_token = memory_set.satp_token();
         let heap_bottom = if use_external_app && task_id == 0 {
@@ -83,6 +90,7 @@ fn init_task(task_id: usize, use_external_app: bool) {
             satp_token,
             heap_bottom,
             heap_end: heap_bottom,
+            mmap_end: MMAP_BASE,
         };
 
         if use_external_app {
@@ -140,6 +148,32 @@ pub fn set_current_brk(new_brk: usize) -> usize {
 
         TASKS[current].heap_end = new_brk;
         TASKS[current].heap_end
+    }
+}
+
+pub fn alloc_current_mmap(len: usize) -> usize {
+    unsafe {
+        let current = CURRENT;
+        let start = round_up(TASKS[current].mmap_end, crate::mm::PAGE_SIZE);
+        let end = round_up(start + len, crate::mm::PAGE_SIZE);
+        TASKS[current].mmap_end = end;
+        start
+    }
+}
+
+pub fn map_current_user_range(start: usize, end: usize) -> bool {
+    unsafe {
+        let current = CURRENT;
+        let mapped = match TASKS[current].memory_set.as_ref() {
+            Some(memory_set) => memory_set.map_user_zero_range(start, end),
+            None => false,
+        };
+
+        if mapped {
+            crate::mm::activate_satp(TASKS[current].satp_token);
+        }
+
+        mapped
     }
 }
 
@@ -228,4 +262,8 @@ fn find_next_ready() -> Option<usize> {
     }
 
     None
+}
+
+fn round_up(value: usize, align: usize) -> usize {
+    (value + align - 1) & !(align - 1)
 }

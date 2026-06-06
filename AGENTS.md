@@ -9,7 +9,7 @@
 - 当前重点不是继续零散补自测 syscall，而是先打通官方测例入口：virtio-blk、EXT4、测试脚本扫描、ELF 用户程序加载。
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。原因判断为官方测例入口尚未打通，而不是单个 syscall 失败。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
-- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）和 `brk` 增长映射真实用户堆页。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取 `*_testcode.sh`，输出官方测试组 START/END 标记；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页，以及 official basic 早期 Linux syscall 编号兼容。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明
@@ -116,7 +116,8 @@ all tasks exited
 1. 用官方 basic/busybox ELF 运行结果反推缺失 Linux ABI/syscall。
 2. 补 per-process fd table，避免多程序串行时 fd 状态串扰。
 3. 补 fork/exec/wait/waitpid，逐步支持 busybox shell 方式运行测试。
-4. 尽快替换当前“陷入后借用户栈跑内核”的临时做法，补独立内核栈。
+4. 尽快在本地构建 official basic ELF 镜像，替代临时 Rust ELF 验证。
+5. 尽快替换当前“陷入后借用户栈跑内核”的临时做法，补独立内核栈。
 
 不要在测试盘入口没打通前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。
 

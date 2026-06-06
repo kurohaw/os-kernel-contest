@@ -676,6 +676,7 @@ fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
         return false;
     }
 
+    set_external_cwd_from_path(path);
     crate::loader::clear_external_args();
     let mut index = 0usize;
     while index < command.argc {
@@ -690,6 +691,23 @@ fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
     crate::loader::set_external_app(read_len);
 
     true
+}
+
+fn set_external_cwd_from_path(path: &[u8]) {
+    let mut last_slash = None;
+    let mut index = 0usize;
+    while index < path.len() {
+        if path[index] == b'/' {
+            last_slash = Some(index);
+        }
+        index += 1;
+    }
+
+    if let Some(index) = last_slash {
+        crate::loader::set_external_cwd(&path[..index]);
+    } else {
+        crate::loader::set_external_cwd(&[]);
+    }
 }
 
 fn is_busybox_echo(command: &[u8], line: &[u8], next_index: usize) -> bool {

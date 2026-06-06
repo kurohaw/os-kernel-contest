@@ -6,6 +6,7 @@ pub const EXTERNAL_APP_MAX_SIZE: usize = 4 * 1024 * 1024;
 pub const EXTERNAL_ARG_MAX: usize = 8;
 const EXTERNAL_GROUP_MAX_LEN: usize = 32;
 const EXTERNAL_ARG_MAX_LEN: usize = 64;
+const EXTERNAL_CWD_MAX_LEN: usize = 128;
 const ELF_PT_LOAD: u32 = 1;
 const ELF_PH_SIZE: usize = 56;
 const USER_PAGE_SIZE: usize = 4096;
@@ -15,9 +16,11 @@ static mut EXTERNAL_GROUP: [u8; EXTERNAL_GROUP_MAX_LEN] = [0; EXTERNAL_GROUP_MAX
 static mut EXTERNAL_ARGV: [[u8; EXTERNAL_ARG_MAX_LEN]; EXTERNAL_ARG_MAX] =
     [[0; EXTERNAL_ARG_MAX_LEN]; EXTERNAL_ARG_MAX];
 static mut EXTERNAL_ARG_LEN: [usize; EXTERNAL_ARG_MAX] = [0; EXTERNAL_ARG_MAX];
+static mut EXTERNAL_CWD: [u8; EXTERNAL_CWD_MAX_LEN] = [0; EXTERNAL_CWD_MAX_LEN];
 static mut EXTERNAL_APP_LEN: usize = 0;
 static mut EXTERNAL_GROUP_LEN: usize = 0;
 static mut EXTERNAL_ARG_COUNT: usize = 0;
+static mut EXTERNAL_CWD_LEN: usize = 0;
 static mut EXTERNAL_APP_READY: bool = false;
 
 pub fn init() {
@@ -125,6 +128,25 @@ pub fn external_arg(index: usize) -> &'static [u8] {
     } else {
         b""
     }
+}
+
+pub fn set_external_cwd(cwd: &[u8]) {
+    let copy_len = core::cmp::min(cwd.len(), EXTERNAL_CWD_MAX_LEN);
+
+    unsafe {
+        let cwd_buffer = core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(EXTERNAL_CWD) as *mut u8,
+            EXTERNAL_CWD_MAX_LEN,
+        );
+        cwd_buffer.fill(0);
+        cwd_buffer[..copy_len].copy_from_slice(&cwd[..copy_len]);
+        EXTERNAL_CWD_LEN = copy_len;
+    }
+}
+
+pub fn external_cwd() -> &'static [u8] {
+    let len = unsafe { EXTERNAL_CWD_LEN };
+    unsafe { core::slice::from_raw_parts(core::ptr::addr_of!(EXTERNAL_CWD) as *const u8, len) }
 }
 
 pub fn set_external_group(group: &[u8]) {
