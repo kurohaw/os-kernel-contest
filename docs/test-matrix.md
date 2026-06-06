@@ -66,7 +66,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | write | 64 | 已支持 | stdout/stderr 输出字符串 | `/dev/null` 写入直接丢弃 |
 | fstat | 80 | 最小支持 | stdout、动态 fd 返回成功 | stat buffer 当前最小填充 |
 | getpid | 172 | 已支持 | app0 返回 0，app1 返回 1 | 当前 pid 等于 task id |
-| brk | 214 | 最小支持 | 查询和设置堆边界 | 当前只维护边界，未真实映射堆页 |
+| brk | 214 | 最小支持 | 查询、增长堆边界并写入新增页 | 增长时映射零页，缩小时暂不回收 |
 
 ## 用户程序验证点
 
@@ -117,9 +117,9 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 | 模块 | 限制 |
 |---|---|
-| `brk` | 只维护堆边界，尚未为新增堆区映射用户页 |
+| `brk` | 增长时映射用户零页；缩小时暂不回收页 |
 | `read` | stdin 暂时直接返回 0 |
-| `openat` | 只识别 `/dev/null` 和 `/hello.txt` |
+| `openat` | 识别 `/dev/null`、`/hello.txt` 和 EXT4 根目录普通文件；尚未支持子目录和完整路径解析 |
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
 | 文件系统 | `openat/read/fstat` 已能读取 EXT4 根目录普通文件；尚未支持子目录、写入、目录 fd、挂载点和完整路径解析 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
@@ -129,7 +129,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 | 方向 | 目标 | 状态 |
 |---|---|---|
-| 堆内存 | `brk` 增长后真实映射用户页 | 未开始 |
+| 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
 | 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
 | 文件系统 | 支持子目录、相对路径、目录 fd 和更多 pseudo path | 下一步 |

@@ -62,6 +62,11 @@ pub fn init() {
         unsafe {
             let memory_set = MemorySet::new_user(i);
             let satp_token = memory_set.satp_token();
+            let heap_bottom = if use_external_app && i == 0 {
+                crate::loader::external_app_heap_base()
+            } else {
+                crate::loader::USER_HEAP_BASE
+            };
 
             TASKS[i] = TaskControlBlock {
                 status: TaskStatus::Ready,
@@ -69,12 +74,17 @@ pub fn init() {
                 task_cx: TaskContext::zero_init(),
                 memory_set: Some(memory_set),
                 satp_token,
-                heap_bottom: crate::loader::USER_HEAP_BASE,
-                heap_end: crate::loader::USER_HEAP_BASE,
+                heap_bottom,
+                heap_end: heap_bottom,
             };
 
             if use_external_app {
-                crate::println!("task {} external user space ready: satp={:#x}", i, satp_token);
+                crate::println!(
+                    "task {} external user space ready: satp={:#x}, heap={:#x}",
+                    i,
+                    satp_token,
+                    heap_bottom,
+                );
             } else {
                 crate::println!("task {} user space ready: satp={:#x}", i, satp_token);
             }
@@ -109,6 +119,19 @@ pub fn set_current_brk(new_brk: usize) -> usize {
 
         if new_brk < heap_bottom || new_brk > heap_top {
             return old_brk;
+        }
+
+        if new_brk > old_brk {
+            let mapped = match TASKS[current].memory_set.as_ref() {
+                Some(memory_set) => memory_set.map_user_zero_range(old_brk, new_brk),
+                None => false,
+            };
+
+            if !mapped {
+                return old_brk;
+            }
+
+            crate::mm::activate_satp(TASKS[current].satp_token);
         }
 
         TASKS[current].heap_end = new_brk;

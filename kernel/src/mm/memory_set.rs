@@ -247,6 +247,34 @@ impl MemorySet {
         );
     }
 
+    pub fn map_user_zero_range(&self, start: usize, end: usize) -> bool {
+        if start >= end {
+            return true;
+        }
+
+        let mut page_va = round_down(start, PAGE_SIZE);
+        let end_va = round_up(end, PAGE_SIZE);
+
+        while page_va < end_va {
+            if self.page_table.translate(VirtAddr(page_va).floor()).is_none() {
+                let frame = match alloc_frame() {
+                    Some(frame) => frame,
+                    None => return false,
+                };
+
+                self.page_table.map(
+                    VirtAddr(page_va).floor(),
+                    PhysPageNum(frame.ppn()),
+                    PTEFlags::R | PTEFlags::W | PTEFlags::U,
+                );
+            }
+
+            page_va += PAGE_SIZE;
+        }
+
+        true
+    }
+
     fn load_elf_segment(&self, elf: &[u8], ph_offset: usize) {
         let flags = le_u32(elf, ph_offset + 4);
         let file_offset = le_u64(elf, ph_offset + 8) as usize;

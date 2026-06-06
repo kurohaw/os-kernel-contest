@@ -1,11 +1,12 @@
 pub const APP_NUM: usize = 2;
 pub const USER_APP_BASE: usize = 0x10000;
 pub const USER_HEAP_BASE: usize = 0x20000;
-pub const USER_HEAP_SIZE: usize = 0x10000;
+pub const USER_HEAP_SIZE: usize = 16 * 1024 * 1024;
 pub const EXTERNAL_APP_MAX_SIZE: usize = 4 * 1024 * 1024;
 const EXTERNAL_GROUP_MAX_LEN: usize = 32;
 const ELF_PT_LOAD: u32 = 1;
 const ELF_PH_SIZE: usize = 56;
+const USER_PAGE_SIZE: usize = 4096;
 
 static mut EXTERNAL_APP: [u8; EXTERNAL_APP_MAX_SIZE] = [0; EXTERNAL_APP_MAX_SIZE];
 static mut EXTERNAL_GROUP: [u8; EXTERNAL_GROUP_MAX_LEN] = [0; EXTERNAL_GROUP_MAX_LEN];
@@ -152,6 +153,40 @@ pub fn external_app_phnum() -> usize {
     le_u16(data, 56) as usize
 }
 
+pub fn external_app_heap_base() -> usize {
+    let data = external_app_data();
+    let phoff = external_app_phoff();
+    let phentsize = external_app_phentsize();
+    let phnum = external_app_phnum();
+    let mut end = USER_HEAP_BASE;
+
+    if phoff == 0 || phentsize < ELF_PH_SIZE {
+        return end;
+    }
+
+    let mut index = 0usize;
+    while index < phnum {
+        let offset = phoff + index * phentsize;
+        if offset + ELF_PH_SIZE > data.len() {
+            break;
+        }
+
+        if le_u32(data, offset) == ELF_PT_LOAD {
+            let vaddr = le_u64(data, offset + 16) as usize;
+            let memsz = le_u64(data, offset + 40) as usize;
+            if let Some(segment_end) = vaddr.checked_add(memsz) {
+                if segment_end > end {
+                    end = segment_end;
+                }
+            }
+        }
+
+        index += 1;
+    }
+
+    round_up(end, USER_PAGE_SIZE)
+}
+
 pub fn print_external_group_end() {
     let group_len = unsafe { EXTERNAL_GROUP_LEN };
     if group_len == 0 {
@@ -205,6 +240,10 @@ fn le_u32(buffer: &[u8], offset: usize) -> u32 {
 
 fn le_u16(buffer: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([buffer[offset], buffer[offset + 1]])
+}
+
+fn round_up(value: usize, align: usize) -> usize {
+    (value + align - 1) & !(align - 1)
 }
 
 #[no_mangle]
