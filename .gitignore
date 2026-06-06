@@ -6,6 +6,10 @@ hello-rust/
 *.bin
 *.elf
 exec.out
+kernel-rv
+kernel-la
+disk.img
+disk-la.img
 .DS_Store
 .vscode/
 .idea/

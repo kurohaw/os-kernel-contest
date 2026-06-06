@@ -3,16 +3,17 @@
 ## 当前验证命令
 
 ```bash
-cd /mnt/d/os-kernel-contest/kernel
-make build
-make run
+cd /mnt/d/os-kernel-contest
+make all
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default -no-reboot
 ```
 
 当前 smoke test 通过标准：
 
+- 根目录生成 ELF 格式的 `kernel-rv`。
 - QEMU 能启动到 `kernel started`。
 - `app0` 和 `app1` 都能完成 syscall 验证输出。
-- 最后出现 `all tasks exited`。
+- 最后出现 `all tasks exited`，随后 QEMU 主动退出。
 
 ## 官方评测快照
 

@@ -9,8 +9,8 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest`；GitLab: `gitlab.eduxiji.net/T2026102569910192/oskernel2025-sudo_win_the_cscc` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 准备实现真实堆页映射 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取和测试矩阵 |
+| 当前目标 | 接入官方测试磁盘扫描 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵和官方 RISC-V 提交入口适配 |
 
 ## 2026-05-18 rCore baseline
 
@@ -576,6 +576,28 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 
 测试矩阵已经建立；后续接入官方测例时，可以继续在该文档中追加测试名、结果和阻塞 syscall。
 
+## 2026-06-06 官方提交入口适配
+
+### 今日目标
+
+根据官方初赛提交说明，先把项目从本地 RustSBI loader 流程切到评测机要求的根目录构建和 RISC-V QEMU 启动形式。
+
+### 修改内容
+
+- 根目录 `make all` 生成 ELF 格式 `kernel-rv`，并临时生成 `kernel-la` 占位文件。
+- 保留旧 `exec.out` 裸二进制产物，避免破坏已有本地流程。
+- 将 `make run` 调整为 `qemu-system-riscv64 -kernel kernel-rv -bios default` 风格，旧 RustSBI loader 流程保留为 `run-loader`。
+- 将 Cargo target/linker 配置复制到非隐藏 `cargo-config/`，构建前再恢复到 `.cargo/config.toml`，适配评测系统过滤隐藏目录的行为。
+- 增加 SBI shutdown，所有内嵌自测任务退出后主动关闭 QEMU。
+
+### 验证结果
+
+`make all` 通过；`kernel-rv` 为 RISC-V ELF。使用官方风格 QEMU 命令可启动到 `kernel started`，完成 `app0/app1` 自测，并在 `all tasks exited` 后退出 QEMU。
+
+### 结论
+
+RISC-V 提交入口已经与官方说明对齐到第一层。下一步不应继续只补自测 syscall，而应优先接入 virtio-blk 与 EXT4 测试磁盘扫描，找到并运行 `xxxxx_testcode.sh`。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -600,8 +622,11 @@ trap 处理从简单中断处理升级为完整上下文保存，为 syscall 返
 | 18 | 基础文件描述符表 | fd 不再只依赖固定编号，支持后续文件对象管理 | 已完成 |
 | 19 | 基础文件读取 | 打开内嵌只读文件后可以通过 `read` 读取内容 | 已完成 |
 | 20 | 测试矩阵 | 建立当前 syscall 和文件读取验证记录 | 已完成 |
-| 21 | 真实堆页映射 | `brk` 增长后能访问新映射用户页 | 下一步 |
-| 22 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
+| 21 | 官方 RISC-V 提交入口 | `make all` 生成 `kernel-rv`，官方风格 QEMU 能启动并主动退出 | 已完成 |
+| 22 | 测试磁盘扫描 | 识别官方挂载的 virtio-blk EXT4 测试盘并列出测试脚本 | 下一步 |
+| 23 | 官方脚本入口 | 串行运行或按格式跳过 `xxxxx_testcode.sh` 测试点 | 未开始 |
+| 24 | 真实堆页映射 | `brk` 增长后能访问新映射用户页 | 未开始 |
+| 25 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
 
 ## 提交计划
 

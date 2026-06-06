@@ -152,7 +152,7 @@ pub fn exit_current(code: i32) -> ! {
     }
 
     crate::println!("all tasks exited");
-    loop{}
+    crate::sbi::shutdown();
 }
 
 fn find_next_ready() -> Option<usize> {
