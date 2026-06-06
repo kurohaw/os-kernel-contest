@@ -2,6 +2,7 @@
 #![no_main]
 
 mod console;
+mod drivers;
 mod fs;
 mod lang_items;
 mod loader;
@@ -26,6 +27,7 @@ pub fn rust_main() -> ! {
     loader::init();
 
     mm::init();
+    drivers::init();
 
     trap::init();
     trap::enable_user_memory_access();
@@ -52,4 +54,3 @@ fn clear_bss() {
         .fill(0);
     }
 }
-

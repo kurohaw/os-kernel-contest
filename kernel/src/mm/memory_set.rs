@@ -3,6 +3,8 @@ use core::arch::asm;
 use super::{alloc_frame, PageTable, PageTableEntry, PTEFlags, PhysAddr, PhysPageNum, VirtAddr, PAGE_SIZE};
 use super::frame_allocator::MEMORY_END;
 
+const MMIO_RANGES: &[(usize, usize)] = &[(0x1000_0000, 0x9000)];
+
 pub struct MemorySet {
     page_table: PageTable,
 }
@@ -77,6 +79,8 @@ impl MemorySet {
                 PTEFlags::R | PTEFlags::W,
                 ".memory",
             );
+
+            memory_set.map_mmio_ranges();
         }
 
         memory_set
@@ -152,6 +156,8 @@ impl MemorySet {
                 ".memory",
             );
 
+            memory_set.map_mmio_ranges();
+
             memory_set.load_user_app(app_id);
         }
 
@@ -218,6 +224,12 @@ impl MemorySet {
             PhysAddr(start),
             flags,
         );
+    }
+
+    fn map_mmio_ranges(&self) {
+        for &(start, size) in MMIO_RANGES {
+            self.map_identical_range(start, start + size, PTEFlags::R | PTEFlags::W, ".mmio");
+        }
     }
 
     pub fn translate(&self, va: VirtAddr) -> Option<PageTableEntry> {
