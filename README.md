@@ -38,8 +38,9 @@
 - 无分区 EXT4 测试盘根目录扫描，识别并读取 `*_testcode.sh`，输出官方测试组 START/END 标记。
 - 从测试盘读取 RISC-V ELF，按 `PT_LOAD` segment 映射并进入用户态运行。
 - 外部 ELF 最小启动栈：`argc=1`、`argv[0]`、空 `envp` 和基础 `auxv`。
+- 外部 ELF 通过 `openat/read/fstat` 读取 EXT4 根目录普通文件。
 
-当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF。下一阶段目标是让官方 basic/busybox ELF 通过 libc 启动早期路径，重点补真实文件读取、堆页映射和 Linux ABI syscall。
+当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以让外部 ELF 读取同盘根目录普通文件。下一阶段目标是让官方 basic/busybox ELF 通过 libc 启动早期路径，重点补堆页映射、路径解析、进程模型和 Linux ABI syscall。
 
 QEMU 中可以看到类似：
 

@@ -50,7 +50,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘、读取根目录脚本、输出官方组标记，并从脚本定位根目录 ELF |
 | 2 | ELF 与地址空间 | 已从固定裸二进制过渡到 ELF segment 映射、entry 和最小启动栈初始化 |
 | 3 | 进程模型 | 补齐 `execve`、`fork/clone`、`wait4`、`exit_group` 等 basic/busybox 常用路径 |
-| 4 | 文件系统接口 | 在现有 EXT4 根目录扫描基础上支持打开/读取测试脚本和 ELF 文件 |
+| 4 | 文件系统接口 | 已在现有 EXT4 根目录扫描基础上支持用户态打开/读取根目录普通文件 |
 | 5 | syscall 矩阵 | 用官方 basic 失败日志反推最小 syscall 集，而不是只按自测程序扩展 |
 
 ## 基础 syscall 状态
@@ -60,7 +60,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | test | 0 | 已支持 | `app0/app1` 调用 `sys_test` | 自定义测试 syscall |
 | exit | 1 | 已支持 | `app0/app1` 正常退出 | 支持退出码打印 |
 | yield | 2 | 已支持 | 两个任务轮转运行 | 已修复 yield 后恢复 `TrapContext` |
-| openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt` | 不存在路径返回 `-1` |
+| openat | 56 | 最小支持 | 打开 `/dev/null`、`/hello.txt`、EXT4 根目录普通文件 | 不存在路径返回 `-1` |
 | close | 57 | 最小支持 | 关闭标准 fd 和动态 fd | 重复关闭动态 fd 返回 `-1` |
 | read | 63 | 最小支持 | 读取 `/hello.txt` | stdin 当前返回 `0` |
 | write | 64 | 已支持 | stdout/stderr 输出字符串 | `/dev/null` 写入直接丢弃 |
@@ -94,6 +94,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `/dev/null` | 成功 | 返回 0 | 返回写入长度 | 成功 | 动态 fd |
 | `/hello.txt` | 成功 | 返回内嵌内容 | 不支持 | 成功 | 只读内嵌文件 |
 | `/missing` | 返回 -1 | 不适用 | 不适用 | 不适用 | 不存在路径 |
+| 测试盘根目录普通文件 | 成功 | 按 fd offset 读取 EXT4 内容 | 不支持 | 成功 | 本地 `ext4read` ELF 读取 `data.txt` 通过 |
 
 ## 官方测试盘入口状态
 
@@ -110,6 +111,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | ELF 文件加载 | 最小支持 | 本地 EXT4 镜像加载根目录 `app0` ELF 并运行 | 支持 ELF64 `PT_LOAD`，暂用 4 MiB 缓冲 |
 | ELF 输出包裹 | 已支持 | START 在外部 ELF 前输出，END 在 task exit 后输出 | 单外部 ELF 路径 |
 | 外部 ELF 启动栈 | 最小支持 | 本地 EXT4 镜像加载 `app0` ELF 后正常运行 | `argc=1`、`argv[0]`、空 `envp`、基础 `auxv` |
+| EXT4 syscall 读取 | 最小支持 | 临时外部 ELF `ext4read` 打开并读取根目录 `data.txt` | 只读根目录普通文件 |
 
 ## 当前限制
 
@@ -119,7 +121,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | `read` | stdin 暂时直接返回 0 |
 | `openat` | 只识别 `/dev/null` 和 `/hello.txt` |
 | 文件描述符表 | 当前是全局表，尚未按进程隔离 |
-| 文件系统 | 已能只读扫描 EXT4 根目录测试脚本，但 `openat/read` 尚未接入 EXT4 文件内容 |
+| 文件系统 | `openat/read/fstat` 已能读取 EXT4 根目录普通文件；尚未支持子目录、写入、目录 fd、挂载点和完整路径解析 |
 | 进程模型 | 尚未实现 fork/exec/wait/waitpid |
 | ELF loader | 已支持最小 `argc/argv/envp/auxv`；尚未支持动态链接器、解释器路径、脚本参数、多个 ELF 串行运行 |
 
@@ -130,4 +132,4 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 堆内存 | `brk` 增长后真实映射用户页 | 未开始 |
 | 官方测例 | 用官方 basic/busybox ELF 运行日志反推缺失 syscall | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
-| 文件系统 | 将 `openat/read` 接入 EXT4 真实文件 | 下一步 |
+| 文件系统 | 支持子目录、相对路径、目录 fd 和更多 pseudo path | 下一步 |

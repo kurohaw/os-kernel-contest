@@ -9,8 +9,8 @@
 | 当前仓库 | GitHub: `kurohaw/os-kernel-contest`；GitLab: `gitlab.eduxiji.net/T2026102569910192/oskernel2025-sudo_win_the_cscc` |
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
-| 当前目标 | 接入官方测试磁盘扫描 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF |
+| 当前目标 | 打通官方测试入口和最小 Linux ABI |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 根目录普通文件 `openat/read/fstat` |
 
 ## 2026-05-18 rCore baseline
 
@@ -784,6 +784,49 @@ all tasks exited
 
 外部 ELF 已经具备最小 Linux 启动栈。下一步应优先做真实 EXT4 文件读写路径、真实 `brk` 堆页映射，以及官方 basic/busybox 缺失 syscall 追踪。
 
+## 2026-06-06 EXT4 文件读取接入 syscall
+
+### 今日目标
+
+让测试盘加载的外部 ELF 可以通过 `openat/read/fstat/close` 读取同一 EXT4 测试盘根目录中的普通文件。
+
+### 修改内容
+
+- `drivers::ext4` 在成功读取 superblock 后保存 mounted fs 状态，供 syscall 层复用。
+- 新增根目录路径归一化和 lookup 接口，支持 `file`、`./file`、`/file` 三类根目录普通文件路径。
+- 新增按 offset 读取 inode 数据的路径，支持 extent 和 direct block 文件。
+- `fs` 的 fd 表新增 EXT4 文件描述符，记录 inode、size 和 offset。
+- `openat` 在 `/dev/null`、`/hello.txt` 之外尝试打开 EXT4 根目录文件。
+- `read` 对 EXT4 fd 按 offset 读取并推进文件偏移，`fstat` 对普通文件返回 `S_IFREG` 和 size。
+
+### 验证结果
+
+`make all` 通过。
+
+临时编译外部 ELF `ext4read`，测试盘中包含：
+
+- `ext4read`
+- `data.txt`，内容为 `EXT4-DATA-OK\n`
+- `ext4read_testcode.sh`，执行 `./ext4read`
+
+官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+loader: selected external ELF ext4read
+#### OS COMP TEST GROUP START ext4read ####
+ext4read: start
+EXT4-DATA-OK
+task 0 exited with code 0
+#### OS COMP TEST GROUP END ext4read ####
+all tasks exited
+```
+
+无测试盘回归仍通过，继续运行内嵌 `app0/app1` 并关机。
+
+### 结论
+
+外部 ELF 已能读取测试盘根目录普通文件。下一步应优先补真实 `brk` 用户页映射、子目录/相对路径解析、per-process fd table，以及官方 basic/busybox 运行时暴露出的 syscall。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -815,7 +858,8 @@ all tasks exited
 | 25 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
 | 26 | ELF 加载入口 | 从脚本定位 ELF 并加载第一个官方 basic 程序 | 已完成（本地 ELF 验证） |
 | 27 | Linux ABI 启动参数 | 构造 argv/envp/auxv，让 libc 程序能过启动早期 | 已完成（最小） |
-| 28 | EXT4 文件读取接入 syscall | `openat/read` 能读取测试盘普通文件 | 下一步 |
+| 28 | EXT4 文件读取接入 syscall | `openat/read` 能读取测试盘普通文件 | 已完成（根目录只读） |
+| 29 | 真实堆页映射 | `brk` 增长后能访问新增用户页 | 下一步 |
 
 ## 提交计划
 
@@ -857,3 +901,4 @@ all tasks exited
 | 34 | EXT4 脚本内容读取与组标记输出 | 已完成 |
 | 35 | 外部 ELF 读取与运行 | 已完成 |
 | 36 | 外部 ELF 初始栈 | 已完成 |
+| 37 | EXT4 文件读取接入 syscall | 已完成 |

@@ -20,6 +20,7 @@ const GROUP_START_PREFIX: &[u8] = b"#### OS COMP TEST GROUP START ";
 const MARKER_END: &[u8] = b"####";
 
 static mut SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
+static mut MOUNTED_FS: Option<Ext4Fs> = None;
 
 #[derive(Clone, Copy)]
 struct Ext4Fs {
@@ -36,14 +37,28 @@ struct FileInfo {
     size: u64,
 }
 
+#[derive(Clone, Copy)]
+pub struct Ext4File {
+    pub inode_no: u32,
+    pub size: u64,
+}
+
 pub fn init() {
     if !block::is_ready() {
         return;
     }
 
-    match scan_test_scripts() {
-        Ok(count) => {
-            crate::println!("ext4: found {} test script(s)", count);
+    match read_superblock() {
+        Ok(fs) => {
+            set_mounted_fs(fs);
+            match scan_test_scripts(&fs) {
+                Ok(count) => {
+                    crate::println!("ext4: found {} test script(s)", count);
+                }
+                Err(message) => {
+                    crate::println!("ext4: {}", message);
+                }
+            }
         }
         Err(message) => {
             crate::println!("ext4: {}", message);
@@ -51,12 +66,53 @@ pub fn init() {
     }
 }
 
-fn scan_test_scripts() -> Result<usize, &'static str> {
-    let fs = read_superblock()?;
-    let inode_table = read_inode_table_block(&fs, EXT4_ROOT_INO)?;
+pub fn open_root(path: &[u8]) -> Option<Ext4File> {
+    let fs = mounted_fs()?;
+    let name = normalize_root_path(path)?;
+    let info = lookup_root_file(&fs, name).ok().flatten()?;
+
+    Some(Ext4File {
+        inode_no: info.inode_no,
+        size: info.size,
+    })
+}
+
+pub fn read_file_at(
+    file: Ext4File,
+    offset: usize,
+    output: &mut [u8],
+) -> Result<usize, &'static str> {
+    if output.is_empty() {
+        return Ok(0);
+    }
+
+    if offset as u64 >= file.size {
+        return Ok(0);
+    }
+
+    let fs = mounted_fs().ok_or("EXT4 not mounted")?;
+    let inode_table = read_inode_table_block(&fs, file.inode_no)?;
+    let mut inode = [0u8; INODE_PARSE_SIZE];
+    read_inode(&fs, inode_table, file.inode_no, &mut inode)?;
+
+    copy_inode_range(&fs, &inode, offset as u64, output)
+}
+
+fn set_mounted_fs(fs: Ext4Fs) {
+    unsafe {
+        MOUNTED_FS = Some(fs);
+    }
+}
+
+fn mounted_fs() -> Option<Ext4Fs> {
+    unsafe { MOUNTED_FS }
+}
+
+fn scan_test_scripts(fs: &Ext4Fs) -> Result<usize, &'static str> {
+    let inode_table = read_inode_table_block(fs, EXT4_ROOT_INO)?;
 
     let mut inode = [0u8; INODE_PARSE_SIZE];
-    read_inode(&fs, inode_table, EXT4_ROOT_INO, &mut inode)?;
+    read_inode(fs, inode_table, EXT4_ROOT_INO, &mut inode)?;
 
     let mode = le_u16(&inode, 0);
     if mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFDIR {
@@ -709,6 +765,180 @@ fn copy_data_block(
     Ok(())
 }
 
+fn copy_inode_range(
+    fs: &Ext4Fs,
+    inode: &[u8],
+    read_offset: u64,
+    output: &mut [u8],
+) -> Result<usize, &'static str> {
+    let file_size = inode_size(inode);
+    if read_offset >= file_size {
+        return Ok(0);
+    }
+
+    let read_len = core::cmp::min(output.len() as u64, file_size - read_offset) as usize;
+    let output = &mut output[..read_len];
+    output.fill(0);
+
+    let flags = le_u32(inode, 32);
+    if flags & EXT4_EXTENTS_FL != 0 {
+        copy_extent_tree_range(fs, &inode[40..100], file_size, read_offset, output)?;
+    } else {
+        copy_direct_blocks_range(fs, &inode[40..88], file_size, read_offset, output)?;
+    }
+
+    Ok(read_len)
+}
+
+fn copy_extent_tree_range(
+    fs: &Ext4Fs,
+    root: &[u8],
+    file_size: u64,
+    read_offset: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let depth = extent_depth(root)?;
+
+    if depth == 0 {
+        return copy_extent_leaf_range(fs, root, file_size, read_offset, output);
+    }
+
+    if depth != 1 {
+        return Err("unsupported EXT4 extent depth");
+    }
+
+    let entries = extent_entries(root)? as usize;
+    let mut index = 0usize;
+    while index < entries {
+        let offset = 12 + index * 12;
+        if offset + 12 > root.len() {
+            return Err("invalid EXT4 extent index");
+        }
+
+        let leaf = extent_index_leaf(&root[offset..offset + 12]);
+        let mut leaf_block = [0u8; MAX_BLOCK_SIZE];
+        read_fs_block(fs, leaf, &mut leaf_block)?;
+        copy_extent_leaf_range(fs, &leaf_block[..fs.block_size], file_size, read_offset, output)?;
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_extent_leaf_range(
+    fs: &Ext4Fs,
+    node: &[u8],
+    file_size: u64,
+    read_offset: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    if extent_depth(node)? != 0 {
+        return Err("invalid EXT4 extent leaf");
+    }
+
+    let entries = extent_entries(node)? as usize;
+    let mut index = 0usize;
+    while index < entries {
+        let offset = 12 + index * 12;
+        if offset + 12 > node.len() {
+            return Err("invalid EXT4 extent entry");
+        }
+
+        let logical = le_u32(node, offset) as u64;
+        let len = (le_u16(node, offset + 4) & 0x7fff) as u64;
+        let physical = ((le_u16(node, offset + 6) as u64) << 32) | le_u32(node, offset + 8) as u64;
+
+        let mut block_index = 0u64;
+        while block_index < len {
+            let file_offset = (logical + block_index) * fs.block_size as u64;
+            if file_offset >= file_size {
+                break;
+            }
+
+            let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
+            copy_data_block_range(
+                fs,
+                physical + block_index,
+                file_offset,
+                valid_len,
+                read_offset,
+                output,
+            )?;
+
+            block_index += 1;
+        }
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_direct_blocks_range(
+    fs: &Ext4Fs,
+    i_block: &[u8],
+    file_size: u64,
+    read_offset: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let mut index = 0usize;
+    while index < 12 {
+        let block_no = le_u32(i_block, index * 4) as u64;
+        if block_no == 0 {
+            break;
+        }
+
+        let file_offset = index as u64 * fs.block_size as u64;
+        if file_offset >= file_size {
+            break;
+        }
+
+        let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
+        copy_data_block_range(fs, block_no, file_offset, valid_len, read_offset, output)?;
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_data_block_range(
+    fs: &Ext4Fs,
+    block_no: u64,
+    file_offset: u64,
+    valid_len: usize,
+    read_offset: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let block_start = file_offset;
+    let block_end = file_offset + valid_len as u64;
+    let read_start = read_offset;
+    let read_end = read_offset + output.len() as u64;
+
+    let overlap_start = if block_start > read_start {
+        block_start
+    } else {
+        read_start
+    };
+    let overlap_end = if block_end < read_end { block_end } else { read_end };
+
+    if overlap_start >= overlap_end {
+        return Ok(());
+    }
+
+    let copy_len = (overlap_end - overlap_start) as usize;
+    let src_offset = (overlap_start - block_start) as usize;
+    let dest_offset = (overlap_start - read_start) as usize;
+
+    let mut buffer = [0u8; MAX_BLOCK_SIZE];
+    read_fs_block(fs, block_no, &mut buffer)?;
+    output[dest_offset..dest_offset + copy_len]
+        .copy_from_slice(&buffer[src_offset..src_offset + copy_len]);
+
+    Ok(())
+}
+
 fn read_disk_bytes(mut offset: u64, mut output: &mut [u8]) -> Result<(), &'static str> {
     let mut sector = [0u8; block::BLOCK_SIZE];
 
@@ -811,6 +1041,28 @@ fn contains_byte(buffer: &[u8], target: u8) -> bool {
         index += 1;
     }
     false
+}
+
+fn normalize_root_path(path: &[u8]) -> Option<&[u8]> {
+    let mut path = path;
+
+    if path.starts_with(b"/") {
+        path = &path[1..];
+    }
+
+    if path.starts_with(b"./") {
+        path = &path[2..];
+    }
+
+    if path.is_empty()
+        || path == b"."
+        || path == b".."
+        || contains_byte(path, b'/')
+    {
+        return None;
+    }
+
+    Some(path)
 }
 
 fn is_elf(buffer: &[u8]) -> bool {
