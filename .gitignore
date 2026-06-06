@@ -10,6 +10,8 @@ kernel-rv
 kernel-la
 disk.img
 disk-la.img
+AGENTS.md
 .DS_Store
 .vscode/
 .idea/
+
