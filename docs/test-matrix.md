@@ -29,6 +29,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 - `virtio-blk: ready`
 - `oscomp: found test script basic_testcode.sh`
 - `oscomp: found test script lua_testcode.sh`
+- 脚本内或 fallback 生成的 `#### OS COMP TEST GROUP START ... ####`
+- 脚本内或 fallback 生成的 `#### OS COMP TEST GROUP END ... ####`
 - `ext4: found 2 test script(s)`
 
 ## 官方评测快照
@@ -45,7 +47,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 | 优先级 | 方向 | 目标 |
 |---:|---|---|
-| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘并列出根目录脚本；下一步读取脚本内容并输出官方组标记 |
+| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘、读取根目录脚本并输出官方组标记；下一步解析脚本中的 ELF 路径 |
 | 2 | ELF 与地址空间 | 从固定裸二进制加载过渡到 ELF segment 映射、entry/sp/auxv 初始化 |
 | 3 | 进程模型 | 补齐 `execve`、`fork/clone`、`wait4`、`exit_group` 等 basic/busybox 常用路径 |
 | 4 | 文件系统接口 | 在现有 EXT4 根目录扫描基础上支持打开/读取测试脚本和 ELF 文件 |
@@ -102,8 +104,9 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | EXT4 superblock | 已支持 | 本地无分区 EXT4 镜像 | 支持 1K/2K/4K block size |
 | root inode | 已支持 | 读取 group descriptor 和 inode table | 当前只读 |
 | extent 目录块 | 最小支持 | 根目录扫描验证 | 支持 depth=0/1 |
-| `*_testcode.sh` 发现 | 已支持 | 本地镜像发现 2 个脚本 | 目前只打印文件名 |
-| 脚本内容读取 | 未开始 | 待验证 | 下一步 |
+| `*_testcode.sh` 发现 | 已支持 | 本地镜像发现 2 个脚本 | 打印文件名并继续读取脚本内容 |
+| 脚本内容读取 | 已支持 | 本地镜像读取 `basic_testcode.sh` 和 `lua_testcode.sh` | 当前最多读取 16 KiB |
+| 官方组标记输出 | 已支持 | 脚本内 marker 原样输出；无 marker 时按文件名前缀生成 START/END | 暂时跳过测试组执行 |
 | ELF 文件加载 | 未开始 | 待验证 | 下一步之后 |
 
 ## 当前限制
@@ -122,6 +125,6 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 方向 | 目标 | 状态 |
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 未开始 |
-| 官方测例 | 读取 `*_testcode.sh` 内容并输出官方测试组标记 | 下一步 |
+| 官方测例 | 从 `*_testcode.sh` 内容中解析待运行 ELF 路径和参数 | 下一步 |
 | 进程模型 | fork/exec/wait/waitpid | 未开始 |
-| 文件系统 | 将 EXT4 文件内容读取接入脚本/ELF loader | 下一步 |
+| 文件系统 | 将 EXT4 文件内容读取接入 ELF loader | 下一步 |

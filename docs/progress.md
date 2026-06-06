@@ -10,7 +10,7 @@
 | 当前基础版本 | `rCore-Tutorial-v3-main` |
 | 主参考作品 | 2024 Phoenix |
 | 当前目标 | 接入官方测试磁盘扫描 |
-| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描 |
+| 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、最小 `brk` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 根目录测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出 |
 
 ## 2026-05-18 rCore baseline
 
@@ -652,6 +652,49 @@ ext4: found 2 test script(s)
 
 官方测试入口已经推进到“能识别挂载测试盘并列出根目录测试脚本”。下一步需要读取脚本文件内容，按官方要求输出测试组起止标记；随后从脚本中定位 ELF 测试程序，接入 ELF loader、用户栈参数和进程模型。
 
+## 2026-06-06 EXT4 脚本内容读取与组标记输出
+
+### 今日目标
+
+在已经发现 `*_testcode.sh` 的基础上，继续读取脚本文件内容，并输出官方 `#### OS COMP TEST GROUP ... ####` 标记。若脚本内没有显式标记，则根据脚本文件名前缀生成 START/END 标记，用于暂时跳过尚未执行的测试组。
+
+### 修改内容
+
+- EXT4 目录扫描现在保留脚本目录项 inode，不再只打印文件名。
+- 新增按 inode 读取普通文件内容的最小路径，复用 direct block 和 extent 读取逻辑。
+- 为脚本内容增加固定大小缓冲区，当前最多读取 16 KiB。
+- 扫描脚本文本中的 `#### OS COMP TEST GROUP ... ####`，并原样输出匹配到的官方标记。
+- 对没有显式标记的脚本，根据 `basic_testcode.sh` 这样的文件名前缀输出 fallback：
+  - `#### OS COMP TEST GROUP START basic ####`
+  - `#### OS COMP TEST GROUP END basic ####`
+
+### 验证结果
+
+`make all` 通过。
+
+本地 EXT4 测试镜像中：
+
+- `basic_testcode.sh` 包含官方 START/END echo。
+- `lua_testcode.sh` 不包含官方 START/END。
+
+使用官方风格 QEMU 挂载镜像后，关键输出：
+
+```text
+oscomp: found test script basic_testcode.sh
+#### OS COMP TEST GROUP START basic ####
+#### OS COMP TEST GROUP END basic ####
+oscomp: found test script lua_testcode.sh
+#### OS COMP TEST GROUP START lua ####
+#### OS COMP TEST GROUP END lua ####
+ext4: found 2 test script(s)
+```
+
+无测试盘回归仍通过：输出 `virtio-blk: device not found` 后继续运行内嵌 `app0/app1`，并在 `all tasks exited` 后关机。
+
+### 结论
+
+官方测试入口已经能做到“识别测试盘、找到脚本、读取脚本内容、输出测试组起止标记”。下一步应从脚本内容中解析要运行的 ELF 路径和参数，并开始实现从 EXT4 读取 ELF、映射 ELF segment、构造用户栈和进入官方测试程序。
+
 ## 下一组任务
 
 | 顺序 | 任务 | 完成标准 | 状态 |
@@ -678,9 +721,10 @@ ext4: found 2 test script(s)
 | 20 | 测试矩阵 | 建立当前 syscall 和文件读取验证记录 | 已完成 |
 | 21 | 官方 RISC-V 提交入口 | `make all` 生成 `kernel-rv`，官方风格 QEMU 能启动并主动退出 | 已完成 |
 | 22 | 测试磁盘扫描 | 识别官方挂载的 virtio-blk EXT4 测试盘并列出测试脚本 | 已完成 |
-| 23 | 官方脚本入口 | 串行运行或按格式跳过 `xxxxx_testcode.sh` 测试点 | 下一步 |
+| 23 | 官方脚本入口 | 串行运行或按格式跳过 `xxxxx_testcode.sh` 测试点 | 已完成（暂时跳过） |
 | 24 | 真实堆页映射 | `brk` 增长后能访问新映射用户页 | 未开始 |
 | 25 | 官方测例矩阵 | 接入比赛测例并记录通过情况 | 未开始 |
+| 26 | ELF 加载入口 | 从脚本定位 ELF 并加载第一个官方 basic 程序 | 下一步 |
 
 ## 提交计划
 
@@ -719,3 +763,4 @@ ext4: found 2 test script(s)
 | 31 | 真实堆页映射 | 暂缓 |
 | 32 | virtio-blk 扇区读取 | 已完成 |
 | 33 | EXT4 根目录测试脚本扫描 | 已完成 |
+| 34 | EXT4 脚本内容读取与组标记输出 | 已完成 |

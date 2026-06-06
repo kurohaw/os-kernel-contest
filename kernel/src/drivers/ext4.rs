@@ -1,4 +1,5 @@
 use super::block;
+use core::ptr::addr_of_mut;
 
 const EXT4_SUPER_OFFSET: u64 = 1024;
 const EXT4_SUPER_MAGIC: u16 = 0xef53;
@@ -13,6 +14,11 @@ const INODE_PARSE_SIZE: usize = 160;
 const GROUP_DESC_PARSE_SIZE: usize = 64;
 const EXT4_NAME_MAX: usize = 255;
 const TEST_SCRIPT_SUFFIX: &[u8] = b"_testcode.sh";
+const SCRIPT_BUFFER_SIZE: usize = 16 * 1024;
+const GROUP_MARKER_PREFIX: &[u8] = b"#### OS COMP TEST GROUP ";
+const MARKER_END: &[u8] = b"####";
+
+static mut SCRIPT_BUFFER: [u8; SCRIPT_BUFFER_SIZE] = [0; SCRIPT_BUFFER_SIZE];
 
 #[derive(Clone, Copy)]
 struct Ext4Fs {
@@ -251,11 +257,11 @@ fn scan_dir_data_block(
 ) -> Result<(), &'static str> {
     let mut buffer = [0u8; MAX_BLOCK_SIZE];
     read_fs_block(fs, block_no, &mut buffer)?;
-    scan_dir_entries(&buffer[..valid_len], found);
+    scan_dir_entries(fs, &buffer[..valid_len], found);
     Ok(())
 }
 
-fn scan_dir_entries(block: &[u8], found: &mut usize) {
+fn scan_dir_entries(fs: &Ext4Fs, block: &[u8], found: &mut usize) {
     let mut offset = 0usize;
     while offset + 8 <= block.len() {
         let inode = le_u32(block, offset);
@@ -269,14 +275,43 @@ fn scan_dir_entries(block: &[u8], found: &mut usize) {
         if inode != 0 && name_len <= EXT4_NAME_MAX && name_len <= rec_len - 8 {
             let name = &block[offset + 8..offset + 8 + name_len];
             if is_test_script(name) {
-                *found += 1;
-                crate::print!("oscomp: found test script ");
-                print_name(name);
-                crate::println!();
+                handle_test_script(fs, inode, name, found);
             }
         }
 
         offset += rec_len;
+    }
+}
+
+fn handle_test_script(fs: &Ext4Fs, inode_no: u32, name: &[u8], found: &mut usize) {
+    *found += 1;
+
+    crate::print!("oscomp: found test script ");
+    print_name(name);
+    crate::println!();
+
+    let mut inode = [0u8; INODE_PARSE_SIZE];
+    let read_result = read_inode_table_block(fs, inode_no)
+        .and_then(|inode_table| read_inode(fs, inode_table, inode_no, &mut inode));
+
+    if read_result.is_err() {
+        emit_fallback_group_markers(name);
+        return;
+    }
+
+    let file_size = inode_size(&inode);
+    let read_len = core::cmp::min(file_size as usize, SCRIPT_BUFFER_SIZE);
+    let script = unsafe {
+        core::slice::from_raw_parts_mut(addr_of_mut!(SCRIPT_BUFFER) as *mut u8, read_len)
+    };
+
+    if read_inode_data(fs, &inode, script).is_err() {
+        emit_fallback_group_markers(name);
+        return;
+    }
+
+    if emit_group_markers_from_script(script) == 0 {
+        emit_fallback_group_markers(name);
     }
 }
 
@@ -286,6 +321,142 @@ fn read_fs_block(fs: &Ext4Fs, block_no: u64, buffer: &mut [u8]) -> Result<(), &'
     }
 
     read_disk_bytes(block_no * fs.block_size as u64, &mut buffer[..fs.block_size])
+}
+
+fn read_inode_data(fs: &Ext4Fs, inode: &[u8], output: &mut [u8]) -> Result<(), &'static str> {
+    output.fill(0);
+
+    let file_size = inode_size(inode);
+    let flags = le_u32(inode, 32);
+
+    if flags & EXT4_EXTENTS_FL != 0 {
+        copy_extent_tree(fs, &inode[40..100], file_size, output)
+    } else {
+        copy_direct_blocks(fs, &inode[40..88], file_size, output)
+    }
+}
+
+fn copy_extent_tree(
+    fs: &Ext4Fs,
+    root: &[u8],
+    file_size: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let depth = extent_depth(root)?;
+
+    if depth == 0 {
+        return copy_extent_leaf(fs, root, file_size, output);
+    }
+
+    if depth != 1 {
+        return Err("unsupported EXT4 extent depth");
+    }
+
+    let entries = extent_entries(root)? as usize;
+    let mut index = 0usize;
+    while index < entries {
+        let offset = 12 + index * 12;
+        if offset + 12 > root.len() {
+            return Err("invalid EXT4 extent index");
+        }
+
+        let leaf = extent_index_leaf(&root[offset..offset + 12]);
+        let mut leaf_block = [0u8; MAX_BLOCK_SIZE];
+        read_fs_block(fs, leaf, &mut leaf_block)?;
+        copy_extent_leaf(fs, &leaf_block[..fs.block_size], file_size, output)?;
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_extent_leaf(
+    fs: &Ext4Fs,
+    node: &[u8],
+    file_size: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    if extent_depth(node)? != 0 {
+        return Err("invalid EXT4 extent leaf");
+    }
+
+    let entries = extent_entries(node)? as usize;
+    let mut index = 0usize;
+    while index < entries {
+        let offset = 12 + index * 12;
+        if offset + 12 > node.len() {
+            return Err("invalid EXT4 extent entry");
+        }
+
+        let logical = le_u32(node, offset) as u64;
+        let len = (le_u16(node, offset + 4) & 0x7fff) as u64;
+        let physical = ((le_u16(node, offset + 6) as u64) << 32) | le_u32(node, offset + 8) as u64;
+
+        let mut block_index = 0u64;
+        while block_index < len {
+            let file_offset = (logical + block_index) * fs.block_size as u64;
+            if file_offset >= file_size {
+                break;
+            }
+
+            let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
+            copy_data_block(fs, physical + block_index, file_offset, valid_len, output)?;
+
+            block_index += 1;
+        }
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_direct_blocks(
+    fs: &Ext4Fs,
+    i_block: &[u8],
+    file_size: u64,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let mut index = 0usize;
+    while index < 12 {
+        let block_no = le_u32(i_block, index * 4) as u64;
+        if block_no == 0 {
+            break;
+        }
+
+        let file_offset = index as u64 * fs.block_size as u64;
+        if file_offset >= file_size {
+            break;
+        }
+
+        let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
+        copy_data_block(fs, block_no, file_offset, valid_len, output)?;
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn copy_data_block(
+    fs: &Ext4Fs,
+    block_no: u64,
+    file_offset: u64,
+    valid_len: usize,
+    output: &mut [u8],
+) -> Result<(), &'static str> {
+    let dest_start = file_offset as usize;
+    if dest_start >= output.len() {
+        return Ok(());
+    }
+
+    let copy_len = core::cmp::min(valid_len, output.len() - dest_start);
+    let mut buffer = [0u8; MAX_BLOCK_SIZE];
+    read_fs_block(fs, block_no, &mut buffer)?;
+    output[dest_start..dest_start + copy_len].copy_from_slice(&buffer[..copy_len]);
+
+    Ok(())
 }
 
 fn read_disk_bytes(mut offset: u64, mut output: &mut [u8]) -> Result<(), &'static str> {
@@ -349,6 +520,65 @@ fn remaining_block_len(file_size: u64, file_offset: u64, block_size: usize) -> u
 
 fn is_test_script(name: &[u8]) -> bool {
     name.ends_with(TEST_SCRIPT_SUFFIX)
+}
+
+fn emit_group_markers_from_script(script: &[u8]) -> usize {
+    let mut emitted = 0usize;
+    let mut index = 0usize;
+
+    while index + GROUP_MARKER_PREFIX.len() <= script.len() {
+        if starts_with_at(script, index, GROUP_MARKER_PREFIX) {
+            let marker_start = index;
+            let search_start = index + GROUP_MARKER_PREFIX.len();
+
+            if let Some(marker_end_start) = find_bytes_from(script, MARKER_END, search_start) {
+                let marker_end = marker_end_start + MARKER_END.len();
+                print_name(&script[marker_start..marker_end]);
+                crate::println!();
+                emitted += 1;
+                index = marker_end;
+                continue;
+            }
+        }
+
+        index += 1;
+    }
+
+    emitted
+}
+
+fn emit_fallback_group_markers(name: &[u8]) {
+    let group_len = name.len() - TEST_SCRIPT_SUFFIX.len();
+    let group = &name[..group_len];
+
+    crate::print!("#### OS COMP TEST GROUP START ");
+    print_name(group);
+    crate::println!(" ####");
+    crate::print!("#### OS COMP TEST GROUP END ");
+    print_name(group);
+    crate::println!(" ####");
+}
+
+fn starts_with_at(buffer: &[u8], offset: usize, pattern: &[u8]) -> bool {
+    offset + pattern.len() <= buffer.len()
+        && &buffer[offset..offset + pattern.len()] == pattern
+}
+
+fn find_bytes_from(buffer: &[u8], pattern: &[u8], start: usize) -> Option<usize> {
+    if pattern.is_empty() || start >= buffer.len() {
+        return None;
+    }
+
+    let mut index = start;
+    while index + pattern.len() <= buffer.len() {
+        if &buffer[index..index + pattern.len()] == pattern {
+            return Some(index);
+        }
+
+        index += 1;
+    }
+
+    None
 }
 
 fn print_name(name: &[u8]) {

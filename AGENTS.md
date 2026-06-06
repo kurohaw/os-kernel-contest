@@ -9,7 +9,7 @@
 - 当前重点不是继续零散补自测 syscall，而是先打通官方测例入口：virtio-blk、EXT4、测试脚本扫描、ELF 用户程序加载。
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。原因判断为官方测例入口尚未打通，而不是单个 syscall 失败。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
-- 当前已能识别官方风格挂载的 virtio-blk 测试盘，并从无分区 EXT4 根目录扫描 `*_testcode.sh` 脚本名。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 根目录扫描并读取 `*_testcode.sh`，并输出官方测试组 START/END 标记。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明
@@ -106,16 +106,16 @@ all tasks exited
 - `brk` 只维护边界，尚未真实映射新增堆页。
 - 文件系统只有 `/dev/null` 和内嵌只读 `/hello.txt`。
 - fd 表仍是全局表，尚未按进程隔离。
-- virtio-blk 与 EXT4 目前只支持只读根目录扫描测试脚本，尚未读取脚本内容、解释脚本或从盘上加载 ELF。
+- virtio-blk 与 EXT4 目前支持只读根目录扫描测试脚本、读取脚本内容和输出测试组 START/END 标记；尚未解释脚本命令或从盘上加载 ELF。
 - 尚未实现官方 ELF loader、fork/exec/wait/waitpid、真实路径解析和 per-process 文件描述符表。
 - 尚未真正支持 LoongArch。
 
 ## 下一步优先级
 
-1. 读取 `xxxxx_testcode.sh` 内容，确认脚本中的官方测试组格式。
-2. 按官方格式串行运行或暂时跳过测试组。
-3. 从测试脚本定位第一个 basic ELF，接入 ELF segment 映射、entry、用户栈和参数。
-4. 从官方 basic 用例的失败日志反推 ELF loader、进程模型和 syscall 最小集合。
+1. 从 `xxxxx_testcode.sh` 中解析出要运行的 ELF 路径和参数。
+2. 从测试盘读取第一个 basic ELF，接入 ELF segment 映射、entry、用户栈和参数。
+3. 建立最小 exec/run 路径，让官方 basic 程序能进入用户态。
+4. 从官方 basic 用例的失败日志反推进程模型和 syscall 最小集合。
 
 不要在测试盘入口没打通前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。
 

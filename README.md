@@ -35,9 +35,9 @@
 - 基础 syscall：`write`、`read`、`openat`、`close`、`fstat`、`getpid`、`brk` 等最小路径。
 - 官方 RISC-V 提交入口：根目录 `make all` 生成 `kernel-rv` 和临时 `kernel-la`。
 - QEMU virtio-blk 扇区读取。
-- 无分区 EXT4 测试盘根目录扫描，并识别 `*_testcode.sh`。
+- 无分区 EXT4 测试盘根目录扫描，识别并读取 `*_testcode.sh`，输出官方测试组 START/END 标记。
 
-当前用户程序仍是内嵌最小测试程序。下一阶段目标是读取官方 `*_testcode.sh` 内容，按官方格式输出测试组起止标记，并接入盘上 ELF 测试程序加载。
+当前用户程序仍是内嵌最小测试程序。下一阶段目标是从官方 `*_testcode.sh` 中解析待运行程序路径，并接入盘上 ELF 测试程序加载。
 
 QEMU 中可以看到类似：
 
