@@ -39,10 +39,12 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 |---|---|---:|---|
 | 2026-06-06 12:01 | Accepted | 0.0 | 产物被评测系统接受，但所有官方测试套件均未得分 |
 | 2026-06-06 local | QEMU + official `pre-2025` basic | 102/102 | 本地 official basic ELF 镜像经官方 `test_runner.py` 解析全部通过 |
+| 2026-06-07 12:47 | Accepted | 0.0 | 编译成功，但官方镜像脚本位于 `glibc/`、`musl/` 子目录；旧代码只扫描根目录导致未进入 basic |
+| 2026-06-07 local | 官方目录结构 basic 镜像 | 102/102 | 根目录同时包含 `glibc/basic_testcode.sh` 和 `musl/basic_testcode.sh` 时，可选择 `basic-glibc` 并解析全部通过 |
 
 截图中的汇总结果显示，`basic`、`busybox`、`cyclictest`、`iozone`、`iperf`、`libcbench`、`libctest`、`lmbench`、`ltp`、`lua`、`netperf` 在 glibc/musl 与 rv/la 维度下均为 0。
 
-当前判断：此前 0 分主要来自官方测例入口和 Linux ABI 尚未完整打通。当前本地已打通 official basic；下一步需要用官方平台重新提交确认线上 basic 得分，再继续推进 busybox、lua、libctest 等更复杂用户态。
+当前判断：最新 0 分不是编译失败，而是线上镜像布局与早期本地镜像不同。官方 `sdcard-rv.img` 根目录下是 `glibc/`、`musl/`，测试脚本在对应子目录内；因此需要递归扫描并以脚本所在目录作为初始 cwd。当前本地已用官方目录结构验证 `basic-glibc/basic-musl` 中至少一组可得到 `102/102`。
 
 优先级应调整为：
 
@@ -133,6 +135,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 多 ELF 串行队列 | 最小支持 | 本地 `run-all.sh` 连续执行 `./argshow one` 和 `./argshow two three`，两次退出后才输出 END | 队列上限 64 条，仍非完整 shell |
 | Linux syscall 编号 smoke | 最小支持 | 临时外部 ELF 直接调用 `sched_yield/gettimeofday/openat/read/mmap/exit=93` | 验证 official basic 早期 ABI 入口 |
 | official basic | 已通过 | 官方 `pre-2025` basic 源码编译 ELF + 本地 EXT4 镜像 + 官方 `test_runner.py` | 本地解析 `TOTAL 102 / 102` |
+| 官方目录结构 basic | 已通过 | 根目录含 `glibc/basic_testcode.sh` 与 `musl/basic_testcode.sh` 的 EXT4 镜像 | 递归扫描子目录，选择一个 basic 组；本地解析 `TOTAL 102 / 102` |
 
 ## 当前限制
 

@@ -20,6 +20,7 @@ const SCRIPT_PATH_MAX: usize = 128;
 const SCRIPT_COMMAND_MAX: usize = 64;
 const SCRIPT_ARG_MAX_LEN: usize = 64;
 const MAX_SCRIPT_DEPTH: usize = 2;
+const MAX_SCAN_DEPTH: usize = 2;
 const GROUP_MARKER_PREFIX: &[u8] = b"#### OS COMP TEST GROUP ";
 const GROUP_START_PREFIX: &[u8] = b"#### OS COMP TEST GROUP START ";
 const MARKER_END: &[u8] = b"####";
@@ -182,27 +183,37 @@ fn mounted_fs() -> Option<Ext4Fs> {
 }
 
 fn scan_test_scripts(fs: &Ext4Fs) -> Result<usize, &'static str> {
-    let inode_table = read_inode_table_block(fs, EXT4_ROOT_INO)?;
+    let mut found = 0usize;
+    scan_directory(fs, EXT4_ROOT_INO, &[], 0, &mut found)?;
+    Ok(found)
+}
 
+fn scan_directory(
+    fs: &Ext4Fs,
+    inode_no: u32,
+    dir_path: &[u8],
+    scan_depth: usize,
+    found: &mut usize,
+) -> Result<(), &'static str> {
+    let inode_table = read_inode_table_block(fs, inode_no)?;
     let mut inode = [0u8; INODE_PARSE_SIZE];
-    read_inode(fs, inode_table, EXT4_ROOT_INO, &mut inode)?;
+    read_inode(fs, inode_table, inode_no, &mut inode)?;
 
     let mode = le_u16(&inode, 0);
     if mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFDIR {
-        return Err("root inode is not a directory");
+        return Err("inode is not a directory");
     }
 
-    let root_size = inode_size(&inode);
+    let dir_size = inode_size(&inode);
     let flags = le_u32(&inode, 32);
-    let mut found = 0usize;
 
     if flags & EXT4_EXTENTS_FL != 0 {
-        scan_extent_tree(&fs, &inode[40..100], root_size, &mut found)?;
+        scan_extent_tree(fs, &inode[40..100], dir_size, dir_path, scan_depth, found)?;
     } else {
-        scan_direct_blocks(&fs, &inode[40..88], root_size, &mut found)?;
+        scan_direct_blocks(fs, &inode[40..88], dir_size, dir_path, scan_depth, found)?;
     }
 
-    Ok(found)
+    Ok(())
 }
 
 fn read_superblock() -> Result<Ext4Fs, &'static str> {
@@ -286,12 +297,14 @@ fn scan_extent_tree(
     fs: &Ext4Fs,
     root: &[u8],
     file_size: u64,
+    dir_path: &[u8],
+    scan_depth: usize,
     found: &mut usize,
 ) -> Result<(), &'static str> {
     let depth = extent_depth(root)?;
 
     if depth == 0 {
-        return scan_extent_leaf(fs, root, file_size, found);
+        return scan_extent_leaf(fs, root, file_size, dir_path, scan_depth, found);
     }
 
     if depth != 1 {
@@ -309,7 +322,14 @@ fn scan_extent_tree(
         let leaf = extent_index_leaf(&root[offset..offset + 12]);
         let mut leaf_block = [0u8; MAX_BLOCK_SIZE];
         read_fs_block(fs, leaf, &mut leaf_block)?;
-        scan_extent_leaf(fs, &leaf_block[..fs.block_size], file_size, found)?;
+        scan_extent_leaf(
+            fs,
+            &leaf_block[..fs.block_size],
+            file_size,
+            dir_path,
+            scan_depth,
+            found,
+        )?;
 
         index += 1;
     }
@@ -321,6 +341,8 @@ fn scan_extent_leaf(
     fs: &Ext4Fs,
     node: &[u8],
     file_size: u64,
+    dir_path: &[u8],
+    scan_depth: usize,
     found: &mut usize,
 ) -> Result<(), &'static str> {
     if extent_depth(node)? != 0 {
@@ -347,7 +369,14 @@ fn scan_extent_leaf(
             }
 
             let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
-            scan_dir_data_block(fs, physical + block_index, valid_len, found)?;
+            scan_dir_data_block(
+                fs,
+                physical + block_index,
+                valid_len,
+                dir_path,
+                scan_depth,
+                found,
+            )?;
 
             block_index += 1;
         }
@@ -362,6 +391,8 @@ fn scan_direct_blocks(
     fs: &Ext4Fs,
     i_block: &[u8],
     file_size: u64,
+    dir_path: &[u8],
+    scan_depth: usize,
     found: &mut usize,
 ) -> Result<(), &'static str> {
     let mut index = 0usize;
@@ -377,7 +408,7 @@ fn scan_direct_blocks(
         }
 
         let valid_len = remaining_block_len(file_size, file_offset, fs.block_size);
-        scan_dir_data_block(fs, block_no, valid_len, found)?;
+        scan_dir_data_block(fs, block_no, valid_len, dir_path, scan_depth, found)?;
 
         index += 1;
     }
@@ -389,15 +420,22 @@ fn scan_dir_data_block(
     fs: &Ext4Fs,
     block_no: u64,
     valid_len: usize,
+    dir_path: &[u8],
+    scan_depth: usize,
     found: &mut usize,
 ) -> Result<(), &'static str> {
     let mut buffer = [0u8; MAX_BLOCK_SIZE];
     read_fs_block(fs, block_no, &mut buffer)?;
-    scan_dir_entries(fs, &buffer[..valid_len], found);
-    Ok(())
+    scan_dir_entries(fs, &buffer[..valid_len], dir_path, scan_depth, found)
 }
 
-fn scan_dir_entries(fs: &Ext4Fs, block: &[u8], found: &mut usize) {
+fn scan_dir_entries(
+    fs: &Ext4Fs,
+    block: &[u8],
+    dir_path: &[u8],
+    scan_depth: usize,
+    found: &mut usize,
+) -> Result<(), &'static str> {
     let mut offset = 0usize;
     while offset + 8 <= block.len() {
         let inode = le_u32(block, offset);
@@ -410,13 +448,31 @@ fn scan_dir_entries(fs: &Ext4Fs, block: &[u8], found: &mut usize) {
 
         if inode != 0 && name_len <= EXT4_NAME_MAX && name_len <= rec_len - 8 {
             let name = &block[offset + 8..offset + 8 + name_len];
-            if is_test_script(name) {
-                handle_test_script(fs, inode, name, found);
+            if is_basic_test_script(name) {
+                handle_test_script(fs, inode, dir_path, name, found);
+            } else if scan_depth < MAX_SCAN_DEPTH && !is_dot_entry(name) {
+                let mut child_inode = [0u8; INODE_PARSE_SIZE];
+                let child_result = read_inode_table_block(fs, inode)
+                    .and_then(|inode_table| read_inode(fs, inode_table, inode, &mut child_inode));
+                if child_result.is_ok()
+                    && le_u16(&child_inode, 0) & EXT4_MODE_TYPE_MASK == EXT4_S_IFDIR
+                {
+                    let mut child_path = [0u8; SCRIPT_PATH_MAX];
+                    let base_len = copy_path(dir_path, &mut child_path);
+                    let child_len = append_path_part(&mut child_path, base_len, name);
+                    let _ = scan_directory(fs, inode, &child_path[..child_len], scan_depth + 1, found);
+                }
+            }
+
+            if crate::loader::has_external_app() {
+                return Ok(());
             }
         }
 
         offset += rec_len;
     }
+
+    Ok(())
 }
 
 fn find_dir_entry(block: &[u8], target: &[u8]) -> Option<u32> {
@@ -443,10 +499,24 @@ fn find_dir_entry(block: &[u8], target: &[u8]) -> Option<u32> {
     None
 }
 
-fn handle_test_script(fs: &Ext4Fs, inode_no: u32, name: &[u8], found: &mut usize) {
+fn handle_test_script(
+    fs: &Ext4Fs,
+    inode_no: u32,
+    dir_path: &[u8],
+    name: &[u8],
+    found: &mut usize,
+) {
+    if crate::loader::has_external_app() {
+        return;
+    }
+
     *found += 1;
 
     crate::print!("oscomp: found test script ");
+    if !dir_path.is_empty() {
+        print_name(dir_path);
+        crate::print!("/");
+    }
     print_name(name);
     crate::println!();
 
@@ -470,9 +540,9 @@ fn handle_test_script(fs: &Ext4Fs, inode_no: u32, name: &[u8], found: &mut usize
         return;
     }
 
-    if try_load_first_command_from_script(fs, script, &[], 0) {
+    if try_load_first_command_from_script(fs, script, dir_path, 0) {
         emit_group_start_from_script_or_fallback(name, script);
-        set_external_group_from_script_name(name);
+        set_external_group_from_script(name, script);
         return;
     }
 
@@ -1474,8 +1544,12 @@ fn remaining_block_len(file_size: u64, file_offset: u64, block_size: usize) -> u
     }
 }
 
-fn is_test_script(name: &[u8]) -> bool {
-    name.ends_with(TEST_SCRIPT_SUFFIX)
+fn is_basic_test_script(name: &[u8]) -> bool {
+    name == b"basic_testcode.sh"
+}
+
+fn is_dot_entry(name: &[u8]) -> bool {
+    name == b"." || name == b".."
 }
 
 fn contains_byte(buffer: &[u8], target: u8) -> bool {
@@ -1572,6 +1646,37 @@ fn emit_fallback_group_end(name: &[u8]) {
 fn set_external_group_from_script_name(name: &[u8]) {
     let group_len = name.len() - TEST_SCRIPT_SUFFIX.len();
     crate::loader::set_external_group(&name[..group_len]);
+}
+
+fn set_external_group_from_script(name: &[u8], script: &[u8]) {
+    if let Some(group) = first_group_start_name(script) {
+        crate::loader::set_external_group(group);
+    } else {
+        set_external_group_from_script_name(name);
+    }
+}
+
+fn first_group_start_name(script: &[u8]) -> Option<&[u8]> {
+    let mut index = 0usize;
+
+    while index + GROUP_START_PREFIX.len() <= script.len() {
+        if starts_with_at(script, index, GROUP_START_PREFIX) {
+            let group_start = index + GROUP_START_PREFIX.len();
+            if let Some(marker_end_start) = find_bytes_from(script, MARKER_END, group_start) {
+                let mut group_end = marker_end_start;
+                while group_end > group_start && script[group_end - 1] == b' ' {
+                    group_end -= 1;
+                }
+                if group_end > group_start {
+                    return Some(&script[group_start..group_end]);
+                }
+            }
+        }
+
+        index += 1;
+    }
+
+    None
 }
 
 fn starts_with_at(buffer: &[u8], offset: usize, pattern: &[u8]) -> bool {
