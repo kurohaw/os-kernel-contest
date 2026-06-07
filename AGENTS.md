@@ -10,8 +10,9 @@
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。历史原因判断为官方测例入口和 Linux ABI 当时尚未打通。
 - 2026-06-06 本地 official basic 结果：使用官方 `pre-2025` basic 源码手工编译 RISC-V ELF，打包为无分区 EXT4 镜像后，QEMU 运行日志经官方 `test_runner.py` 解析为 `102/102`。
 - 2026-06-07 官方评测仍为 0.0：编译成功，但官方镜像根目录实际是 `glibc/`、`musl/`，每个目录下才有 `basic_testcode.sh`；旧代码只扫描 EXT4 根目录，因此线上没有进入 basic。
+- 2026-06-07 第二次官方评测仍为 0.0：源码已编进评测机，但官方页面未给串口输出。进一步处理为 fixed fast path：启动时优先直接探测 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh`、`basic_testcode.sh`，避免在官方大镜像中递归扫描大量目录。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
-- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 扫描并读取根目录或一级/二级子目录中的 `basic_testcode.sh`，可进入 `glibc/basic` 或 `musl/basic` 运行 official basic；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页、official basic 常用 Linux syscall 编号兼容，以及最小 `clone/fork/execve/wait4/nanosleep` 路径。
+- 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 优先按固定路径读取 `musl/basic_testcode.sh` 或 `glibc/basic_testcode.sh`，可进入 `musl/basic` 或 `glibc/basic` 运行 official basic；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页、official basic 常用 Linux syscall 编号兼容，以及最小 `clone/fork/execve/wait4/nanosleep` 路径。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
 
 ## 目录说明

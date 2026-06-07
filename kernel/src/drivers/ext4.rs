@@ -183,9 +183,36 @@ fn mounted_fs() -> Option<Ext4Fs> {
 }
 
 fn scan_test_scripts(fs: &Ext4Fs) -> Result<usize, &'static str> {
+    if try_load_known_basic_script(fs, b"musl", b"basic_testcode.sh") {
+        return Ok(1);
+    }
+    if try_load_known_basic_script(fs, b"glibc", b"basic_testcode.sh") {
+        return Ok(1);
+    }
+    if try_load_known_basic_script(fs, b"", b"basic_testcode.sh") {
+        return Ok(1);
+    }
+
     let mut found = 0usize;
     scan_directory(fs, EXT4_ROOT_INO, &[], 0, &mut found)?;
     Ok(found)
+}
+
+fn try_load_known_basic_script(fs: &Ext4Fs, dir_path: &[u8], name: &[u8]) -> bool {
+    let mut path = [0u8; SCRIPT_PATH_MAX];
+    let mut path_len = 0usize;
+    if !dir_path.is_empty() {
+        path_len = append_path_part(&mut path, path_len, dir_path);
+    }
+    path_len = append_path_part(&mut path, path_len, name);
+
+    let info = match lookup_path(fs, &path[..path_len]) {
+        Ok(Some(info)) => info,
+        _ => return false,
+    };
+
+    let mut found = 0usize;
+    handle_test_script(fs, info.inode_no, dir_path, name, &mut found)
 }
 
 fn scan_directory(
@@ -449,7 +476,9 @@ fn scan_dir_entries(
         if inode != 0 && name_len <= EXT4_NAME_MAX && name_len <= rec_len - 8 {
             let name = &block[offset + 8..offset + 8 + name_len];
             if is_basic_test_script(name) {
-                handle_test_script(fs, inode, dir_path, name, found);
+                if handle_test_script(fs, inode, dir_path, name, found) {
+                    return Ok(());
+                }
             } else if scan_depth < MAX_SCAN_DEPTH && !is_dot_entry(name) {
                 let mut child_inode = [0u8; INODE_PARSE_SIZE];
                 let child_result = read_inode_table_block(fs, inode)
@@ -505,9 +534,9 @@ fn handle_test_script(
     dir_path: &[u8],
     name: &[u8],
     found: &mut usize,
-) {
+) -> bool {
     if crate::loader::has_external_app() {
-        return;
+        return false;
     }
 
     *found += 1;
@@ -526,7 +555,7 @@ fn handle_test_script(
 
     if read_result.is_err() {
         emit_fallback_group_markers(name);
-        return;
+        return false;
     }
 
     let file_size = inode_size(&inode);
@@ -537,18 +566,20 @@ fn handle_test_script(
 
     if read_inode_data(fs, &inode, script).is_err() {
         emit_fallback_group_markers(name);
-        return;
+        return false;
     }
 
     if try_load_first_command_from_script(fs, script, dir_path, 0) {
         emit_group_start_from_script_or_fallback(name, script);
         set_external_group_from_script(name, script);
-        return;
+        return true;
     }
 
     if emit_group_markers_from_script(script) == 0 {
         emit_fallback_group_markers(name);
     }
+
+    false
 }
 
 fn try_load_first_command_from_script(
