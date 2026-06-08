@@ -35,28 +35,29 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 ## 官方评测快照
 
-| 时间 | 提交状态 | 总分 | 结论 |
-|---|---|---:|---|
+| 时间 | 提交状态 | 分数/结果 | 结论 |
+|---|---|---|---|
 | 2026-06-06 12:01 | Accepted | 0.0 | 产物被评测系统接受，但所有官方测试套件均未得分 |
 | 2026-06-06 local | QEMU + official `pre-2025` basic | 102/102 | 本地 official basic ELF 镜像经官方 `test_runner.py` 解析全部通过 |
 | 2026-06-07 12:47 | Accepted | 0.0 | 编译成功，但官方镜像脚本位于 `glibc/`、`musl/` 子目录；旧代码只扫描根目录导致未进入 basic |
 | 2026-06-07 local | 官方目录结构 basic 镜像 | 102/102 | 根目录同时包含 `glibc/basic_testcode.sh` 和 `musl/basic_testcode.sh` 时，可选择 `basic-glibc` 并解析全部通过 |
 | 2026-06-07 13:37 | Accepted | 0.0 | 子目录扫描修复已编入评测机，但仍无分；页面未提供串口输出，继续改为 fixed path fast path |
 | 2026-06-07 local | 官方目录结构 basic fast path | 102/102 | 启动优先探测 `musl/basic_testcode.sh`，不再依赖递归目录扫描顺序 |
+| 2026-06-08 | Accepted | basic=102 | 官方线上 basic 通过，fixed path 入口在评测机生效 |
 
-截图中的汇总结果显示，`basic`、`busybox`、`cyclictest`、`iozone`、`iperf`、`libcbench`、`libctest`、`lmbench`、`ltp`、`lua`、`netperf` 在 glibc/musl 与 rv/la 维度下均为 0。
+此前截图中的汇总结果显示，`basic`、`busybox`、`cyclictest`、`iozone`、`iperf`、`libcbench`、`libctest`、`lmbench`、`ltp`、`lua`、`netperf` 在 glibc/musl 与 rv/la 维度下均为 0；2026-06-08 重新评测后，`basic` 已更新为 102。
 
-当前判断：最新 0 分不是编译失败，而是线上运行输出没有被 basic 解析器识别。官方页面没有附串口输出，只能继续缩小差异面。当前入口已改为 fixed path fast path：先探测 `musl/basic_testcode.sh`，再探测 `glibc/basic_testcode.sh`，最后探测根目录 `basic_testcode.sh`；只有都找不到才回退递归扫描。
+当前判断：线上 0 分阻塞已解除，`basic=102` 说明 fixed path fast path 能被官方镜像命中。当前入口仍是先探测 `musl/basic_testcode.sh`，再探测 `glibc/basic_testcode.sh`，最后探测根目录 `basic_testcode.sh`；只有都找不到才回退递归扫描。后续改启动、脚本解析或日志输出时，要先保护 basic 回归。
 
 优先级应调整为：
 
 | 优先级 | 方向 | 目标 |
 |---:|---|---|
-| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘、读取根目录脚本、输出官方组标记，并从脚本定位根目录 ELF |
+| 1 | 官方测例入口 | 已能识别 virtio-blk EXT4 测试盘并通过 fixed path 进入官方 basic，线上 basic 得分 102 |
 | 2 | ELF 与地址空间 | 已从固定裸二进制过渡到 ELF segment 映射、entry 和最小启动栈初始化 |
 | 3 | 进程模型 | official basic 所需 `execve`、`fork/clone`、`wait4`、`exit_group` 已有最小路径；后续升级为更完整进程隔离 |
 | 4 | 文件系统接口 | 已在现有 EXT4 根目录扫描基础上支持用户态打开/读取根目录普通文件 |
-| 5 | syscall 矩阵 | official basic 本地已通过；继续用 busybox/lua/libctest 失败日志反推下一批 syscall |
+| 5 | syscall 矩阵 | official basic 本地和线上均已通过；继续用 busybox/lua/libctest 失败日志反推下一批 syscall |
 
 ## 基础 syscall 状态
 
@@ -139,6 +140,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | official basic | 已通过 | 官方 `pre-2025` basic 源码编译 ELF + 本地 EXT4 镜像 + 官方 `test_runner.py` | 本地解析 `TOTAL 102 / 102` |
 | 官方目录结构 basic | 已通过 | 根目录含 `glibc/basic_testcode.sh` 与 `musl/basic_testcode.sh` 的 EXT4 镜像 | 递归扫描子目录，选择一个 basic 组；本地解析 `TOTAL 102 / 102` |
 | fixed path basic | 已通过 | 同一官方目录结构镜像 | 直接选择 `musl/basic_testcode.sh`；本地解析 `TOTAL 102 / 102` |
+| 官方线上 basic | 已通过 | 官方评测 | `basic` 得分 102 |
 
 ## 当前限制
 
@@ -157,6 +159,6 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 方向 | 目标 | 状态 |
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
-| 官方测例 | official basic 已本地通过；继续运行 busybox/lua/libctest 观察缺失 syscall | 进行中 |
+| 官方测例 | official basic 已本地和线上通过；继续运行 busybox/lua/libctest 观察缺失 syscall | 进行中 |
 | 进程模型 | 将最小 fork/clone/exec/wait 升级为 per-process address space、fd table 和资源回收 | 下一步 |
 | 文件系统 | 支持目录 fd、挂载点和更多 pseudo path | 下一步 |
