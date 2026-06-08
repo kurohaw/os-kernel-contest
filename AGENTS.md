@@ -1,6 +1,6 @@
 # 项目协作说明
 
-本文档给队内成员和 Codex 使用。开始开发前先读这里，再看 `docs/progress.md` 和 `docs/test-matrix.md`。
+本文档给队内成员和 Codex 使用。开始开发前先读这里，再看 `docs/progress.md`、`docs/test-matrix.md` 和 `docs/next-evaluation-roadmap.md`。
 
 ## 当前项目状态
 
@@ -21,6 +21,7 @@
 - `kernel/`：自建 Rust/RISC-V 内核，当前主要实现启动、trap、分页、任务、syscall、最小文件描述符层。
 - `user/`：自建用户态测试程序，当前有 `app0` 和 `app1`，会编译为裸二进制并由内核 `include_bytes!` 嵌入。
 - `docs/`：开发进度、测试矩阵、参考来源和路线说明。阶段完成后必须更新相关文档。
+- `docs/next-evaluation-roadmap.md`：官方 basic=102 后的具体推进路线，包含保分基线、busybox 入口、后续 ABI 补齐顺序和队友协作注意事项。
 - `rCore-Tutorial-v3-main/`：学习和参考 baseline，不是当前提交内核主体。不要直接在里面改比赛实现。
 - `office-test.txt`：官方提交说明原文参考，不要当垃圾文件直接删除；后续可整理进 `docs/`。
 
