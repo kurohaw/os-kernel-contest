@@ -141,6 +141,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 官方目录结构 basic | 已通过 | 根目录含 `glibc/basic_testcode.sh` 与 `musl/basic_testcode.sh` 的 EXT4 镜像 | 递归扫描子目录，选择一个 basic 组；本地解析 `TOTAL 102 / 102` |
 | fixed path basic | 已通过 | 同一官方目录结构镜像 | 直接选择 `musl/basic_testcode.sh`；本地解析 `TOTAL 102 / 102` |
 | 官方线上 basic | 已通过 | 官方评测 | `basic` 得分 102 |
+| 测试组选择器 | 已通过 | `make all` 与 `make all TEST_GROUP=busybox` | 默认 basic；busybox feature 构建通过 |
+| busybox 简单命令队列 | 最小支持 | 本地 EXT4 镜像使用 RISC-V basic ELF 代替 busybox 验证调度链路 | 读取 `busybox_cmd.txt`，排队 45 条简单命令，输出 success 结果、END 并主动退出；尚未用真实 busybox ELF 验证 |
 
 ## 当前限制
 
@@ -153,12 +155,13 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 文件系统 | `openat/read/fstat` 已能读取 EXT4 多级普通文件；尚未支持写入、目录 fd、挂载点和完整 Linux 路径语义 |
 | 进程模型 | official basic 所需 `clone/fork/execve/wait4` 已有最小实现；当前仍共享地址空间，尚未完整进程隔离 |
 | ELF loader | 已支持脚本命令 argv、空 `envp`、基础 `auxv` 和多个 ELF 串行队列；尚未支持动态链接器、解释器路径 |
+| busybox 脚本 | 当前直接解析 `busybox_cmd.txt`；包含管道、重定向、后台任务、变量或 `[` 的命令暂时跳过 |
 
 ## 下一步待测
 
 | 方向 | 目标 | 状态 |
 |---|---|---|
 | 堆内存 | `brk` 增长后真实映射用户页 | 已完成（增长映射） |
-| 官方测例 | official basic 已本地和线上通过；继续运行 busybox/lua/libctest 观察缺失 syscall | 进行中 |
+| 官方测例 | official basic 已本地和线上通过；busybox 简单命令调度链路已接入，下一步使用真实 busybox ELF 观察缺失 syscall | 进行中 |
 | 进程模型 | 将最小 fork/clone/exec/wait 升级为 per-process address space、fd table 和资源回收 | 下一步 |
 | 文件系统 | 支持目录 fd、挂载点和更多 pseudo path | 下一步 |

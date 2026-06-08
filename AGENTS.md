@@ -12,6 +12,7 @@
 - 2026-06-07 官方评测仍为 0.0：编译成功，但官方镜像根目录实际是 `glibc/`、`musl/`，每个目录下才有 `basic_testcode.sh`；旧代码只扫描 EXT4 根目录，因此线上没有进入 basic。
 - 2026-06-07 第二次官方评测仍为 0.0：源码已编进评测机，但官方页面未给串口输出。进一步处理为 fixed fast path：启动时优先直接探测 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh`、`basic_testcode.sh`，避免在官方大镜像中递归扫描大量目录。
 - 2026-06-08 官方评测结果：`basic` 得分 102，说明 fixed path basic 入口已在评测机生效；线上 0 分阻塞已解除。
+- 2026-06-08 已加入测试组选择器：默认 `make all` 仍只运行 basic；本地可用 `make all TEST_GROUP=busybox` 构建 busybox 模式。busybox 模式会直接读取 `busybox_cmd.txt`，当前只排队执行不含复杂 shell 语法的 45 条命令。
 - 当前 `main` 已完成 RISC-V 官方提交入口适配：根目录 `make all` 能生成 ELF `kernel-rv`，并可用官方风格 QEMU 命令启动和主动退出。
 - 当前已能识别官方风格挂载的 virtio-blk 测试盘，从无分区 EXT4 优先按固定路径读取 `musl/basic_testcode.sh` 或 `glibc/basic_testcode.sh`，可进入 `musl/basic` 或 `glibc/basic` 运行 official basic；能跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把脚本中的多个真实 ELF 命令排队串行运行并传入 argv；外部 ELF 支持最小 `argc/argv/envp/auxv` 启动栈、EXT4 普通文件读取（含子目录路径）、`brk` 增长映射真实用户堆页、official basic 常用 Linux syscall 编号兼容，以及最小 `clone/fork/execve/wait4/nanosleep` 路径。
 - `kernel-la` 目前只是临时占位文件，不代表已经支持 LoongArch。
@@ -52,6 +53,15 @@ git pull --rebase gitlab main
 make all
 qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default -no-reboot
 ```
+
+只构建本地 busybox 测试模式：
+
+```bash
+cd /mnt/d/os-kernel-contest
+make all TEST_GROUP=busybox
+```
+
+未显式传入 `TEST_GROUP=busybox` 时，官方提交默认仍构建 basic 模式。
 
 旧 RustSBI loader 本地流程仍保留：
 
@@ -133,6 +143,7 @@ all tasks exited
 - fd 表仍是全局表，尚未按进程隔离。
 - virtio-blk 与 EXT4 目前支持只读扫描测试脚本、读取脚本内容、输出测试组 START/END 标记、记录脚本命令队列、串行读取 ELF，以及对用户态暴露普通文件读取。
 - 当前线上已靠 basic 拿到 102 分；为保分，仍只自动运行扫描到的第一个 `basic_testcode.sh`，其他测试脚本暂时跳过，避免 busybox/lua/libctest 等未支持路径污染 basic 得分。
+- busybox 模式目前绕过完整 shell，直接读取同目录 `busybox_cmd.txt` 并运行简单 applet；包含管道、重定向、后台任务、变量或 `[` 的命令暂时跳过。
 - ELF loader 目前只支持把整个 ELF 读入 4 MiB 内核缓冲并映射 `PT_LOAD` 段；已构造脚本命令 argv、空 `envp` 和基础 `auxv`，并支持一个测试组内多个外部 ELF 串行运行；但尚未支持动态链接器或解释器路径。
 - `clone/fork/execve/wait4` 是为 official basic 打通的最小实现：clone/fork 共享地址空间，fork 复制用户栈，clone 使用每任务静态用户栈，wait4 通过重试 syscall 阻塞等待；这还不是完整进程隔离模型。
 - `nanosleep` 为最小 busy-wait/cap 实现，不保证真实 POSIX 时间精度。

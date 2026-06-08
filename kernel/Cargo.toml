@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 
+[features]
+default = []
+busybox-test = []
+
 [profile.dev]
 panic = "abort"
 

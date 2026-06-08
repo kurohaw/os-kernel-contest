@@ -7,6 +7,15 @@ KERNEL_ENTRY_PA := 0x80200000
 USER_DIR := ../user
 CARGO_CONFIG_SRC := cargo-config/config.toml
 CARGO_CONFIG_DST := .cargo/config.toml
+TEST_GROUP ?= basic
+
+ifeq ($(TEST_GROUP),basic)
+CARGO_FEATURES :=
+else ifeq ($(TEST_GROUP),busybox)
+CARGO_FEATURES := --features busybox-test
+else
+$(error unsupported TEST_GROUP "$(TEST_GROUP)"; expected basic or busybox)
+endif
 
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
@@ -23,7 +32,7 @@ prepare-cargo:
 
 build: prepare-cargo
 	$(MAKE) -C $(USER_DIR) build
-	cargo build --release
+	cargo build --release $(CARGO_FEATURES)
 	$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
 
 run: build

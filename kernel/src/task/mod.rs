@@ -378,6 +378,10 @@ pub fn exit_current(code: i32) -> ! {
         run_task(next);
     }
 
+    if crate::loader::has_external_app() {
+        crate::drivers::ext4::report_current_external_result(code);
+    }
+
     if crate::loader::has_external_app() && crate::drivers::ext4::load_next_queued_external() {
         init_task(0, true);
         run_task(0);

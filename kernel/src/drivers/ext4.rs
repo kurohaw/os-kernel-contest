@@ -15,6 +15,12 @@ const INODE_PARSE_SIZE: usize = 160;
 const GROUP_DESC_PARSE_SIZE: usize = 64;
 const EXT4_NAME_MAX: usize = 255;
 const TEST_SCRIPT_SUFFIX: &[u8] = b"_testcode.sh";
+#[cfg(not(feature = "busybox-test"))]
+const SELECTED_TEST_SCRIPT: &[u8] = b"basic_testcode.sh";
+#[cfg(feature = "busybox-test")]
+const SELECTED_TEST_SCRIPT: &[u8] = b"busybox_testcode.sh";
+const BUSYBOX_COMMAND_FILE: &[u8] = b"busybox_cmd.txt";
+const BUSYBOX_EXECUTABLE: &[u8] = b"busybox";
 const SCRIPT_BUFFER_SIZE: usize = 16 * 1024;
 const SCRIPT_PATH_MAX: usize = 128;
 const SCRIPT_COMMAND_MAX: usize = 64;
@@ -32,11 +38,14 @@ static mut SCRIPT_COMMANDS: [ScriptCommand; SCRIPT_COMMAND_MAX] =
     [const { ScriptCommand::zero() }; SCRIPT_COMMAND_MAX];
 static mut SCRIPT_COMMAND_COUNT: usize = 0;
 static mut SCRIPT_COMMAND_NEXT: usize = 0;
+static mut CURRENT_SCRIPT_COMMAND: ScriptCommand = ScriptCommand::zero();
 
 #[derive(Clone, Copy)]
 struct ScriptCommand {
     path: [u8; SCRIPT_PATH_MAX],
     path_len: usize,
+    label: [u8; SCRIPT_PATH_MAX],
+    label_len: usize,
     args: [[u8; SCRIPT_ARG_MAX_LEN]; crate::loader::EXTERNAL_ARG_MAX],
     arg_len: [usize; crate::loader::EXTERNAL_ARG_MAX],
     argc: usize,
@@ -47,10 +56,26 @@ impl ScriptCommand {
         Self {
             path: [0; SCRIPT_PATH_MAX],
             path_len: 0,
+            label: [0; SCRIPT_PATH_MAX],
+            label_len: 0,
             args: [[0; SCRIPT_ARG_MAX_LEN]; crate::loader::EXTERNAL_ARG_MAX],
             arg_len: [0; crate::loader::EXTERNAL_ARG_MAX],
             argc: 0,
         }
+    }
+
+    #[cfg(feature = "busybox-test")]
+    fn arg(&self, index: usize) -> &[u8] {
+        if index >= self.argc {
+            return b"";
+        }
+
+        &self.args[index][..self.arg_len[index]]
+    }
+
+    #[cfg(feature = "busybox-test")]
+    fn label(&self) -> &[u8] {
+        &self.label[..self.label_len]
     }
 }
 
@@ -158,6 +183,29 @@ pub fn load_next_queued_external() -> bool {
     }
 }
 
+pub fn report_current_external_result(code: i32) {
+    #[cfg(feature = "busybox-test")]
+    {
+        let command = unsafe { CURRENT_SCRIPT_COMMAND };
+        if command.argc < 2 || !path_basename_eq(command.arg(0), BUSYBOX_EXECUTABLE) {
+            return;
+        }
+
+        crate::print!("testcase busybox ");
+        print_name(command.label());
+
+        let expected_nonzero = command.arg(1) == b"false";
+        if code == 0 || expected_nonzero {
+            crate::println!(" success");
+        } else {
+            crate::println!(" fail");
+        }
+    }
+
+    #[cfg(not(feature = "busybox-test"))]
+    let _ = code;
+}
+
 pub fn load_external_elf_path(path: &[u8]) -> bool {
     let fs = match mounted_fs() {
         Some(fs) => fs,
@@ -183,13 +231,13 @@ fn mounted_fs() -> Option<Ext4Fs> {
 }
 
 fn scan_test_scripts(fs: &Ext4Fs) -> Result<usize, &'static str> {
-    if try_load_known_basic_script(fs, b"musl", b"basic_testcode.sh") {
+    if try_load_known_test_script(fs, b"musl", SELECTED_TEST_SCRIPT) {
         return Ok(1);
     }
-    if try_load_known_basic_script(fs, b"glibc", b"basic_testcode.sh") {
+    if try_load_known_test_script(fs, b"glibc", SELECTED_TEST_SCRIPT) {
         return Ok(1);
     }
-    if try_load_known_basic_script(fs, b"", b"basic_testcode.sh") {
+    if try_load_known_test_script(fs, b"", SELECTED_TEST_SCRIPT) {
         return Ok(1);
     }
 
@@ -198,7 +246,7 @@ fn scan_test_scripts(fs: &Ext4Fs) -> Result<usize, &'static str> {
     Ok(found)
 }
 
-fn try_load_known_basic_script(fs: &Ext4Fs, dir_path: &[u8], name: &[u8]) -> bool {
+fn try_load_known_test_script(fs: &Ext4Fs, dir_path: &[u8], name: &[u8]) -> bool {
     let mut path = [0u8; SCRIPT_PATH_MAX];
     let mut path_len = 0usize;
     if !dir_path.is_empty() {
@@ -475,7 +523,7 @@ fn scan_dir_entries(
 
         if inode != 0 && name_len <= EXT4_NAME_MAX && name_len <= rec_len - 8 {
             let name = &block[offset + 8..offset + 8 + name_len];
-            if is_basic_test_script(name) {
+            if is_selected_test_script(name) {
                 if handle_test_script(fs, inode, dir_path, name, found) {
                     return Ok(());
                 }
@@ -569,7 +617,7 @@ fn handle_test_script(
         return false;
     }
 
-    if try_load_first_command_from_script(fs, script, dir_path, 0) {
+    if try_load_commands_from_test_script(fs, script, dir_path, name) {
         emit_group_start_from_script_or_fallback(name, script);
         set_external_group_from_script(name, script);
         return true;
@@ -580,6 +628,84 @@ fn handle_test_script(
     }
 
     false
+}
+
+fn try_load_commands_from_test_script(
+    fs: &Ext4Fs,
+    script: &[u8],
+    initial_cwd: &[u8],
+    name: &[u8],
+) -> bool {
+    if name == b"busybox_testcode.sh" {
+        return try_load_busybox_commands(fs, initial_cwd);
+    }
+
+    try_load_first_command_from_script(fs, script, initial_cwd, 0)
+}
+
+fn try_load_busybox_commands(fs: &Ext4Fs, initial_cwd: &[u8]) -> bool {
+    if crate::loader::has_external_app() {
+        return false;
+    }
+
+    let mut command_file_path = [0u8; SCRIPT_PATH_MAX];
+    let mut command_file_len = copy_path(initial_cwd, &mut command_file_path);
+    command_file_len = append_path_part(
+        &mut command_file_path,
+        command_file_len,
+        BUSYBOX_COMMAND_FILE,
+    );
+
+    let info = match lookup_path(fs, &command_file_path[..command_file_len]) {
+        Ok(Some(info)) => info,
+        _ => return false,
+    };
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG
+        || info.size == 0
+        || info.size as usize > SCRIPT_BUFFER_SIZE
+    {
+        return false;
+    }
+
+    let read_len = info.size as usize;
+    let commands = unsafe {
+        core::slice::from_raw_parts_mut(addr_of_mut!(NESTED_SCRIPT_BUFFER) as *mut u8, read_len)
+    };
+    if read_root_file_into(fs, info, commands).is_err() {
+        return false;
+    }
+
+    let mut busybox_path = [0u8; SCRIPT_PATH_MAX];
+    let mut busybox_path_len = copy_path(initial_cwd, &mut busybox_path);
+    busybox_path_len = append_path_part(&mut busybox_path, busybox_path_len, BUSYBOX_EXECUTABLE);
+
+    clear_script_command_queue();
+    let mut line_start = 0usize;
+    let mut queued = false;
+    while line_start < commands.len() {
+        let line_end = find_line_end(commands, line_start);
+        let line = &commands[line_start..line_end];
+        if busybox_line_is_queueable(line)
+            && enqueue_elf_command(fs, &busybox_path[..busybox_path_len], line, 0)
+        {
+            queued = true;
+        }
+        line_start = line_end + 1;
+    }
+
+    queued && load_next_queued_external()
+}
+
+fn busybox_line_is_queueable(line: &[u8]) -> bool {
+    next_token(line, 0).is_some() && !busybox_line_has_unsupported_shell_syntax(line)
+}
+
+fn busybox_line_has_unsupported_shell_syntax(line: &[u8]) -> bool {
+    contains_byte(line, b'|')
+        || contains_byte(line, b'>')
+        || contains_byte(line, b'&')
+        || contains_byte(line, b'$')
+        || contains_byte(line, b'[')
 }
 
 fn try_load_first_command_from_script(
@@ -727,6 +853,7 @@ fn enqueue_elf_command(
     let command = unsafe { &mut *core::ptr::addr_of_mut!(SCRIPT_COMMANDS[command_index]) };
     *command = ScriptCommand::zero();
     command.path_len = copy_path(path, &mut command.path);
+    command.label_len = copy_path(trim_line_whitespace(line), &mut command.label);
     push_script_command_arg(command, path);
     while let Some((arg_start, arg_end, next)) = next_token(line, next_index) {
         push_script_command_arg(command, &line[arg_start..arg_end]);
@@ -773,6 +900,9 @@ fn load_script_command(fs: &Ext4Fs, command: ScriptCommand) -> bool {
     };
 
     crate::loader::clear_external_args();
+    unsafe {
+        CURRENT_SCRIPT_COMMAND = command;
+    }
     let mut index = 0usize;
     while index < command.argc {
         let len = command.arg_len[index];
@@ -862,6 +992,20 @@ fn find_line_end(buffer: &[u8], start: usize) -> usize {
         index += 1;
     }
     index
+}
+
+fn trim_line_whitespace(mut line: &[u8]) -> &[u8] {
+    while !line.is_empty() && (line[0] == b' ' || line[0] == b'\t' || line[0] == b'\r') {
+        line = &line[1..];
+    }
+    while !line.is_empty()
+        && (line[line.len() - 1] == b' '
+            || line[line.len() - 1] == b'\t'
+            || line[line.len() - 1] == b'\r')
+    {
+        line = &line[..line.len() - 1];
+    }
+    line
 }
 
 fn next_token(buffer: &[u8], mut index: usize) -> Option<(usize, usize, usize)> {
@@ -1575,8 +1719,8 @@ fn remaining_block_len(file_size: u64, file_offset: u64, block_size: usize) -> u
     }
 }
 
-fn is_basic_test_script(name: &[u8]) -> bool {
-    name == b"basic_testcode.sh"
+fn is_selected_test_script(name: &[u8]) -> bool {
+    name == SELECTED_TEST_SCRIPT
 }
 
 fn is_dot_entry(name: &[u8]) -> bool {

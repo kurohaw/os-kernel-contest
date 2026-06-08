@@ -57,6 +57,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 目标：在不破坏官方 basic 默认行为的前提下，允许本地只跑 busybox。
 
+当前状态：已完成。默认 `make all` 运行 basic；`make all TEST_GROUP=busybox` 构建 busybox 模式。
+
 推荐行为：
 
 - 官方默认模式只跑 basic，保住线上 102。
@@ -82,6 +84,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 ## 3. busybox 第一阶段：进入脚本并定位第一个失败点
 
 目标不是一次通过 busybox，而是稳定进入 busybox 脚本，运行到第一个真实失败点。
+
+当前状态：调度链路已完成。内核会直接读取 `busybox_cmd.txt`，将不含复杂 shell 语法的命令转换为 `busybox <applet> ...` 队列，并输出官方 success/fail 格式。下一步需要使用真实静态 busybox ELF 运行并分析失败。
 
 优先处理：
 
