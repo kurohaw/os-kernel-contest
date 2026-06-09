@@ -21,7 +21,6 @@ pub const VIRTGPU_YRES: u32 = 800;
 use crate::drivers::block::BLOCK_DEVICE;
 use crate::drivers::chardev::{CharDevice, UART};
 use crate::drivers::plic::{IntrTargetPriority, PLIC};
-use crate::drivers::{KEYBOARD_DEVICE, MOUSE_DEVICE};
 
 pub fn device_init() {
     use riscv::register::sie;
@@ -31,8 +30,9 @@ pub fn device_init() {
     let machine = IntrTargetPriority::Machine;
     plic.set_threshold(hart_id, supervisor, 0);
     plic.set_threshold(hart_id, machine, 1);
-    //irq nums: 5 keyboard, 6 mouse, 8 block, 10 uart
-    for intr_src_id in [5usize, 6, 8, 10] {
+    // The official evaluator mounts its test disk as x0 and our easy-fs
+    // disk.img as x1. The second virtio-mmio block device uses IRQ 2.
+    for intr_src_id in [2usize, 10] {
         plic.enable(hart_id, supervisor, intr_src_id);
         plic.set_priority(intr_src_id, 1);
     }
@@ -45,9 +45,7 @@ pub fn irq_handler() {
     let mut plic = unsafe { PLIC::new(VIRT_PLIC) };
     let intr_src_id = plic.claim(0, IntrTargetPriority::Supervisor);
     match intr_src_id {
-        5 => KEYBOARD_DEVICE.handle_irq(),
-        6 => MOUSE_DEVICE.handle_irq(),
-        8 => BLOCK_DEVICE.handle_irq(),
+        2 => BLOCK_DEVICE.handle_irq(),
         10 => UART.handle_irq(),
         _ => panic!("unsupported IRQ {}", intr_src_id),
     }

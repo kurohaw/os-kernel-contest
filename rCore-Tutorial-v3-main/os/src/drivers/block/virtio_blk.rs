@@ -7,7 +7,9 @@ use alloc::collections::BTreeMap;
 use virtio_drivers::{BlkResp, RespStatus, VirtIOBlk, VirtIOHeader};
 
 #[allow(unused)]
-const VIRTIO0: usize = 0x10008000;
+// The official evaluator reserves the first virtio-mmio block device for its
+// EXT4 test disk. Our easy-fs root disk is attached as the second device.
+const VIRTIO0: usize = 0x10002000;
 
 pub struct VirtIOBlock {
     virtio_blk: UPIntrFreeCell<VirtIOBlk<'static, VirtioHal>>,

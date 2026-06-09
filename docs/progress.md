@@ -12,6 +12,39 @@
 | 当前目标 | 打通官方测试入口和最小 Linux ABI |
 | 当前完成度 | 已完成最小启动、trap、syscall、两任务轮转、物理页帧分配、Sv39 页表基础、区间映射、内核地址空间结构、临时用户段权限映射、Sv39 内核分页开启、用户地址空间自检、任务绑定用户地址空间、按任务切换页表、用户程序 loader 边界、独立用户程序构建、用户程序二进制嵌入自检、用户程序加载运行、`write` syscall、`getpid` syscall、最小 `read` syscall、基础文件描述符层、最小 `close` syscall、最小 `fstat` syscall、最小 `openat` syscall、基础文件描述符表、基础文件读取、测试矩阵、官方 RISC-V 提交入口适配、virtio-blk 扇区读取、EXT4 测试脚本扫描、测试脚本内容读取、官方测试组 START/END 标记输出、从测试盘读取并运行 RISC-V ELF、外部 ELF 最小启动栈、EXT4 多级普通文件 `openat/read/fstat`、`brk` 增长映射真实用户堆页、最小脚本下钻和 argv、多 ELF 串行队列、official basic 常用 Linux syscall、最小 `clone/fork/execve/wait4/nanosleep`、官方 `glibc/`/`musl/` 子目录 basic 扫描、本地 official basic `102/102`、官方线上 basic 得分 `102` |
 
+> 2026-06-09 起，旧自建最小内核冻结在 `codex/basic-102-archive`。当前开发分支改用 rCore-Tutorial-v3 成熟架构，下面旧进度保留作为历史记录。
+
+## 2026-06-09 迁移到 rCore 成熟架构
+
+### 决策
+
+- 不再继续扩展旧自建最小内核。
+- 旧 `basic=102` 版本保存在 `codex/basic-102-archive`。
+- 新分支 `codex/rcore-architecture` 以 rCore-Tutorial-v3 为内核主体，在成熟 Process、Task、MemorySet、VFS、fd table、pipe、同步和信号架构上继续开发。
+- rCore 使用 GPLv3，后续必须保留许可证、来源和修改记录。
+
+### 已完成
+
+- 验证 rCore 内核、用户程序集和 easy-fs 镜像能够构建。
+- 根目录 `make all` 已切换到 rCore 构建链路。
+- 生成官方要求的 `kernel-rv`、临时 `kernel-la`，以及内部 easy-fs `disk.img`。
+- 移除启动路径对 GPU、键盘和鼠标的强制初始化。
+- 将内部 easy-fs 根盘适配为官方双磁盘布局中的 x1，保留 x0 给官方 EXT4 测试盘。
+- 官方风格 QEMU 命令能够启动到 `Rust user shell`。
+
+### 当前边界
+
+- 迁移分支还没有读取 x0 官方 EXT4 测试盘，也没有自动执行官方 ELF。
+- 迁移分支尚未恢复 basic 得分，暂时不能提交官方评测。
+- 依赖目前能利用本地 Cargo 缓存构建，但还没有 vendor 到仓库；这是官方构建前必须解决的问题。
+
+### 下一步
+
+1. vendor rCore Rust 依赖。
+2. 在 rCore 新增 `oscomp` 模块和 x0 EXT4 只读访问。
+3. 接入官方 ELF 和 Linux/RISC-V syscall ABI。
+4. 恢复 basic `102/102`。
+
 ## 2026-05-18 rCore baseline
 
 ### 今日目标

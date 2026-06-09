@@ -2,6 +2,26 @@
 
 本文档给队友和 Codex 使用。当前线上 `basic=102` 已确认，后续开发目标是保住 basic 分数，再逐步打开 busybox、lua、libctest 等测试组。
 
+> 2026-06-09 路线调整：旧自建最小内核冻结在 `codex/basic-102-archive`。当前 `codex/rcore-architecture` 分支采用 rCore-Tutorial-v3 成熟架构重新接入官方测试。迁移分支恢复 basic 前不可提交官方评测。
+
+## 成熟架构迁移
+
+当前已经完成：
+
+- rCore 内核、用户程序和 easy-fs 镜像可离线使用本地缓存构建。
+- 根目录 `make all` 已切换为构建 rCore，并生成 `kernel-rv`、`kernel-la` 和 `disk.img`。
+- 移除启动路径对 GPU、键盘和鼠标的强制依赖。
+- 官方 x0 保留给 EXT4 测试盘，内部 easy-fs `disk.img` 使用 x1。
+- 官方风格 QEMU 双磁盘命令已启动到 `Rust user shell`。
+
+迁移恢复得分顺序：
+
+1. vendor 全部 Rust 依赖，保证评测机无需联网。
+2. 新增 `oscomp` 模块和 x0 EXT4 只读访问。
+3. 将官方 ELF 接入 rCore `ProcessControlBlock/MemorySet`。
+4. 接入 Linux/RISC-V syscall 编号和行为。
+5. 恢复 basic `102/102` 后，再推进真实 busybox。
+
 ## 当前结论
 
 - 官方线上 0 分阻塞已经解除，2026-06-08 评测中 `basic` 得分 102。

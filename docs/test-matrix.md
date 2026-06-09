@@ -35,6 +35,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 
 ## 官方评测快照
 
+> 当前 `codex/rcore-architecture` 为架构迁移分支，尚未恢复官方测试执行，不能用于线上评测。下表中的 `basic=102` 属于归档分支 `codex/basic-102-archive`。
+
 | 时间 | 提交状态 | 分数/结果 | 结论 |
 |---|---|---|---|
 | 2026-06-06 12:01 | Accepted | 0.0 | 产物被评测系统接受，但所有官方测试套件均未得分 |
@@ -141,6 +143,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -b
 | 官方目录结构 basic | 已通过 | 根目录含 `glibc/basic_testcode.sh` 与 `musl/basic_testcode.sh` 的 EXT4 镜像 | 递归扫描子目录，选择一个 basic 组；本地解析 `TOTAL 102 / 102` |
 | fixed path basic | 已通过 | 同一官方目录结构镜像 | 直接选择 `musl/basic_testcode.sh`；本地解析 `TOTAL 102 / 102` |
 | 官方线上 basic | 已通过 | 官方评测 | `basic` 得分 102 |
+| rCore 成熟架构启动 | 已通过 | 根目录 `make all` + 官方风格双磁盘 QEMU 命令 | 无图形环境下使用 x1 easy-fs 启动到 `Rust user shell` |
+| rCore 官方测试执行 | 未接入 | x0 官方 EXT4 测试盘 | 迁移分支下一步，恢复前不可提交官方评测 |
 | 测试组选择器 | 已通过 | `make all` 与 `make all TEST_GROUP=busybox` | 默认 basic；busybox feature 构建通过 |
 | busybox 简单命令队列 | 最小支持 | 本地 EXT4 镜像使用 RISC-V basic ELF 代替 busybox 验证调度链路 | 读取 `busybox_cmd.txt`，排队 45 条简单命令，输出 success 结果、END 并主动退出；尚未用真实 busybox ELF 验证 |
 

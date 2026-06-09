@@ -5,7 +5,12 @@
 ## 当前项目状态
 
 - 当前仓库：`D:\os-kernel-contest`。
-- 当前阶段：初赛开发期，优先目标是打通官方测试和最小 Linux ABI。
+- 当前开发分支：`codex/rcore-architecture`。旧自建最小内核已冻结在 `codex/basic-102-archive`，不再继续扩展。
+- 当前阶段：迁移到成熟 rCore-Tutorial-v3 架构，并重新接入官方测试。
+- 当前成熟架构已经具备进程/线程、独立内核栈、地址空间、调度、VFS/File、fd table、pipe、同步、信号、easy-fs、网络和驱动基础。
+- 根目录 `make all` 已切换为构建 rCore 内核，生成 `kernel-rv`、临时 `kernel-la` 和内部 easy-fs `disk.img`。
+- 已适配官方无图形双磁盘启动：官方 EXT4 测试盘使用 x0，内部 easy-fs `disk.img` 使用 x1；官方风格 QEMU 命令能够启动到 `Rust user shell`。
+- 当前迁移分支尚未重新接入官方 EXT4 测试执行器，暂时不要提交官方评测；可提交版本仍是 `codex/basic-102-archive`。
 - 当前重点不是继续零散补自测 syscall，而是用官方 ELF/脚本实际运行结果反推缺失 ABI，再逐组推进 basic、busybox、lua、libctest 等测试。
 - 2026-06-06 官方评测结果：提交被 Accepted，但总分 0.0。历史原因判断为官方测例入口和 Linux ABI 当时尚未打通。
 - 2026-06-06 本地 official basic 结果：使用官方 `pre-2025` basic 源码手工编译 RISC-V ELF，打包为无分区 EXT4 镜像后，QEMU 运行日志经官方 `test_runner.py` 解析为 `102/102`。
@@ -19,11 +24,11 @@
 
 ## 目录说明
 
-- `kernel/`：自建 Rust/RISC-V 内核，当前主要实现启动、trap、分页、任务、syscall、最小文件描述符层。
-- `user/`：自建用户态测试程序，当前有 `app0` 和 `app1`，会编译为裸二进制并由内核 `include_bytes!` 嵌入。
+- `kernel/`、`user/`：旧自建最小内核和用户态程序，仅作为历史参考；新架构完成迁移后可删除。
+- `rCore-Tutorial-v3-main/`：当前新内核主体，基于 GPLv3 的 rCore-Tutorial-v3 成熟架构继续开发。
 - `docs/`：开发进度、测试矩阵、参考来源和路线说明。阶段完成后必须更新相关文档。
 - `docs/next-evaluation-roadmap.md`：官方 basic=102 后的具体推进路线，包含保分基线、busybox 入口、后续 ABI 补齐顺序和队友协作注意事项。
-- `rCore-Tutorial-v3-main/`：学习和参考 baseline，不是当前提交内核主体。不要直接在里面改比赛实现。
+- `rCore-Tutorial-v3-main/`：当前新内核主体。修改时保留 GPLv3 许可证、原作者信息和来源说明。
 - `office-test.txt`：官方提交说明原文参考，不要当垃圾文件直接删除；后续可整理进 `docs/`。
 
 ## 官方评测硬约束
@@ -151,11 +156,11 @@ all tasks exited
 
 ## 下一步优先级
 
-1. 保住官方线上 `basic = 102` 回归。改启动、脚本解析、日志输出、ELF loader、syscall 分发前，都要确认不会破坏 fixed path basic。
-2. 用官方 busybox/lua/libctest ELF 运行结果反推下一批缺失 Linux ABI/syscall。
-3. 补 per-process fd table，避免多程序、fork/exec、pipe/close 路径相互串扰。
-4. 将最小 clone/fork/exec/wait4 升级为更接近 Linux 的进程模型和父子资源模型。
-5. 尽快替换当前“陷入后借用户栈跑内核”的临时做法，补独立内核栈。
+1. 将 rCore 依赖 vendor 到仓库，保证评测机构建不需要联网。
+2. 在 rCore 架构中新增独立 `oscomp` 模块，访问 x0 官方 EXT4 测试盘。
+3. 将官方 ELF 加载到 rCore 的 `ProcessControlBlock/MemorySet`，重新打通 basic。
+4. 将 Linux/RISC-V syscall 编号和 ABI 行为接入 rCore 的 syscall 模块，恢复官方 basic `102/102`。
+5. 恢复 basic 后再运行真实 busybox、lua 和 libctest，所有新增能力基于成熟 Process/VFS 架构实现。
 
 不要在 basic 线上回归未保护前，把大量时间花在展示性功能、网络、图形界面或复杂优化上。
 
