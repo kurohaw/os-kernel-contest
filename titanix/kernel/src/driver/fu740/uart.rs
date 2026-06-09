@@ -1,0 +1,115 @@
+#![allow(unused)]
+use core::task::Waker;
+
+use alloc::boxed::Box;
+
+use crate::{driver::CharDevice, sync::mutex::SpinLock};
+
+type Callback = Box<dyn Fn(u8) + Send + Sync>;
+type Mutex<T> = SpinLock<T>;
+
+pub struct UART {
+    base_addr: usize,
+    waker: Mutex<Option<Waker>>,
+    cb: Callback,
+}
+
+impl UART {
+    pub fn new(base_addr: usize, cb: Callback) -> Self {
+        let ret = Self {
+            base_addr,
+            waker: Mutex::new(None),
+            cb,
+        };
+        ret.init();
+        ret
+    }
+    fn txdata_ptr(&self) -> *mut u32 {
+        self.base_addr as *mut u32
+    }
+    fn rxdata_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0x4) as *mut u32
+    }
+    fn txctrl_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0x8) as *mut u32
+    }
+    fn rxctrl_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0xC) as *mut u32
+    }
+    fn ie_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0x10) as *mut u32
+    }
+    fn ip_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0x14) as *mut u32
+    }
+    fn div_ptr(&self) -> *mut u32 {
+        (self.base_addr + 0x18) as *mut u32
+    }
+
+    pub fn init(&self) {
+        unsafe {
+            // set ie rxwm enable, num_entries > rxcnt
+            // set ie txwm enable, num_entries < txcnt
+            // when rx is not empty, send intr
+            // when tx is empty, send intr, why? close it!
+            self.ie_ptr().write_volatile(2);
+            self.set_rxcnt(0);
+            self.set_txcnt(1);
+        }
+    }
+
+    fn set_rxcnt(&self, rxcnt: u32) {
+        unsafe {
+            let rxctrl = self.rxctrl_ptr().read_volatile();
+            self.rxctrl_ptr()
+                .write_volatile((rxctrl & !(7 << 16)) | ((rxcnt & 7) << 16));
+        }
+    }
+
+    fn set_txcnt(&self, txcnt: u32) {
+        unsafe {
+            let txctrl = self.txctrl_ptr().read_volatile();
+            self.txctrl_ptr()
+                .write_volatile((txctrl & !(7 << 16)) | ((txcnt & 7) << 16));
+        }
+    }
+
+    fn putchar(&self, s: u8) {
+        unsafe {
+            while self.txdata_ptr().read_volatile() & 0x8000_0000 == 0x8000_0000 {}
+            self.txdata_ptr().write_volatile(s as u32);
+        }
+    }
+}
+
+impl CharDevice for UART {
+    fn puts(&self, s: &[u8]) {
+        for c in s {
+            if *c == b'\n' {
+                self.putchar(b'\r');
+            }
+            self.putchar(*c);
+        }
+    }
+    fn getchar(&self) -> u8 {
+        unsafe {
+            let ret = self.rxdata_ptr().read_volatile();
+            if ret & 0x8000_0000 == 0x8000_0000 {
+                0xff
+            } else {
+                (ret & 0xff) as u8
+            }
+        }
+    }
+    fn register_waker(&self, waker: core::task::Waker) {
+        *self.waker.lock() = Some(waker);
+    }
+    fn handle_irq(&self) {
+        let ch = self.getchar();
+        log::debug!("[UART::handle_irq] ch {}", ch);
+        (self.cb)(ch);
+        if let Some(w) = self.waker.lock().take() {
+            w.wake();
+        }
+    }
+}

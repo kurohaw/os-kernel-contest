@@ -1,0 +1,15 @@
+- 适配busybox时在解析elf时没有将各个段对齐到页，导致页表映射出现问题
+- 在将内核页表映射到高地址的过程中，忘记将sp指针进行映射，导致构造新页表时发生pagefault，因为旧的地址空间(0x80200000段)在新页表中没有相关映射
+- Vec的copy_from_raw_parts不能从用户态地址拷贝？
+- libc测试时waitpid结果不对？原因是sigreturn的时候返回值写成了0，导致在trap_handler中将0覆盖了x10寄存器，解决：sigreturn应该返回x10寄存器的值。
+- 需要写sepc或者stvec寄存器时一定要关中断！！！
+- 不要随意刷表，只能刷本进程的页表
+- 进程一开始从用户态回到内核态时，需要给用户态的trap context中的sstatus的sie字段置零，因为在`__return_to_user`函数中会给sstatus赋值，即便前面事先调用了`close_interrupt`函数也不能保证内核态中断不发生，因此我们需要手动给sstatus清除sie
+- 适配iozone的时候发现所有进程都spin在pselect函数，原因是共享内存在fork的时候默认被设为了copy-on-write，导致无法真正共享，修复后即可正常运行。
+- 适配libc-test的时候发现创建一个新线程时需要向tp寄存器写入tls，向gp寄存器写入全局指针
+- 适配libc-test的pthread相关的测试时，需要注意set_tid_address和clear_tid_address的含义以及SignalContext一定要写对！注意SigSet需要补齐到libc规定的大小
+- 信号被阻塞时不应从队列中清除，而是一直留着直到不阻塞并处理
+- 需要将buddy_system_allocator中的LcokHeap的锁改为SpinNoIrqLock，否则内核中断可能会死锁并且不报错！！
+- 记得存浮点寄存器（lmbench ctx switch）
+- 注意某些耗时系统调用可能被信号中断，否则可能永远阻塞
+- 当进程退出时，需要将子进程转移到initproc下，转移完后需要向initproc发送信号唤醒它！！否则会有如下情况：某个进程退出后由于其父进程持有其强引用，但父进程没有调用wait系统调用释放子进程内存，而是在父进程退出时将子进程挂到initproc下，但由于没有唤醒initproc，initproc不会醒过来去回收子进程的内存空间，从而造成内存泄漏。
