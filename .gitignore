@@ -13,6 +13,7 @@ kernel-la
 disk.img
 disk-la.img
 AGENTS.md
+office-test.txt
 .DS_Store
 .vscode/
 .idea/
