@@ -17,8 +17,12 @@
 - `titanix/kernel/src/oscomp.rs` 已能从 x0 virtio-blk 测试盘识别 EXT4，
   并优先命中 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh` 或根目录
   `basic_testcode.sh`。
-- 当前已能输出 basic START/END 并主动关机，但**尚未从 EXT4 加载并执行
-  basic ELF**，因此当前 Titanix 主线还不应被视为已经恢复官方分数。
+- 当前已能读取 `basic_testcode.sh`，跟随 `cd` 和嵌套 `run-all.sh`，从
+  `tests="..."` 中解析首个命令 `basic/brk`。
+- `basic/brk` 会从 EXT4 复制到 tmpfs，由内置 `runtestcase` 通过
+  `fork + execve + wait4` 执行；本地官方 `test_runner.py` 已解析为
+  `test_brk 3/3`，说明 Titanix 主线已经具备产生 basic 分数的最小闭环。
+- 该结果尚未经过新一轮线上评测，不能把本地 `3/3` 写成官方线上分数。
 
 ## 目录说明
 
@@ -74,20 +78,27 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
 
 ```text
 oscomp: found official basic script musl/basic_testcode.sh
-#### OS COMP TEST GROUP START basic ####
-oscomp: Titanix official basic entry reached
-#### OS COMP TEST GROUP END basic ####
+oscomp: first basic command musl/basic/brk
+#### OS COMP TEST GROUP START basic-musl ####
+========== START test_brk ==========
+Before alloc,heap pos: ...
+After alloc,heap pos: ...
+Alloc again,heap pos: ...
+========== END test_brk ==========
+#### OS COMP TEST GROUP END basic-musl ####
 [kernel] kernel will shutdown...
 ```
 
-这只代表已经进入 basic 入口，不代表执行了 basic ELF 或获得分数。
+使用官方 `test_runner.py` 解析日志时，`test_brk` 应为 `3/3`。
 
 ## 关键技术边界
 
 - Titanix 原生文件系统是 FAT32；当前提交模式以 tmpfs 作为根 VFS，并由
   `oscomp` 适配层独立只读探测官方 EXT4 测试盘。
-- `oscomp` 当前只识别 fixed path basic 脚本，尚未把 EXT4 文件挂入 Titanix
-  VFS，也尚未读取脚本内容或执行盘上的 ELF。
+- `oscomp` 尚未把整个 EXT4 挂入 Titanix VFS；当前只读脚本和首个 ELF，
+  再把 ELF、argv 和结束标记复制为 tmpfs 中的 `/oscomp-*` 文件。
+- 当前只执行 `run-all.sh` 的第一个测试名。继续扩展时必须保持测试串行，
+  每个 ELF 都要 `wait4` 回收后才能启动下一个。
 - Titanix 原文件名 `kernel/src/process/aux.rs` 与 Windows 保留名冲突，当前改为
   `aux_file.rs`，并通过 `#[path = "aux_file.rs"]` 保持模块名 `aux`。
 - Titanix 原始 ELF 使用高虚拟地址，不能直接作为官方 `-kernel` 输入；根目录
@@ -97,13 +108,13 @@ oscomp: Titanix official basic entry reached
 
 ## 下一步唯一主线
 
-1. 让 `oscomp` 读取命中的 `basic_testcode.sh` 内容。
-2. 将官方 EXT4 普通文件接入 Titanix VFS，或建立受控的只读外部文件接口。
-3. 从 EXT4 读取 basic ELF，并使用 Titanix `Process/MemorySpace` 创建进程。
-4. 运行第一个真实 basic ELF，依据日志修复 ABI。
-5. 恢复 Titanix 主线的官方 basic 分数，再推进 BusyBox。
+1. 将 `run-all.sh` 的测试列表完整解析为命令队列。
+2. 让 `runtestcase` 串行执行队列中的全部 basic ELF。
+3. 每次只推进到第一个失败项，依据真实日志修复 syscall、VFS 或进程语义。
+4. 保持 `test_brk 3/3` 和无测试盘主动退出回归。
+5. basic 获得稳定线上分数后再推进 BusyBox。
 
-不要在执行第一个官方 basic ELF 前投入网络、图形、多核优化或展示功能。
+不要在 basic 队列稳定前投入网络、图形、多核优化或展示功能。
 
 ## 协作注意事项
 
@@ -122,4 +133,6 @@ oscomp: Titanix official basic entry reached
 - 不要恢复 `aux.rs` 文件名，否则 Windows 工作区无法检出。
 - 改根 Makefile、wrapper ELF、virtio、EXT4 或 `oscomp` 后，必须运行官方风格
   QEMU 回归。
-- 当前 basic START/END 区间内不要加入调试噪声，避免后续影响官方解析。
+- `/oscomp-first`、`/oscomp-argv`、`/oscomp-end` 是当前内核与 runner 的内部
+  协议，修改其中任一方时必须同步修改另一方。
+- basic START/END 区间内不要加入会伪装成 testcase 的调试输出。

@@ -4,7 +4,7 @@
 异步执行器、网络和驱动架构上完成 2026 官方评测适配。
 
 旧自建内核的官方 `basic=102` 版本保存在 `codex/basic-102-archive`。当前
-`codex/titanix-architecture` 是重写开发分支，尚未恢复真实 basic ELF 执行。
+`codex/titanix-architecture` 是重写开发分支，已跑通首个真实 basic ELF。
 
 ## 当前进度
 
@@ -13,9 +13,11 @@
 - 使用官方风格 `256M`、单核 QEMU 命令启动并主动关机。
 - 从 x0 virtio-blk 测试盘识别 EXT4。
 - 命中 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh` 或根目录 fixed path。
-- 输出 basic START/END，证明已经进入官方 basic 测试入口。
+- 读取 basic 脚本和嵌套 `run-all.sh`，解析首个测试 `basic/brk`。
+- 将 ELF 和 argv 暂存到 tmpfs，通过 Titanix 的 `fork/execve/wait4` 执行。
+- 本地官方 `test_runner.py` 对 `test_brk` 的解析结果为 `3/3`。
 
-当前还没有从 EXT4 读取脚本内容、加载 basic ELF 或恢复官方分数。
+当前只执行 basic 队列中的第一个 ELF，线上分数仍需重新提交评测确认。
 
 ## 构建
 

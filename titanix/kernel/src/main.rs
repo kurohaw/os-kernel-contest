@@ -148,10 +148,10 @@ pub fn rust_main(hart_id: usize) {
         mm::remap_test();
         trap::init();
         driver::init();
-        oscomp::init();
         executor::init();
         loader::init();
         fs::init();
+        oscomp::init();
         timer::init();
         net::config::init();
 

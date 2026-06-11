@@ -10,12 +10,15 @@
 | 官方风格 256M 单核启动 | 通过 | Titanix 启动并主动关机 |
 | 无效/空测试盘 | 通过 | 输出无 EXT4 提示，继续运行提交 runner |
 | EXT4 superblock | 通过 | 从 x0 virtio-blk 识别无分区 EXT4 |
-| `musl/basic_testcode.sh` fixed path | 通过 | 输出 basic START/END |
+| `musl/basic_testcode.sh` fixed path | 通过 | 执行 `musl/basic/brk`，解析 `3/3` |
 | `glibc/basic_testcode.sh` fixed path | 待单独回归 | 代码已支持 |
-| 根目录 `basic_testcode.sh` fixed path | 待单独回归 | 代码已支持 |
-| 读取 basic 脚本内容 | 未实现 | 下一步 |
-| 从 EXT4 加载 basic ELF | 未实现 | 下一步 |
-| Titanix 主线真实 basic testcase | 未实现 | 当前无分数预期 |
+| 根目录 `basic_testcode.sh` fixed path | 通过 | 执行 `basic/brk`，解析 `3/3` |
+| 读取 basic 脚本内容 | 通过 | 支持 `cd`、嵌套脚本和 `tests="..."` 首项 |
+| 从 EXT4 加载 basic ELF | 通过 | `musl/basic/brk` 复制到 tmpfs 后 `execve` |
+| argv 传递 | 通过 | NUL 分隔 argv 经 `/oscomp-argv` 传给 runner |
+| `test_brk` | 通过 | 官方 `test_runner.py` 解析 `3/3` |
+| basic 完整命令队列 | 未实现 | 当前只运行第一个 ELF |
+| 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 旧自建内核官方 basic | 已归档 | `codex/basic-102-archive` 线上 basic=102 |
 
 ## 官方风格命令
@@ -29,13 +32,18 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
   -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot
 ```
 
-当前 EXT4 basic 入口通过标准：
+当前首个 basic ELF 通过标准：
 
 ```text
 oscomp: found official basic script musl/basic_testcode.sh
-#### OS COMP TEST GROUP START basic ####
-oscomp: Titanix official basic entry reached
-#### OS COMP TEST GROUP END basic ####
+oscomp: first basic command musl/basic/brk
+#### OS COMP TEST GROUP START basic-musl ####
+========== START test_brk ==========
+Before alloc,heap pos: ...
+After alloc,heap pos: ...
+Alloc again,heap pos: ...
+========== END test_brk ==========
+#### OS COMP TEST GROUP END basic-musl ####
 [kernel] kernel will shutdown...
 ```
 
@@ -46,6 +54,7 @@ oscomp: Titanix official basic entry reached
 | 根 Makefile | 破坏离线依赖恢复或 wrapper ELF |
 | `kernel-rv-wrapper.ld` | 入口或 PT_LOAD 不再位于 `0x80200000` |
 | `driver/qemu` | x0 virtio block 设备初始化失败 |
-| `oscomp.rs` | EXT4 fixed path 无法命中 |
+| `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
+| `runtestcase.rs` | `/oscomp-*` 协议、argv 或 END 标记退化 |
 | nightly 升级 | 旧 RISC-V crate、汇编或 async API 再次不兼容 |
 | 日志 | basic START/END 被调试输出污染 |
