@@ -1,115 +1,53 @@
 # OS Kernel Contest
 
-操作系统内核比赛开发仓库。
+当前主线基于往届 GPLv3 开源作品 Titanix，目标是在其完整的进程、内存、VFS、
+异步执行器、网络和驱动架构上完成 2026 官方评测适配。
 
-当前开发路线：
-
-- 以 `rCore-Tutorial-v3-main` 作为学习和参考 baseline。
-- 在 `kernel/` 中实现自建 Rust/RISC-V 内核。
-- 在 `user/` 中维护独立用户程序，编译为二进制后由内核嵌入、加载和运行。
+旧自建内核的官方 `basic=102` 版本保存在 `codex/basic-102-archive`。当前
+`codex/titanix-architecture` 是重写开发分支，已跑通首个真实 basic ELF。
 
 ## 当前进度
 
-截至 2026-06-06，`kernel/` 已完成：
+- 根目录 `make all` 可完全离线构建 Titanix。
+- 生成官方要求的 RISC-V executable ELF `kernel-rv`。
+- 使用官方风格 `256M`、单核 QEMU 命令启动并主动关机。
+- 从 x0 virtio-blk 测试盘识别 EXT4。
+- 命中 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh` 或根目录 fixed path。
+- 读取 basic 脚本和嵌套 `run-all.sh`，解析首个测试 `basic/brk`。
+- 将 ELF 和 argv 暂存到 tmpfs，通过 Titanix 的 `fork/execve/wait4` 执行。
+- 本地官方 `test_runner.py` 对 `test_brk` 的解析结果为 `3/3`。
 
-- QEMU + RustSBI 启动。
-- `_start -> rust_main` 启动链路。
-- `.bss` 清零。
-- SBI 串口输出。
-- `print!` / `println!`。
-- panic handler。
-- trap 入口和 timer interrupt。
-- `TrapContext` 保存和恢复。
-- syscall dispatcher。
-- `SYS_TEST`、`SYS_EXIT`、`SYS_YIELD`。
-- 两个用户任务 round-robin 轮转。
-- 物理页帧分配器。
-- Sv39 地址类型、页表项和页表映射。
-- 内核地址空间 `MemorySet`。
-- Sv39 分页开启。
-- 用户地址空间自检。
-- 每个任务绑定独立用户地址空间并切换 `satp`。
-- 独立 `user/` 用户程序构建。
-- 用户程序二进制嵌入内核。
-- 用户程序加载到用户地址空间 `0x10000` 并运行。
-- 基础 syscall：`write`、`read`、`openat`、`close`、`fstat`、`getpid`、`brk` 等最小路径。
-- 官方 RISC-V 提交入口：根目录 `make all` 生成 `kernel-rv` 和临时 `kernel-la`。
-- QEMU virtio-blk 扇区读取。
-- 无分区 EXT4 测试盘根目录扫描，识别并读取 `*_testcode.sh`，输出官方测试组 START/END 标记。
-- 从测试盘读取 RISC-V ELF，按 `PT_LOAD` segment 映射并进入用户态运行。
-- 外部 ELF 最小启动栈：脚本命令 `argc/argv`、空 `envp` 和基础 `auxv`。
-- 外部 ELF 通过 `openat/read/fstat` 读取 EXT4 根目录普通文件。
-- EXT4 只读路径解析支持多级子目录普通文件。
-- `brk` 增长时映射真实用户堆页，外部程序可以写入新增堆区。
-- 最小脚本执行器：跳过 `busybox echo`、处理 `cd`、读取嵌套 `.sh`，把多个真实 ELF 命令排队串行运行并构造 argv。
-- Linux syscall 编号兼容层：支持 official basic 早期会用到的 `exit=93`、`sched_yield=124`、`gettimeofday=169`、`mmap=222` 等最小路径。
+当前只执行 basic 队列中的第一个 ELF，线上分数仍需重新提交评测确认。
 
-当前已经可以用本地 EXT4 测试盘加载并运行放在盘上的 `app0` ELF，也可以从官方 basic 风格脚本下钻到子目录脚本，按队列串行运行多个真实 ELF、传入 argv、读取子目录文件并写入用户堆。下一阶段目标是编译并运行官方 basic ELF，继续补 fork/exec/wait 等进程模型。
-
-QEMU 中可以看到类似：
-
-```text
-loader: app0 binary size=... bytes, entry=0x10000
-user app loaded: app_id=0, va=0x10000, bytes=...
-run task 0, switch_satp=...
-sys_test called, arg0=100
-task 0 yield
-run task 1, switch_satp=...
-sys_test called, arg0=200
-task 1 exited with code 1
-all tasks exited
-```
-
-## 运行方式
-
-在 WSL/bash 中执行：
+## 构建
 
 ```bash
 cd /mnt/d/os-kernel-contest
 make all
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default -no-reboot
 ```
 
-根目录 `Makefile` 会先构建 `user/` 中的用户程序，再构建内核并生成官方要求的产物。
-
-带 EXT4 测试盘的本地验证命令示例：
+无测试盘启动：
 
 ```bash
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic -smp 1 -bios default \
-  -drive file=/tmp/oskernel-ext4.img,if=none,format=raw,id=x0 \
-  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
-  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
+  -smp 1 -bios default -no-reboot
 ```
 
-也可以只构建用户程序：
+带官方风格 EXT4 测试盘：
 
 ```bash
-cd /mnt/d/os-kernel-contest/user
-make build
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
+  -smp 1 -bios default \
+  -drive file=/path/to/test.img,if=none,format=raw,id=x0 \
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot
 ```
 
-退出 QEMU：
+## 目录
 
-```text
-Ctrl + A
-X
-```
+- `titanix/kernel/`：当前内核主体。
+- `titanix/user/`：内置用户程序。
+- `titanix/vendor/`：离线 Cargo 依赖。
+- `titanix/dependencies/`：本地底层依赖。
+- `docs/`：路线、进度、测试矩阵和来源说明。
 
-## 文档
-
-- 开发进度记录：`docs/progress.md`
-- 启动流程阅读记录：`docs/boot-notes.md`
-- 本地开发路线：`docs/local-kernel-roadmap.md`
-- 参考来源说明：`docs/references.md`
-
-# 参考来源与增量贡献说明
-
-## 基础参考
-- rCore-Tutorial-v3：作为 Rust/RISC-V 内核学习基础。
-- 2024 Phoenix：参考其比赛工程路线、模块划分和开发顺序。
-- 2025 Starry Mix / NoAxiom：后期参考 syscall 兼容和测试处理。
-
-## 原则
-不直接复制 Phoenix 代码。
-如果复用 rCore 代码，保留原许可证和来源说明。
-本项目的增量贡献会在提交记录和文档中持续记录。
+开发前请先阅读 `AGENTS.md`。

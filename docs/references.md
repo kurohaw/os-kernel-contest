@@ -1,47 +1,38 @@
-# 参考来源与增量贡献说明
-
-## 基础参考
-
-- rCore-Tutorial-v3：作为 Rust/RISC-V 内核学习基础和当前 baseline。
-- 2024 Phoenix：参考其比赛工程路线、模块划分和开发顺序。
-- 2025 Starry Mix / NoAxiom：后期参考 syscall 兼容、测试处理和工程化经验。
-
-## 使用原则
-
-- 不直接复制 Phoenix 代码。
-- 如果复用 rCore-Tutorial-v3 的代码，保留原许可证和来源说明。
-- 所有来自外部项目的代码、文档、设计思路都要在源码注释或文档中说明来源。
-- 本项目的增量贡献通过 Git 提交记录、开发文档和测试记录持续体现。
+# 参考来源与增量贡献
 
 ## 当前基础版本
 
-当前仓库已引入 `rCore-Tutorial-v3-main` 作为 baseline。后续开发会在此基础上逐步完成比赛适配，包括：
+当前新主线基于 Titanix 往届开源作品：
 
-- 梳理启动流程和初始化流程。
-- 记录并解释 trap、内存管理、进程调度、syscall 的实现。
-- 对接 OS 内核实现赛道测试用例。
-- 补齐缺失 syscall 和兼容性问题。
-- 整理初赛设计文档、进展汇报材料和演示视频。
+- 项目：`oskernel2023-Titanix`
+- 来源：https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix
+- 采用分支：`final-submit-qemu`
+- 上游提交：`605b408c56cb63a4e2f9b53db62bb6c632f33277`
+- 许可证：GNU GPLv3 或更高版本
 
-## 当前增量贡献记录
+`titanix/LICENSE`、原作者信息和上游 README 必须保留。队伍还应向指导老师或
+组委会确认使用完整往届架构作为比赛基线的复用边界。
 
-| 时间 | 内容 | 说明 |
-|---|---|---|
-| 2026-05-18 | 初始化参赛开发文档 | 建立 README、进度记录和参考来源说明 |
-| 2026-05-18 | 引入 rCore baseline | 保留原项目结构，作为后续学习和比赛适配基础 |
-| 2026-05-18 | 成功运行 baseline | QEMU 中进入 Rust user shell |
-| 2026-05-23 | 自建最小内核启动 | 建立 `kernel/`，完成启动入口、linker、`.bss` 清零、SBI 输出和 panic |
-| 2026-05-26 | 引入 `TrapContext` | 完成 trap 上下文保存和恢复，为 syscall 返回值写回打基础 |
-| 2026-05-30 | 建立最小 syscall 与用户态闭环 | 完成 U-mode `ecall -> trap_handler -> syscall` 路径 |
-| 2026-05-31 | 完成两任务轮转 | 实现 `SYS_YIELD`、`SYS_EXIT` 和最小 round-robin 调度 |
-| 2026-06-01 | 建立内存管理基础 | 完成物理页帧分配器、Sv39 地址类型、页表项和页表映射 |
-| 2026-06-03 | 开启 Sv39 分页 | 构造内核地址空间并写入 `satp`，分页后内核仍可运行 |
-| 2026-06-04 | 接入用户地址空间 | 每个任务绑定独立用户地址空间，并在运行前切换页表 |
-| 2026-06-04 | 加载独立用户程序 | 建立 `user/` 工程，内核嵌入用户程序二进制并加载到 `0x10000` 运行 |
+## 当前队伍增量
 
-## 后续需要补充
+| 时间 | 内容 |
+|---|---|
+| 2026-06-09 | 将 Titanix 导入 Windows 工作区并处理 `aux.rs` 保留名冲突 |
+| 2026-06-09 | 将工具链迁移到 nightly `2025-02-18` |
+| 2026-06-09 | 修复新 nightly、Poll、PanicInfo、trap 和 virtio API 兼容问题 |
+| 2026-06-09 | vendor Cargo 依赖，建立离线构建 |
+| 2026-06-09 | 重写根 Makefile，生成官方可加载的 wrapper ELF |
+| 2026-06-09 | 新增只读 EXT4 `oscomp` 适配层和 basic fixed path 入口 |
 
-- Phoenix 项目结构阅读笔记。
-- rCore 与 Phoenix 的模块差距表。
-- syscall 兼容性矩阵。
-- 官方测试运行记录。
+## 其他参考
+
+- rCore-Tutorial-v3：理解 Rust/RISC-V 内核基础。
+- 旧自建内核：仅通过 `codex/basic-102-archive` 参考官方 EXT4 和 ABI 经验。
+- Phoenix、Starry、NoAxiom：仅参考设计和比赛推进方法，不直接复制代码。
+
+## 贡献记录原则
+
+- 每个阶段更新 `docs/progress.md` 和 `docs/test-matrix.md`。
+- 明确区分 Titanix 上游能力与本队新增适配。
+- 保留所有第三方许可证。
+- 队员应能够解释实际提交代码和架构设计。

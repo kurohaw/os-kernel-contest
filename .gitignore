@@ -1,4 +1,6 @@
 target/
+**/.cargo/
+.cargo-checksum.json
 hello-rust/
 *.exe
 *.pdb
@@ -14,4 +16,3 @@ AGENTS.md
 .DS_Store
 .vscode/
 .idea/
-
