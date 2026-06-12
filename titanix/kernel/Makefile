@@ -103,10 +103,10 @@ endif
 
 
 env:
-	 (rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	 cargo install cargo-binutils
-	 rustup component add rust-src
-	 rustup component add llvm-tools-preview
+	@command -v cargo >/dev/null || { echo "error: cargo is required"; exit 1; }
+	@command -v rust-objcopy >/dev/null || { echo "error: rust-objcopy is required"; exit 1; }
+	@rustc --print target-libdir --target $(TARGET) >/dev/null 2>&1 || { \
+		echo "error: Rust target $(TARGET) is not installed"; exit 1; }
 
 
 $(KERNEL_BIN): kernel
