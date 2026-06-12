@@ -9,6 +9,7 @@
 ## 当前进度
 
 - 根目录 `make all` 可完全离线构建 Titanix。
+- 使用官方镜像预装的 Rust `nightly-2025-02-01`，评测时不依赖联网下载。
 - 生成官方要求的 RISC-V executable ELF `kernel-rv`。
 - 使用官方风格 `256M`、单核 QEMU 命令启动并主动关机。
 - 从 x0 virtio-blk 测试盘识别 EXT4。
@@ -51,3 +52,6 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
 - `docs/`：路线、进度、测试矩阵和来源说明。
 
 开发前请先阅读 `AGENTS.md`。
+
+不要删除 vendor 中的非隐藏 `cargo-checksum.json`。官方提交会过滤隐藏路径，
+根 Makefile 依靠这些文件恢复 Cargo 所需的 `.cargo-checksum.json`。

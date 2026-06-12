@@ -4,12 +4,40 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-11 |
+| 当前日期 | 2026-06-12 |
 | 当前分支 | `codex/titanix-architecture` |
 | 当前内核主体 | `titanix/` |
 | 保分归档 | `codex/basic-102-archive`，官方 basic=102 |
 | 当前里程碑 | Titanix 已执行官方 EXT4 中的首个 basic ELF `brk` |
 | 当前得分状态 | 本地官方解析器 `test_brk=3/3`，线上分数待评测确认 |
+
+## 2026-06-12 官方离线编译修复
+
+### 线上失败原因
+
+- 提交固定为 `nightly-2025-02-18`，官方环境未预装该版本，rustup 在无网络
+  环境中尝试下载后失败。
+- vendor 的 `.cargo-checksum.json` 仍引用官方提交过滤后不存在的隐藏文件和
+  未跟踪 `Cargo.lock`，首先在 `spin-0.7.1/Cargo.lock` 处停止构建。
+
+### 已修复
+
+- 工具链改为官方镜像已预装的 `nightly-2025-02-01`，只声明构建需要的
+  `rust-src` 和 `llvm-tools-preview`。
+- 重新生成 53 个非隐藏 `cargo-checksum.json`，只保留 Git 已跟踪且路径中
+  不含隐藏组件的文件校验项。
+- 用只包含 Git 跟踪、非隐藏文件的临时提交副本模拟官方过滤，离线
+  `make all` 成功生成 `kernel-rv` 和 `kernel-la`。
+- 模拟副本生成的 `kernel-rv` 为 RISC-V executable ELF，入口
+  `0x80200000`。
+- 使用官方目录结构 EXT4 测试盘回归，`test_brk` 仍由官方解析器判定为
+  `3/3`，QEMU 主动关机。
+
+### 尚待确认
+
+- 本地没有安装 `nightly-2025-02-01` 且网络无法下载，因此本地过滤模拟使用
+  已安装的 `nightly-2025-02-18` 执行编译；线上需要再次提交，确认官方镜像
+  中预装的 `nightly-2025-02-01` 能直接接管构建且不触发下载。
 
 ## 2026-06-11 首个真实 basic ELF
 
@@ -52,8 +80,8 @@
 - 从 Titanix `final-submit-qemu` 分支获取内核、用户态和依赖源码。
 - 保留 Titanix GPLv3 许可证与来源。
 - 将 Windows 不允许检出的 `aux.rs` 改名为 `aux_file.rs`。
-- 将工具链从不可下载的 nightly `2022-11-03` 迁移到本机已有的
-  nightly `2025-02-18`。
+- 将工具链从不可下载的 nightly `2022-11-03` 迁移到可构建当前源码的新版
+  nightly；线上提交最终固定为官方预装的 `2025-02-01`。
 - 修复 PanicInfo、Poll、trap 汇编符号和 virtio-drivers API 兼容问题。
 - vendor 全部 Cargo 依赖，构建过程无需连接 crates.io。
 - 为 vendor 校验文件建立非隐藏备份，模拟官方隐藏文件过滤后仍可全量构建。
@@ -72,6 +100,7 @@
 - 2026-06-09：rCore 迁移尝试能够启动到 shell，但未接入官方 EXT4。
 - 2026-06-09：路线切换为 Titanix 完整架构，并完成启动与 basic 入口。
 - 2026-06-11：Titanix 执行 `basic/brk`，本地官方解析器得到 `3/3`。
+- 2026-06-12：修复官方离线工具链选择和 vendor 隐藏文件校验问题。
 
 ## 下一里程碑
 

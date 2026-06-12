@@ -5,7 +5,9 @@
 | 项目 | 状态 | 结果 |
 |---|---|---|
 | 根目录 `make all` | 通过 | 离线构建，生成 `kernel-rv`、`kernel-la` |
-| 隐藏文件过滤后构建 | 通过 | 删除 `.cargo/` 和 `.cargo-checksum.json` 后可自动恢复并全量构建 |
+| 官方提交过滤模拟 | 通过 | 只保留 Git 跟踪且所有路径组件均非隐藏的文件，仍可离线全量构建 |
+| 官方预装工具链 | 待线上确认 | 固定 `nightly-2025-02-01`，避免评测环境联网下载 |
+| vendor 校验恢复 | 通过 | 53 个非隐藏 checksum 均不引用隐藏文件或未跟踪文件 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
 | 官方风格 256M 单核启动 | 通过 | Titanix 启动并主动关机 |
 | 无效/空测试盘 | 通过 | 输出无 EXT4 提示，继续运行提交 runner |
@@ -52,6 +54,8 @@ Alloc again,heap pos: ...
 | 模块 | 风险 |
 |---|---|
 | 根 Makefile | 破坏离线依赖恢复或 wrapper ELF |
+| `rust-toolchain.toml` | 使用官方未预装版本会触发无网络下载并直接编译失败 |
+| vendor checksum | 引用隐藏或未跟踪文件会在官方过滤后报文件不存在 |
 | `kernel-rv-wrapper.ld` | 入口或 PT_LOAD 不再位于 `0x80200000` |
 | `driver/qemu` | x0 virtio block 设备初始化失败 |
 | `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
