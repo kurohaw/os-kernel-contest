@@ -4,15 +4,14 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use user_lib::{close, execve, fork, openat, read, wait, waitpid, OpenFlags};
+use user_lib::{close, execve, exit, fork, openat, read, wait, waitpid, OpenFlags};
 
 #[macro_use]
 extern crate user_lib;
 
-const EXECUTABLE_PATH: &str = "/oscomp-first\0";
-const ARGV_PATH: &str = "/oscomp-argv\0";
+const QUEUE_PATH: &str = "/oscomp-queue\0";
 const END_MARKER_PATH: &str = "/oscomp-end\0";
-const METADATA_LIMIT: usize = 1024;
+const METADATA_LIMIT: usize = 4096;
 
 fn read_metadata(path: &str) -> Option<Vec<u8>> {
     let fd = openat(path, OpenFlags::O_RDONLY);
@@ -30,48 +29,58 @@ fn read_metadata(path: &str) -> Option<Vec<u8>> {
     Some(data)
 }
 
-fn run_first_test() -> bool {
-    let argv_data = match read_metadata(ARGV_PATH) {
+fn run_test(name: &[u8]) {
+    let mut path = Vec::new();
+    path.extend_from_slice(b"/");
+    path.extend_from_slice(name);
+    path.push(0);
+
+    let mut arg = Vec::new();
+    arg.extend_from_slice(b"./");
+    arg.extend_from_slice(name);
+    arg.push(0);
+    let argv = [arg.as_ptr(), core::ptr::null()];
+
+    let pid = fork();
+    if pid == 0 {
+        let path = core::str::from_utf8(&path).unwrap();
+        if execve(path, &argv, &[core::ptr::null::<u8>()]) != 0 {
+            println!("oscomp: execve {} failed", path);
+        }
+        exit(-1);
+    } else if pid > 0 {
+        let mut exit_code: i32 = 0;
+        waitpid(pid as usize, &mut exit_code);
+    } else {
+        println!("oscomp: fork failed");
+    }
+}
+
+fn run_basic_queue() -> bool {
+    let queue = match read_metadata(QUEUE_PATH) {
         Some(data) => data,
         None => return false,
     };
     let end_marker = read_metadata(END_MARKER_PATH).unwrap_or_default();
 
-    let mut arg_storage: Vec<Vec<u8>> = argv_data
+    let mut ran = false;
+    for name in queue
         .split(|byte| *byte == 0)
-        .filter(|arg| !arg.is_empty())
-        .map(|arg| {
-            let mut value = arg.to_vec();
-            value.push(0);
-            value
-        })
-        .collect();
-    if arg_storage.is_empty() {
-        arg_storage.push(b"./oscomp-first\0".to_vec());
+        .filter(|name| !name.is_empty())
+    {
+        ran = true;
+        run_test(name);
     }
-    let mut argv: Vec<*const u8> = arg_storage.iter().map(|arg| arg.as_ptr()).collect();
-    argv.push(core::ptr::null());
-
-    let pid = fork();
-    if pid == 0 {
-        if execve(EXECUTABLE_PATH, &argv, &[core::ptr::null::<u8>()]) != 0 {
-            println!("oscomp: execve first basic ELF failed");
-            return true;
-        }
-    } else {
-        let mut exit_code: i32 = 0;
-        waitpid(pid as usize, &mut exit_code);
-        if let Ok(marker) = core::str::from_utf8(&end_marker) {
-            println!("{}", marker);
-        }
+    if let Ok(marker) = core::str::from_utf8(&end_marker) {
+        println!("{}", marker);
     }
-    true
+    ran
 }
 
 #[no_mangle]
 fn main() -> i32 {
     if fork() == 0 {
-        if !run_first_test() {
+        if !run_basic_queue() {
             println!("oscomp: no staged basic ELF");
         }
         println!(" !TEST FINISH! ");

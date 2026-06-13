@@ -1,58 +1,102 @@
-# Titanix 官方评测路线
+# 2026-06-12 今日提分计划
 
-## 当前起点
+## 当前可信基线
 
-Titanix 已能由根目录 `make all` 构建为官方 `kernel-rv`，使用官方风格 QEMU
-启动，从 EXT4 测试盘读取 basic 脚本和首个 ELF `basic/brk`，再通过
-`fork + execve + wait4` 执行。
+| 证据 | 结论 |
+|---|---|
+| 官方页面最后可见结果 | 2026-06-11 19:44:39，`0.00 / Compile Error` |
+| 旧线上失败原因 | 下载 `nightly-2025-02-18` 失败；隐藏 `Cargo.lock` 导致 vendor checksum 失败 |
+| 当前 `gitlab/main` | `bab4cd0`，已修复离线工具链和 vendor checksum，但尚无对应线上结果 |
+| 当前本地运行能力 | 串行执行 30 个 basic 测试，官方解析器确认 `91/102` |
+| 当前未得分项 | `getdents` 少 1 项；主动跳过 `mount/umount` 共 10 项 |
+| 当前主要瓶颈 | 线上结果尚未验证；挂载路径会触发 kernel panic |
+| 历史参考上限 | 旧自建内核曾取得官方 basic=102；Titanix 上游也记录了完整 basic/BusyBox/libc 能力 |
 
-本地官方 `test_runner.py` 已确认 `test_brk=3/3`。该结果说明新架构具备最小
-得分闭环，但线上分数仍需新一轮评测确认。旧内核的线上 `basic=102` 保存在
-`codex/basic-102-archive`。
+今天不能把本地 `brk=3/3` 或 Titanix 上游能力当作线上得分。第一目标是消除
+Compile 阶段的不确定性，第二目标是把本地 `91/102` 转化为稳定线上分数。
 
-## 已完成：执行第一个 basic ELF
+## 从全部 Markdown 得出的优先级
 
-- EXT4 普通文件读取。
-- `basic_testcode.sh`、`cd`、嵌套 `run-all.sh` 解析。
-- 首个 ELF 和 argv 暂存到 tmpfs。
-- 使用 Titanix 现有进程、VFS、ELF loader 和 syscall 路径执行。
-- 输出真实 testcase 结果并主动关机。
+- `README.md`、`docs/progress.md` 和 `docs/test-matrix.md` 表明：构建、启动、
+  EXT4 读取和完整 basic 串行队列已闭环，当前线上验证和剩余语义是主要瓶颈。
+- `titanix/README.md` 表明上游曾运行 BusyBox、libc 和性能测试，说明现有内核
+  可能已经具备大量 syscall 能力；今天应先让官方 basic 测试真正执行起来。
+- `titanix/docs/preliminary.md`、`fs_syscall.md`、`syscall.md` 和 `thread.md`
+  表明进程、fd、wait、pipe 等路径已有实现经验，而目录、文件、mount 和 mmap
+  是更高风险区域。
+- `titanix/docs/bugfix.md` 提醒后续重点观察 ELF 段对齐、waitpid 返回值、TLS、
+  信号上下文和阻塞 syscall；这些问题应由真实失败日志驱动，不提前重构。
+- `titanix/docs/rtld.md`、`libc.md`、`signal.md` 表明动态链接和 libc 需要
+  auxv、mmap、TLS、信号等组合能力，不适合作为今天第一轮提分入口。
+- `titanix/docs/net.md`、`redis.md`、`vi.md` 和 `todo.md` 中的网络、性能、多核、
+  调度和交互优化不会解决当前 Compile/basic 得分瓶颈，今天暂缓。
+- `docs/boot-notes.md` 是旧路线阅读笔记，只作为启动机制参考，不作为当前计划。
 
-## 第一阶段：完整 basic 命令队列
+## 今日目标
 
-1. 将 `tests="..."` 全部解析成有序命令队列。
-2. 设计多个 ELF 和 argv 的 tmpfs 暂存协议。
-3. runner 必须逐个 `fork/execve/wait4`，禁止并发。
-4. 在第一个失败项停止扩展，先修复对应 ABI。
-5. 每次修改都回归 `test_brk=3/3` 和无盘主动退出。
+### 必达
 
-完成标准：至少连续执行 `brk` 和第二个 basic 测试，并由官方解析器识别。
+1. 触发 `bab4cd0` 的官方评测，取得新的 Compile 结果并保存完整日志。
+2. 若 Compile 通过，确认完整 basic 队列的线上得分接近本地 `91/102`。
+3. 每次修改保持离线 `make all`、完整 basic `91/102`、无盘主动关机和
+   BusyBox 探针通过。
 
-## 第二阶段：扩大 basic 分数
+### 冲刺
 
-- 将官方 EXT4 文件接入 Titanix VFS，避免长期维护两套路径语义。
-- 补齐 envp、auxv 和动态/静态 ELF 差异。
-- 根据真实失败日志修复 Titanix syscall 行为。
-- 先稳定线上有分，再追求 basic 全量。
+- 修复 `getdents` 最后 1 项。
+- 隔离并修复 `mount/umount` 未实现路径，向 basic `102/102` 靠近。
 
-## 第三阶段：推进 BusyBox
+## 时间表
 
-- basic 稳定后再启用 BusyBox。
-- 优先验证目录、fd、fork/exec/wait、pipe 和相对路径。
-- 使用 Titanix 已有完整架构补语义，不重新堆最小 stub。
+### 12:45-13:15：线上编译门禁
 
-## 暂不投入
+1. 在官方页面触发当前 `gitlab/main` 的新评测。
+2. 确认评测对应提交不早于 `bab4cd0`。
+3. 保存 Compile 输出、开始时间、最终分数和运行日志。
 
-- 网络性能。
-- 多核优化。
-- 图形界面。
-- 展示性功能。
-- LoongArch。
+停止条件：若仍为 Compile Error，暂停后续功能开发，只根据新日志修复；修复后
+先重复隐藏文件过滤和强制离线构建，再重新评测。
 
-这些能力在 basic 串行队列尚未稳定前不会带来有效评测反馈。
+### 已完成：完整 basic 串行队列
 
-## 队友分工建议
+- 解析完整测试列表并暂存 30 个安全 ELF。
+- 暂存 `test_echo`、`text.txt`，创建 `mnt`。
+- 串行 `fork/execve/waitpid`，全部完成后统一关机。
+- 跳过会 panic 的 `mount/umount`。
+- 本地官方解析器结果：`91/102`。
 
-- 成员 A：`oscomp` EXT4 读取、脚本解析和官方测试入口。
-- 成员 B：阅读并记录 Titanix Process、MemorySpace、ELF loader、syscall 路径。
-- 每次合并前共同执行根构建和官方风格 QEMU 回归。
+### 下一阶段：按真实日志修复剩余项
+
+优先顺序：
+
+1. 先触发线上评测，确认 Compile 和实际 basic 得分。
+2. 修复 `getdents` 输出或 ABI，使其从 `4/5` 提升到 `5/5`。
+3. 单独定位 `src/fs/file_system.rs:65` 的 mount 未实现路径。
+4. 仅在 `mount/umount` 不再 panic 后取消跳过。
+
+每次修复都运行完整 basic。若修改导致分数低于 `91/102`、panic 或卡死，立即
+回退该项并保留稳定基线。
+
+### 18:30-19:30：回归与第二次线上评测
+
+1. 运行 vendor checksum、隐藏文件过滤导出和强制离线 `make all`。
+2. 检查两个 ELF、无盘启动、完整 basic、首个 `brk=3/3` 和 BusyBox 外部探针。
+3. 提交并推送稳定版本，触发第二次线上评测。
+4. 将线上分数、首个失败项和日志摘要回填到 `progress.md` 与 `test-matrix.md`。
+
+## 今日暂缓
+
+- BusyBox 测试入口、动态链接和 libc 全量测试。
+- mount/umount 的 `/dev/vda2` 与 FAT 挂载，除非它们是 basic 队列中唯一剩余阻塞。
+- 网络、Redis、交互终端、性能、多核、LoongArch 和架构重构。
+
+这些方向具备长期价值，但今天的边际收益低于“线上编译通过 + 完整 basic 队列”。
+
+## 每轮提交门禁
+
+- `python tools/vendor_checksums.py --check`：0 issues。
+- 隐藏文件过滤后的干净导出仍可构建。
+- 构建日志无 rustup 下载、`cargo install` 或 crates.io 请求。
+- `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
+- 无盘、basic 和 BusyBox 探针均无 panic，并主动关机。
+- Git 状态不包含本地说明文件、镜像、日志和构建产物。
