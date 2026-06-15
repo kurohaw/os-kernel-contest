@@ -3,22 +3,29 @@
 当前主线基于往届 GPLv3 开源作品 Titanix，目标是在其完整的进程、内存、VFS、
 异步执行器、网络和驱动架构上完成 2026 官方评测适配。
 
-旧自建内核的官方 `basic=102` 版本保存在 `codex/basic-102-archive`。当前
-`codex/titanix-architecture` 是重写开发分支，已跑通首个真实 basic ELF。
+旧自建内核曾取得官方线上 `basic=102`。当前 `main` 使用 Titanix 重写路线，
+已能在同一次 RISC-V 启动中串行运行 glibc、musl basic。
 
 ## 当前进度
 
 - 根目录 `make all` 可完全离线构建 Titanix。
 - 使用官方镜像预装的 Rust `nightly-2025-02-01`，评测时不依赖联网下载。
 - 生成官方要求的 RISC-V executable ELF `kernel-rv`。
-- 使用官方风格 `256M`、单核 QEMU 命令启动并主动关机。
+- 使用官方完整 `1G`、单核、网络设备与 RTC 参数启动并主动关机。
 - 从 x0 virtio-blk 测试盘识别 EXT4。
-- 命中 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh` 或根目录 fixed path。
-- 读取 basic 脚本和嵌套 `run-all.sh`，解析首个测试 `basic/brk`。
-- 将 ELF 和 argv 暂存到 tmpfs，通过 Titanix 的 `fork/execve/wait4` 执行。
-- 本地官方 `test_runner.py` 对 `test_brk` 的解析结果为 `3/3`。
+- 固定按 `glibc`、`musl` 顺序收集 basic；两者均不存在时才使用根目录 fixed path。
+- 读取 basic 脚本和嵌套 `run-all.sh`，解析并串行执行 basic 测试队列。
+- 将每组 basic ELF、资源和动态运行时暂存到独立 tmpfs 工作目录。
+- 动态解释器缺失或无效时向 `execve` 返回错误，不再触发 loader panic。
+- 主动跳过当前会触发内核 panic 的 `mount`、`umount`。
+- 本地官方 `test_runner.py` 对完整队列的解析结果为 `91/102`。
+- 双组静态镜像依次输出 glibc、musl START/END；动态 glibc 探针已进入 `main`。
+- 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-当前只执行 basic 队列中的第一个 ELF，线上分数仍需重新提交评测确认。
+官方页面最后可见结果为 2026-06-15 15:43:27：编译状态 `Accpted`，总分
+`91.0`。glibc-rv basic 得到 `91/102`；musl 组已正常开始和结束，但 30 个 ELF
+全部在 `execve` 阶段失败。当前改动增加精确 errno/loader 阶段诊断，并放宽
+loader 不使用的合法扩展 program-header 类型，等待下一次官方评测确认。
 
 ## 构建
 
@@ -30,17 +37,19 @@ make all
 无测试盘启动：
 
 ```bash
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
-  -smp 1 -bios default -no-reboot
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
+  -smp 1 -bios default -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
 ```
 
 带官方风格 EXT4 测试盘：
 
 ```bash
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
   -smp 1 -bios default \
   -drive file=/path/to/test.img,if=none,format=raw,id=x0 \
-  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
 ```
 
 ## 目录

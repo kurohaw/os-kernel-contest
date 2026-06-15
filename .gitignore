@@ -17,3 +17,4 @@ office-test.txt
 .DS_Store
 .vscode/
 .idea/
+__pycache__/

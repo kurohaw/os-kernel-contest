@@ -5,6 +5,7 @@ use crate::{FutexOperations, TimeVal};
 const SYSCALL_GETCWD: usize = 17;
 const SYSCALL_DUP: usize = 23;
 const SYSCALL_DUP3: usize = 24;
+const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_MOUNT: usize = 40;
 const SYSCALL_OPENAT: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
@@ -72,6 +73,10 @@ pub fn sys_mount(
 
 pub fn sys_getcwd(path: usize, len: usize) -> isize {
     syscall(SYSCALL_GETCWD, [path, len, 0])
+}
+
+pub fn sys_chdir(path: &str) -> isize {
+    syscall(SYSCALL_CHDIR, [path.as_ptr() as usize, 0, 0])
 }
 
 pub fn sys_uname(buf: usize) -> isize {

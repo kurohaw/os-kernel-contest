@@ -261,8 +261,15 @@ pub fn sys_execve(path: *const u8, mut args: *const usize, mut envs: *const usiz
         }
     }
 
-    envs_vec.push("PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:".to_string());
-    envs_vec.push("LD_LIBRARY_PATH=/:/lib:/lib64/lp64d:/usr/lib:/usr/local/lib:".to_string());
+    let cwd = current_process().inner_handler(|process| process.cwd.clone());
+    envs_vec.push(alloc::format!(
+        "PATH={}:/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:",
+        cwd
+    ));
+    envs_vec.push(alloc::format!(
+        "LD_LIBRARY_PATH={}/lib:/:/lib:/lib64/lp64d:/usr/lib:/usr/local/lib:",
+        cwd.trim_end_matches('/')
+    ));
 
     let app_inode = resolve_path(AT_FDCWD, &path, OpenFlags::RDONLY);
     if app_inode.is_err() {
@@ -277,7 +284,12 @@ pub fn sys_execve(path: *const u8, mut args: *const usize, mut envs: *const usiz
         app_file.read_all_from_start(elf_data)?;
     }
     // app_file.read_all_from_start(elf_data)?;
-    current_process().exec(&elf_data, Some(&app_file), args_vec, envs_vec)
+    current_process()
+        .exec(&elf_data, Some(&app_file), args_vec, envs_vec)
+        .map_err(|error| {
+            log::warn!("[sys_execve] process replacement failed: {:?}", error);
+            error
+        })
 }
 
 bitflags! {

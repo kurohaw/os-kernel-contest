@@ -1,58 +1,54 @@
-# Titanix 官方评测路线
+# 2026-06-15 下一次评测路线
 
-## 当前起点
+## 当前可信基线
 
-Titanix 已能由根目录 `make all` 构建为官方 `kernel-rv`，使用官方风格 QEMU
-启动，从 EXT4 测试盘读取 basic 脚本和首个 ELF `basic/brk`，再通过
-`fork + execve + wait4` 执行。
+| 证据 | 结论 |
+|---|---|
+| 最新可见官方结果 | 2026-06-15 15:43:27，`Accpted / 91.0` |
+| 线上得分 | glibc-rv basic `91/102`；musl-rv、两项 LoongArch 均为 0 |
+| 当前直接失败原因 | musl 组正常开始和结束，但 30 个 ELF 全部 `execve` 失败 |
+| 本地 glibc basic | 官方解析器复跑 `91/102` |
+| 本地双组镜像 | 同一次启动依次执行 glibc、musl，共 60 个命令并主动关机 |
+| 本地动态探针 | RISC-V glibc 动态 ELF 通过私有 loader/libc 成功进入 `main` |
+| 当前已知边界 | LoongArch 占位 ELF、`getdents 4/5`、主动跳过 `mount/umount` |
 
-本地官方 `test_runner.py` 已确认 `test_brk=3/3`。该结果说明新架构具备最小
-得分闭环，但线上分数仍需新一轮评测确认。旧内核的线上 `basic=102` 保存在
-`codex/basic-102-archive`。
+这轮目标是保持 glibc-rv 91 分，同时恢复至少一个 musl-rv 真实 basic 测试。
 
-## 已完成：执行第一个 basic ELF
+## 本轮提交门禁
 
-- EXT4 普通文件读取。
-- `basic_testcode.sh`、`cd`、嵌套 `run-all.sh` 解析。
-- 首个 ELF 和 argv 暂存到 tmpfs。
-- 使用 Titanix 现有进程、VFS、ELF loader 和 syscall 路径执行。
-- 输出真实 testcase 结果并主动关机。
+1. 强制离线 `make all`，vendor checksum 保持 `53/0`。
+2. 隐藏文件过滤后的干净导出仍能恢复 Cargo 配置并构建。
+3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
+4. 官方完整参数下，无盘、单组 glibc、双组、动态 glibc、未知扩展 header 和
+   BusyBox 外部探针均无 panic、无超时并主动关机。
+5. 单组 glibc basic 官方解析器复跑得到 `91/102`。
+6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
-## 第一阶段：完整 basic 命令队列
+## 下一次官方评测验收
 
-1. 将 `tests="..."` 全部解析成有序命令队列。
-2. 设计多个 ELF 和 argv 的 tmpfs 暂存协议。
-3. runner 必须逐个 `fork/execve/wait4`，禁止并发。
-4. 在第一个失败项停止扩展，先修复对应 ABI。
-5. 每次修改都回归 `test_brk=3/3` 和无盘主动退出。
+- glibc-rv basic 保持至少 91 分。
+- musl-rv 至少开始执行真实 basic 测试。
+- 若 musl 仍失败，串口必须输出负 errno 和 loader 失败阶段。
+- RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 
-完成标准：至少连续执行 `brk` 和第二个 basic 测试，并由官方解析器识别。
+若仍为 0 分，先保存完整串口日志并按以下顺序定位：
 
-## 第二阶段：扩大 basic 分数
+1. 根据首个 musl `execve` errno 与阶段日志定位共同失败点。
+2. 若为 `ENOEXEC`，对照官方 musl ELF/loader 的 program headers 修复兼容性。
+3. 若为 `ENOENT`，修复解释器或运行时路径暂存。
+4. 若 musl 已进入用户态，按首个缺失 syscall/ABI 日志做最小修复。
 
-- 将官方 EXT4 文件接入 Titanix VFS，避免长期维护两套路径语义。
-- 补齐 envp、auxv 和动态/静态 ELF 差异。
-- 根据真实失败日志修复 Titanix syscall 行为。
-- 先稳定线上有分，再追求 basic 全量。
+## 后续提分顺序
 
-## 第三阶段：推进 BusyBox
+1. 根据下一次官方 musl 日志补首个阻塞 ABI，保持 glibc 得分基线。
+2. 修复 `getdents` 最后 1 项及 pipe 串口输出交错的偶发计分波动。
+3. 单独处理 `mount/umount` 未实现路径，确认不再 panic 后再取消跳过。
+4. BusyBox、lua、libctest 按真实日志逐组推进。
+5. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
 
-- basic 稳定后再启用 BusyBox。
-- 优先验证目录、fd、fork/exec/wait、pipe 和相对路径。
-- 使用 Titanix 已有完整架构补语义，不重新堆最小 stub。
+## 本轮暂缓
 
-## 暂不投入
-
-- 网络性能。
-- 多核优化。
-- 图形界面。
-- 展示性功能。
-- LoongArch。
-
-这些能力在 basic 串行队列尚未稳定前不会带来有效评测反馈。
-
-## 队友分工建议
-
-- 成员 A：`oscomp` EXT4 读取、脚本解析和官方测试入口。
-- 成员 B：阅读并记录 Titanix Process、MemorySpace、ELF loader、syscall 路径。
-- 每次合并前共同执行根构建和官方风格 QEMU 回归。
+- 不新增 BusyBox 测试入口。
+- 不处理 `getdents`、`mount/umount`。
+- 不处理网络、性能、多核和 LoongArch。
+- 不进行与当前 panic、双组隔离或动态运行时无关的架构重构。

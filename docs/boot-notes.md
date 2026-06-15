@@ -242,4 +242,6 @@ Rust user shell
 
 本文是 2026-05-18 阅读 rCore baseline 时形成的启动流程笔记，主要用于理解参考工程，不再作为当前开发计划。
 
-当前自建内核已经完成最小启动、trap、syscall、多任务、分页、用户地址空间切换和独立用户程序加载。后续计划以 `docs/progress.md` 和 `docs/local-kernel-roadmap.md` 为准。
+本文是 2026-05-18 形成的历史参考，不代表当前 Titanix 主线状态。当前进度、
+测试事实和提分顺序以 `docs/progress.md`、`docs/test-matrix.md` 和
+`docs/next-evaluation-roadmap.md` 为准。

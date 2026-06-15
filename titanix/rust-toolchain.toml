@@ -1,6 +1,6 @@
 [toolchain]
 profile = "minimal"
-# use the nightly version of the last stable toolchain, see <https://forge.rust-lang.org/>
-# channel = "nightly-2022-08-05"
+# Match the toolchain preinstalled in zhouzhouyi/os-contest:20260510.
 channel = "nightly-2025-02-01"
-components = ["rust-src", "llvm-tools-preview"]
+components = ["rust-src", "llvm-tools-preview", "rustfmt", "clippy"]
+targets = ["riscv64gc-unknown-none-elf"]

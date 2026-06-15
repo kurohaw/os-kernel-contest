@@ -4,15 +4,13 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use user_lib::{close, execve, fork, openat, read, wait, waitpid, OpenFlags};
+use user_lib::{chdir, close, execve, exit, fork, openat, read, wait, waitpid, OpenFlags};
 
 #[macro_use]
 extern crate user_lib;
 
-const EXECUTABLE_PATH: &str = "/oscomp-first\0";
-const ARGV_PATH: &str = "/oscomp-argv\0";
-const END_MARKER_PATH: &str = "/oscomp-end\0";
-const METADATA_LIMIT: usize = 1024;
+const QUEUE_PATH: &str = "/oscomp-queue\0";
+const METADATA_LIMIT: usize = 4096;
 
 fn read_metadata(path: &str) -> Option<Vec<u8>> {
     let fd = openat(path, OpenFlags::O_RDONLY);
@@ -30,48 +28,85 @@ fn read_metadata(path: &str) -> Option<Vec<u8>> {
     Some(data)
 }
 
-fn run_first_test() -> bool {
-    let argv_data = match read_metadata(ARGV_PATH) {
-        Some(data) => data,
-        None => return false,
-    };
-    let end_marker = read_metadata(END_MARKER_PATH).unwrap_or_default();
+fn run_test(name: &[u8]) {
+    let mut path = Vec::new();
+    path.extend_from_slice(b"./");
+    path.extend_from_slice(name);
+    path.push(0);
 
-    let mut arg_storage: Vec<Vec<u8>> = argv_data
-        .split(|byte| *byte == 0)
-        .filter(|arg| !arg.is_empty())
-        .map(|arg| {
-            let mut value = arg.to_vec();
-            value.push(0);
-            value
-        })
-        .collect();
-    if arg_storage.is_empty() {
-        arg_storage.push(b"./oscomp-first\0".to_vec());
-    }
-    let mut argv: Vec<*const u8> = arg_storage.iter().map(|arg| arg.as_ptr()).collect();
-    argv.push(core::ptr::null());
+    let argv = [path.as_ptr(), core::ptr::null()];
 
     let pid = fork();
     if pid == 0 {
-        if execve(EXECUTABLE_PATH, &argv, &[core::ptr::null::<u8>()]) != 0 {
-            println!("oscomp: execve first basic ELF failed");
-            return true;
+        let path = core::str::from_utf8(&path).unwrap();
+        let result = execve(path, &argv, &[core::ptr::null::<u8>()]);
+        if result != 0 {
+            println!("oscomp: execve {} failed: {}", path, result);
         }
-    } else {
+        exit(-1);
+    } else if pid > 0 {
         let mut exit_code: i32 = 0;
         waitpid(pid as usize, &mut exit_code);
-        if let Ok(marker) = core::str::from_utf8(&end_marker) {
-            println!("{}", marker);
+    } else {
+        println!("oscomp: fork failed");
+    }
+}
+
+fn enter_group(record: &[u8]) {
+    let Some(separator) = record.iter().position(|byte| *byte == b'\t') else {
+        println!("oscomp: malformed group record");
+        return;
+    };
+    let (path, marker) = record.split_at(separator);
+    let marker = &marker[1..];
+
+    let mut path_with_nul = path.to_vec();
+    path_with_nul.push(0);
+    let Ok(path) = core::str::from_utf8(&path_with_nul) else {
+        println!("oscomp: invalid group path");
+        return;
+    };
+    if chdir(path) != 0 {
+        println!("oscomp: cannot enter group {}", path);
+        return;
+    }
+    if let Ok(marker) = core::str::from_utf8(marker) {
+        println!("{}", marker);
+    }
+}
+
+fn run_basic_queue() -> bool {
+    let queue = match read_metadata(QUEUE_PATH) {
+        Some(data) => data,
+        None => return false,
+    };
+
+    let mut ran = false;
+    for record in queue
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        match record[0] {
+            b'G' => enter_group(&record[1..]),
+            b'X' => {
+                ran = true;
+                run_test(&record[1..]);
+            }
+            b'E' => {
+                if let Ok(marker) = core::str::from_utf8(&record[1..]) {
+                    println!("{}", marker);
+                }
+            }
+            _ => println!("oscomp: unknown queue record"),
         }
     }
-    true
+    ran
 }
 
 #[no_mangle]
 fn main() -> i32 {
     if fork() == 0 {
-        if !run_first_test() {
+        if !run_basic_queue() {
             println!("oscomp: no staged basic ELF");
         }
         println!(" !TEST FINISH! ");

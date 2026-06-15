@@ -202,7 +202,7 @@ impl Process {
     /// Create a new process
     pub fn new_initproc(elf_data: &[u8], elf_file: Option<&Arc<dyn File>>) -> Arc<Self> {
         let (memory_space, user_sp_top, entry_point, _auxv) =
-            MemorySpace::from_elf(elf_data, elf_file);
+            MemorySpace::from_elf(elf_data, elf_file).expect("initproc must be a valid static ELF");
 
         // Alloc a pid
         let pid = Arc::new(tid_alloc());
@@ -278,7 +278,7 @@ impl Process {
         // memory_space with elf program headers/trampoline/trap context/user stack
         // substitute memory_space
         let (memory_space, ustack_top, entry_point, mut auxs) =
-            MemorySpace::from_elf(elf_data, elf_file);
+            MemorySpace::from_elf(elf_data, elf_file)?;
         let main_thread = self.inner_handler(|proc| {
             if proc.thread_count() > 1 {
                 warn!("[Process:exec] thread count > 1: {}", proc.thread_count());

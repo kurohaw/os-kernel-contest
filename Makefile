@@ -2,6 +2,7 @@ TITANIX_DIR := titanix
 TITANIX_KERNEL := $(TITANIX_DIR)/kernel
 TITANIX_USER := $(TITANIX_DIR)/user
 TARGET_RV := riscv64gc-unknown-none-elf
+RUST_TOOLCHAIN := nightly-2025-02-01
 MODE := release
 TITANIX_ELF := $(TITANIX_KERNEL)/target/$(TARGET_RV)/$(MODE)/kernel
 TITANIX_BIN := $(TITANIX_ELF).bin
@@ -10,17 +11,28 @@ WRAPPER_LD := $(TITANIX_KERNEL)/kernel-rv-wrapper.ld
 KERNEL_RV := kernel-rv
 KERNEL_LA := kernel-la
 
-RUST_SYSROOT := $(shell cd $(TITANIX_DIR) && rustc --print sysroot)
-RUST_HOST := $(shell cd $(TITANIX_DIR) && rustc -vV | sed -n 's/^host: //p')
+export RUSTUP_TOOLCHAIN := $(RUST_TOOLCHAIN)
+
+RUST_SYSROOT = $(shell rustc --print sysroot)
+RUST_HOST = $(shell rustc -vV | sed -n 's/^host: //p')
 RUST_LLD := $(RUST_SYSROOT)/lib/rustlib/$(RUST_HOST)/bin/rust-lld
 
 all: build
+
+check-tools:
+	@command -v rustc >/dev/null || { echo "error: rustc is required"; exit 1; }
+	@command -v cargo >/dev/null || { echo "error: cargo is required"; exit 1; }
+	@command -v rust-objcopy >/dev/null || { echo "error: rust-objcopy is required"; exit 1; }
+	@test -d "$(RUST_SYSROOT)/lib/rustlib/$(TARGET_RV)/lib" || { \
+		echo "error: Rust target $(TARGET_RV) is not installed for $(RUST_TOOLCHAIN)"; exit 1; }
+	@test -x "$(RUST_LLD)" || { \
+		echo "error: rust-lld is not installed for $(RUST_TOOLCHAIN)"; exit 1; }
 
 restore-vendor:
 	find $(TITANIX_DIR)/vendor -name cargo-checksum.json -exec sh -c \
 		'cp "$$1" "$$(dirname "$$1")/.cargo-checksum.json"' _ {} \;
 
-prepare-cargo: restore-vendor
+prepare-cargo: check-tools restore-vendor
 	mkdir -p $(TITANIX_KERNEL)/.cargo $(TITANIX_USER)/.cargo
 	cp $(TITANIX_KERNEL)/cargo-config/config.toml $(TITANIX_KERNEL)/.cargo/config.toml
 	cp $(TITANIX_USER)/cargo-config/config.toml $(TITANIX_USER)/.cargo/config.toml
@@ -43,4 +55,4 @@ clean:
 	$(MAKE) -C $(TITANIX_USER) clean
 	rm -f $(KERNEL_RV) $(KERNEL_LA)
 
-.PHONY: all restore-vendor prepare-cargo build clean
+.PHONY: all check-tools restore-vendor prepare-cargo build clean

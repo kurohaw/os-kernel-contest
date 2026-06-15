@@ -4,48 +4,67 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-15 15:43:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0 |
+| musl-rv basic | 待恢复 | 两组正常收尾，但 musl 30 个 ELF 全部在 `execve` 阶段失败 |
 | 根目录 `make all` | 通过 | 离线构建，生成 `kernel-rv`、`kernel-la` |
-| 官方提交过滤模拟 | 通过 | 只保留 Git 跟踪且所有路径组件均非隐藏的文件，仍可离线全量构建 |
-| 官方预装工具链 | 待线上确认 | 固定 `nightly-2025-02-01`，避免评测环境联网下载 |
-| vendor 校验恢复 | 通过 | 53 个非隐藏 checksum 均不引用隐藏文件或未跟踪文件 |
+| 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-01`，构建日志无联网安装请求 |
+| 隐藏文件过滤后 vendor 校验 | 通过 | 删除全部隐藏文件后，53 个 manifest、0 个问题 |
+| 隐藏文件过滤后构建 | 通过 | 干净导出删除全部隐藏文件后可自动恢复并全量构建 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
-| 官方风格 256M 单核启动 | 通过 | Titanix 启动并主动关机 |
+| 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；Titanix 启动并主动关机 |
 | 无效/空测试盘 | 通过 | 输出无 EXT4 提示，继续运行提交 runner |
 | EXT4 superblock | 通过 | 从 x0 virtio-blk 识别无分区 EXT4 |
-| `musl/basic_testcode.sh` fixed path | 通过 | 执行 `musl/basic/brk`，解析 `3/3` |
-| `glibc/basic_testcode.sh` fixed path | 待单独回归 | 代码已支持 |
+| `musl/basic_testcode.sh` fixed path | 通过 | 与 glibc 同时存在时排在 glibc 后执行 |
+| `glibc/basic_testcode.sh` fixed path | 通过 | 与 musl 同时存在时优先执行 |
 | 根目录 `basic_testcode.sh` fixed path | 通过 | 执行 `basic/brk`，解析 `3/3` |
-| 读取 basic 脚本内容 | 通过 | 支持 `cd`、嵌套脚本和 `tests="..."` 首项 |
-| 从 EXT4 加载 basic ELF | 通过 | `musl/basic/brk` 复制到 tmpfs 后 `execve` |
-| argv 传递 | 通过 | NUL 分隔 argv 经 `/oscomp-argv` 传给 runner |
+| 读取 basic 脚本内容 | 通过 | 支持 `cd`、嵌套脚本和完整 `tests="..."` 队列 |
+| 从 EXT4 加载 basic ELF | 通过 | 每组使用私有 tmpfs 目录，双组镜像串行执行 60 个命令 |
+| basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
+| `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
+| 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
+| glibc 动态 ELF 探针 | 通过 | 暂存私有 loader/libc 后成功进入动态程序 `main` |
+| 损坏动态 loader 探针 | 通过 | 安全 ELF 布局校验返回失败，runner 继续并主动关机 |
+| execve errno 诊断 | 通过 | 损坏 loader 输出 `execve ... failed: -8` |
+| 未知扩展 program header | 通过 | loader 跳过未使用类型，动态 ELF 仍进入 `main` |
+| 缺少 musl 运行时故障注入 | 通过 | 跳过 musl 动态组，已暂存的 glibc 组完整执行并主动关机 |
 | `test_brk` | 通过 | 官方 `test_runner.py` 解析 `3/3` |
-| basic 完整命令队列 | 未实现 | 当前只运行第一个 ELF |
+| 官方 basic 解析器总量 | 已确认 | 32 个测试，共 102 项断言 |
+| basic 串行命令队列 | 通过 | 单组执行 30 个测试，官方解析器稳定复跑 `91/102` |
+| `getdents` | 部分通过 | `4/5`，已执行测试中唯一未满分项 |
+| `mount`、`umount` | 主动跳过 | 当前会在 `src/fs/file_system.rs:65` 触发 kernel panic |
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
-| 旧自建内核官方 basic | 已归档 | `codex/basic-102-archive` 线上 basic=102 |
+| 外部官方 BusyBox 镜像探针 | 通过 | 无 panic、未超时、主动关机；当前不执行 BusyBox 测试入口 |
+| 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
+
+未直接运行 `zhouzhouyi/os-contest:20260510` Docker 镜像，因为当前机器没有
+Docker CLI；当前通过结果来自同版本官方 nightly、隐藏文件过滤干净导出和
+强制离线环境。
 
 ## 官方风格命令
 
 ```bash
 cd /mnt/d/os-kernel-contest
 make all
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
   -smp 1 -bios default \
   -drive file=/path/to/test.img,if=none,format=raw,id=x0 \
-  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
 ```
 
-当前首个 basic ELF 通过标准：
+当前完整 basic 队列通过标准：
 
 ```text
-oscomp: found official basic script musl/basic_testcode.sh
-oscomp: first basic command musl/basic/brk
-#### OS COMP TEST GROUP START basic-musl ####
+oscomp: skip known unsafe basic command mount
+oscomp: skip known unsafe basic command umount
+oscomp: staged 30 basic commands
+#### OS COMP TEST GROUP START basic-glibc ####
 ========== START test_brk ==========
-Before alloc,heap pos: ...
-After alloc,heap pos: ...
-Alloc again,heap pos: ...
 ========== END test_brk ==========
-#### OS COMP TEST GROUP END basic-musl ####
+...
+========== END test_yield ==========
+#### OS COMP TEST GROUP END basic-glibc ####
+ !TEST FINISH!
 [kernel] kernel will shutdown...
 ```
 
@@ -59,6 +78,7 @@ Alloc again,heap pos: ...
 | `kernel-rv-wrapper.ld` | 入口或 PT_LOAD 不再位于 `0x80200000` |
 | `driver/qemu` | x0 virtio block 设备初始化失败 |
 | `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
-| `runtestcase.rs` | `/oscomp-*` 协议、argv 或 END 标记退化 |
+| `runtestcase.rs` | `G/X/E` 队列、工作目录切换、argv 或 END 标记退化 |
+| 动态 loader | 缺失/无效解释器重新触发 panic，或组间 libc 相互覆盖 |
 | nightly 升级 | 旧 RISC-V crate、汇编或 async API 再次不兼容 |
 | 日志 | basic START/END 被调试输出污染 |

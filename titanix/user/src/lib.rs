@@ -92,6 +92,10 @@ pub fn getcwd(path: usize, len: usize) -> isize {
     sys_getcwd(path, len)
 }
 
+pub fn chdir(path: &str) -> isize {
+    sys_chdir(path)
+}
+
 pub fn mount(dev_name: usize, target_path: usize, ftype: usize, flags: u32, data: usize) -> isize {
     sys_mount(dev_name, target_path, ftype, flags, data)
 }
