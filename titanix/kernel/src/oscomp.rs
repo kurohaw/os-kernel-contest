@@ -307,7 +307,7 @@ fn elf_has_interp(elf: &[u8]) -> Result<bool, &'static str> {
         let header = elf
             .program_header(index)
             .map_err(|_| "invalid ELF program header")?;
-        if header.get_type().map_err(|_| "invalid ELF segment type")? == Type::Interp {
+        if header.get_type().ok() == Some(Type::Interp) {
             return Ok(true);
         }
     }
@@ -366,8 +366,17 @@ fn install_group_runtime(
             )
         }
         BasicFlavor::Musl => {
-            let libc = read_file(fs, "musl/lib/libc.so")
-                .map_err(|_| "required musl/lib/libc.so not found")?;
+            let libc = read_first_disk_file(
+                fs,
+                &[
+                    "musl/lib/libc.so",
+                    "musl/lib/ld-musl-riscv64.so.1",
+                    "musl/lib/ld-musl-riscv64-sf.so.1",
+                    "lib/ld-musl-riscv64.so.1",
+                    "lib/ld-musl-riscv64-sf.so.1",
+                ],
+            )
+            .ok_or("required musl runtime not found")?;
             for name in [
                 "libc.so",
                 "lib/libc.so",
@@ -387,6 +396,10 @@ fn install_group_runtime(
         }
         BasicFlavor::Root => Err("dynamic root basic group has no isolated runtime"),
     }
+}
+
+fn read_first_disk_file(fs: &Ext4, paths: &[&str]) -> Option<Vec<u8>> {
+    paths.iter().find_map(|path| read_file(fs, path).ok())
 }
 
 fn install_required_disk_file(

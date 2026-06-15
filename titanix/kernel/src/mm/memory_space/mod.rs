@@ -990,7 +990,7 @@ impl MemorySpace {
                     cwd.trim_end_matches('/'),
                     interp.trim_start_matches('/')
                 );
-                for candidate in [interp.as_str(), local_interp.as_str()] {
+                for candidate in [local_interp.as_str(), interp.as_str()] {
                     if let Ok(inode) = resolve_path(AT_FDCWD, candidate, OpenFlags::RDONLY) {
                         interp_inode = Some(inode);
                         break;
