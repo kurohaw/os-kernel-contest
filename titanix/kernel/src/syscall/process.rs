@@ -284,7 +284,12 @@ pub fn sys_execve(path: *const u8, mut args: *const usize, mut envs: *const usiz
         app_file.read_all_from_start(elf_data)?;
     }
     // app_file.read_all_from_start(elf_data)?;
-    current_process().exec(&elf_data, Some(&app_file), args_vec, envs_vec)
+    current_process()
+        .exec(&elf_data, Some(&app_file), args_vec, envs_vec)
+        .map_err(|error| {
+            log::warn!("[sys_execve] process replacement failed: {:?}", error);
+            error
+        })
 }
 
 bitflags! {

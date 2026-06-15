@@ -4,14 +4,40 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-14 |
+| 当前日期 | 2026-06-15 |
 | 当前分支 | `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 同一次 RISC-V 启动串行执行 glibc、musl basic，动态 loader 不再 panic |
-| 当前提交 | `a6c614a`；双组与 loader 修复当前未提交 |
-| 最新可见线上结果 | 2026-06-13 19:30:50，`Accpted / 0.0`，首个 musl 动态 ELF 触发 loader panic |
+| 当前里程碑 | 官方 glibc-rv basic 取得 91 分，正在恢复 musl-rv execve |
+| 当前提交 | `9a7fdb9`，已推送至 `gitlab/main` |
+| 最新可见线上结果 | 2026-06-15 15:43:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0 |
 | 本地得分闭环 | 官方 basic 解析器 `91/102` |
+
+## 2026-06-15 官方 91 分与 musl execve 诊断
+
+### 线上证据
+
+- 官方总分由 `0.0` 提升至 `91.0`，glibc-rv basic 为 `91/102`。
+- glibc、musl 两组均完成 START/END，RISC-V 无 panic 并主动关机。
+- musl 组已暂存 30 个 ELF，但 30 次 `execve` 全部失败，没有进入任何
+  `========== START test_* ==========`。
+- LoongArch 仍因 `kernel-la` 是 RISC-V 占位 ELF 无法加载。
+
+### 当前修复
+
+- runner 输出 `execve` 的负 errno，下一次线上失败可直接区分 `ENOENT/ENOEXEC`。
+- ELF 安全校验只检查头部、program-header 表和段文件范围，不再拒绝 loader
+  不使用的合法扩展 program-header 类型。
+- ELF 映射和解释器扫描只处理需要的 `PT_LOAD/PT_INTERP`，未知类型安全跳过。
+- 主 ELF、解释器查找/布局/解析和进程替换失败时输出简短阶段日志。
+
+### 本地验证
+
+- glibc basic 仍为 `91/102`。
+- 动态 glibc、双组静态、BusyBox 外部探针和无盘启动均无 panic 并主动关机。
+- 将非执行的 RISC-V attributes header 改为未知扩展类型后，动态 ELF 仍进入
+  `main`。
+- 损坏 loader 探针输出 `execve ... failed: -8`，继续输出组 END 并主动关机。
 
 ## 2026-06-14 动态 loader 与双组队列
 

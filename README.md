@@ -21,11 +21,10 @@
 - 双组静态镜像依次输出 glibc、musl START/END；动态 glibc 探针已进入 `main`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果为 2026-06-13 19:30:50：编译状态 `Accpted`，总分
-`0.0`。RISC-V 已找到 `musl/basic_testcode.sh` 并暂存 30 个命令，但首个动态
-ELF 因 tmpfs 缺少解释器，在 `memory_space/mod.rs:871` 的 `unwrap()` panic。
-当前未提交改动已修复该调用链并加入 glibc、musl 双组隔离队列，尚待下一次
-官方评测确认得分。
+官方页面最后可见结果为 2026-06-15 15:43:27：编译状态 `Accpted`，总分
+`91.0`。glibc-rv basic 得到 `91/102`；musl 组已正常开始和结束，但 30 个 ELF
+全部在 `execve` 阶段失败。当前改动增加精确 errno/loader 阶段诊断，并放宽
+loader 不使用的合法扩展 program-header 类型，等待下一次官方评测确认。
 
 ## 构建
 

@@ -39,8 +39,9 @@ fn run_test(name: &[u8]) {
     let pid = fork();
     if pid == 0 {
         let path = core::str::from_utf8(&path).unwrap();
-        if execve(path, &argv, &[core::ptr::null::<u8>()]) != 0 {
-            println!("oscomp: execve {} failed", path);
+        let result = execve(path, &argv, &[core::ptr::null::<u8>()]);
+        if result != 0 {
+            println!("oscomp: execve {} failed: {}", path, result);
         }
         exit(-1);
     } else if pid > 0 {

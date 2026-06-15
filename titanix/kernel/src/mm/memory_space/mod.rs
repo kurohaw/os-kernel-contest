@@ -114,10 +114,6 @@ fn validate_elf_layout(data: &[u8]) -> GeneralRet<()> {
         let base = ph_offset
             .checked_add(ph_entry_size.checked_mul(index).ok_or(SyscallErr::ENOEXEC)?)
             .ok_or(SyscallErr::ENOEXEC)?;
-        let segment_type = read_elf_u32(data, base).ok_or(SyscallErr::ENOEXEC)?;
-        if segment_type > 7 && !(0x6000_0000..=0x7fff_ffff).contains(&segment_type) {
-            return Err(SyscallErr::ENOEXEC);
-        }
         let file_offset_pos = base
             .checked_add(segment_offset)
             .ok_or(SyscallErr::ENOEXEC)?;
@@ -690,8 +686,11 @@ impl MemorySpace {
         // self.page_table.get_unchecked_mut().clear_user_space();
 
         for i in 0..ph_count {
-            let ph = elf.program_header(i).unwrap();
-            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+            let Ok(ph) = elf.program_header(i) else {
+                warn!("[elf-loader] skip invalid program header {}", i);
+                continue;
+            };
+            if ph.get_type().ok() == Some(xmas_elf::program::Type::Load) {
                 let start_va: VirtAddr = (ph.virtual_addr() as usize + offset.0).into();
                 let end_va: VirtAddr =
                     ((ph.virtual_addr() + ph.mem_size()) as usize + offset.0).into();
@@ -788,8 +787,14 @@ impl MemorySpace {
         let mut memory_space = Self::new_from_global();
 
         // map program headers of elf, with U flag
-        validate_elf_layout(elf_data)?;
-        let elf = xmas_elf::ElfFile::new(elf_data).map_err(|_| SyscallErr::ENOEXEC)?;
+        validate_elf_layout(elf_data).map_err(|error| {
+            warn!("[elf-loader] main ELF layout rejected: {:?}", error);
+            error
+        })?;
+        let elf = xmas_elf::ElfFile::new(elf_data).map_err(|_| {
+            warn!("[elf-loader] main ELF parse failed");
+            SyscallErr::ENOEXEC
+        })?;
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
         if magic != [0x7f, 0x45, 0x4c, 0x46] {
@@ -814,7 +819,12 @@ impl MemorySpace {
             value: PAGE_SIZE as usize,
         });
 
-        if let Some(interp_entry_point) = memory_space.load_dl_interp_if_needed(&elf)? {
+        if let Some(interp_entry_point) =
+            memory_space.load_dl_interp_if_needed(&elf).map_err(|error| {
+                warn!("[elf-loader] interpreter load failed: {:?}", error);
+                error
+            })?
+        {
             auxv.push(AuxHeader {
                 aux_type: AT_BASE,
                 value: DL_INTERP_OFFSET,
@@ -943,7 +953,7 @@ impl MemorySpace {
         let mut interp = None;
         for i in 0..ph_count {
             let ph = elf.program_header(i).map_err(|_| SyscallErr::ENOEXEC)?;
-            if ph.get_type().map_err(|_| SyscallErr::ENOEXEC)? == Type::Interp {
+            if ph.get_type().ok() == Some(Type::Interp) {
                 let data = match ph.get_data(elf).map_err(|_| SyscallErr::ENOEXEC)? {
                     SegmentData::Undefined(data) => data,
                     _ => return Err(SyscallErr::ENOEXEC),
@@ -990,13 +1000,21 @@ impl MemorySpace {
                     break;
                 }
             }
-            let interp_inode = interp_inode.ok_or(SyscallErr::ENOENT)?;
+            let interp_inode = interp_inode.ok_or_else(|| {
+                warn!("[elf-loader] interpreter not found");
+                SyscallErr::ENOENT
+            })?;
             let interp_file = interp_inode.open(interp_inode.clone())?;
             let mut interp_elf_data = Vec::new();
             interp_file.read_all_from_start(&mut interp_elf_data)?;
-            validate_elf_layout(&interp_elf_data)?;
-            let interp_elf =
-                xmas_elf::ElfFile::new(&interp_elf_data).map_err(|_| SyscallErr::ENOEXEC)?;
+            validate_elf_layout(&interp_elf_data).map_err(|error| {
+                warn!("[elf-loader] interpreter ELF layout rejected: {:?}", error);
+                error
+            })?;
+            let interp_elf = xmas_elf::ElfFile::new(&interp_elf_data).map_err(|_| {
+                warn!("[elf-loader] interpreter ELF parse failed");
+                SyscallErr::ENOEXEC
+            })?;
             self.map_elf(&interp_elf, Some(&interp_file), DL_INTERP_OFFSET.into());
 
             Ok(Some(

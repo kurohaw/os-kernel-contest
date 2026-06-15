@@ -1,42 +1,42 @@
-# 2026-06-14 下一次评测路线
+# 2026-06-15 下一次评测路线
 
 ## 当前可信基线
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-13 19:30:50，`Accpted / 0.0` |
-| 线上直接失败原因 | musl 首个动态 ELF 缺少解释器，`memory_space/mod.rs:871` 的 `unwrap()` 触发 panic |
+| 最新可见官方结果 | 2026-06-15 15:43:27，`Accpted / 91.0` |
+| 线上得分 | glibc-rv basic `91/102`；musl-rv、两项 LoongArch 均为 0 |
+| 当前直接失败原因 | musl 组正常开始和结束，但 30 个 ELF 全部 `execve` 失败 |
 | 本地 glibc basic | 官方解析器复跑 `91/102` |
 | 本地双组镜像 | 同一次启动依次执行 glibc、musl，共 60 个命令并主动关机 |
 | 本地动态探针 | RISC-V glibc 动态 ELF 通过私有 loader/libc 成功进入 `main` |
 | 当前已知边界 | LoongArch 占位 ELF、`getdents 4/5`、主动跳过 `mount/umount` |
 
-这轮目标不是扩展更多测试组，而是把已经能编译的提交变成稳定的 RISC-V 非零分。
-必须先保证 glibc 得分不会被后续 musl 动态运行失败拖垮。
+这轮目标是保持 glibc-rv 91 分，同时恢复至少一个 musl-rv 真实 basic 测试。
 
 ## 本轮提交门禁
 
 1. 强制离线 `make all`，vendor checksum 保持 `53/0`。
 2. 隐藏文件过滤后的干净导出仍能恢复 Cargo 配置并构建。
 3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
-4. 官方完整参数下，无盘、单组 glibc、双组、动态 glibc 探针和 BusyBox 外部探针
-   均无 panic、无超时并主动关机。
+4. 官方完整参数下，无盘、单组 glibc、双组、动态 glibc、未知扩展 header 和
+   BusyBox 外部探针均无 panic、无超时并主动关机。
 5. 单组 glibc basic 官方解析器复跑得到 `91/102`。
 6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
 
-- glibc-rv basic 得分非零。
+- glibc-rv basic 保持至少 91 分。
 - musl-rv 至少开始执行真实 basic 测试。
-- 即使 musl 单项 `execve` 失败，也继续后续记录并输出组 END。
+- 若 musl 仍失败，串口必须输出负 errno 和 loader 失败阶段。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 
 若仍为 0 分，先保存完整串口日志并按以下顺序定位：
 
-1. 检查 glibc 组是否完成 START/END；若未完成，优先修复 glibc 基线。
-2. 检查 musl 组是否因缺失运行时被整体跳过，或已进入首个真实 ELF。
-3. 若 musl 已进入用户态，按首个缺失 syscall/ABI 日志做最小修复。
-4. 若出现新的 kernel panic，优先消除 panic，不并行开发其他功能。
+1. 根据首个 musl `execve` errno 与阶段日志定位共同失败点。
+2. 若为 `ENOEXEC`，对照官方 musl ELF/loader 的 program headers 修复兼容性。
+3. 若为 `ENOENT`，修复解释器或运行时路径暂存。
+4. 若 musl 已进入用户态，按首个缺失 syscall/ABI 日志做最小修复。
 
 ## 后续提分顺序
 
