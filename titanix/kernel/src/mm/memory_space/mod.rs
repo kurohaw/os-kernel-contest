@@ -7,7 +7,10 @@ use alloc::{
 };
 use log::{debug, error, info, trace, warn};
 use riscv::register::scause::Scause;
-use xmas_elf::ElfFile;
+use xmas_elf::{
+    ElfFile,
+    program::{SegmentData, Type},
+};
 
 use crate::{
     config::{
@@ -43,6 +46,105 @@ pub mod page_fault_handler;
 pub mod vm_area;
 
 mod cow;
+
+fn read_elf_u16(data: &[u8], offset: usize) -> Option<usize> {
+    let bytes = data.get(offset..offset.checked_add(2)?)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]) as usize)
+}
+
+fn read_elf_u32(data: &[u8], offset: usize) -> Option<usize> {
+    let bytes = data.get(offset..offset.checked_add(4)?)?;
+    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
+}
+
+fn read_elf_u64(data: &[u8], offset: usize) -> Option<usize> {
+    let bytes = data.get(offset..offset.checked_add(8)?)?;
+    usize::try_from(u64::from_le_bytes([
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+    ]))
+    .ok()
+}
+
+fn validate_elf_layout(data: &[u8]) -> GeneralRet<()> {
+    if data.get(..4) != Some(&[0x7f, b'E', b'L', b'F']) || data.get(5) != Some(&1) {
+        return Err(SyscallErr::ENOEXEC);
+    }
+
+    let (header_size, ph_offset, ph_entry_size, ph_count, segment_offset, segment_size, min_entry) =
+        match data.get(4) {
+            Some(1) => (
+                52,
+                read_elf_u32(data, 28),
+                read_elf_u16(data, 42),
+                read_elf_u16(data, 44),
+                4,
+                16,
+                32,
+            ),
+            Some(2) => (
+                64,
+                read_elf_u64(data, 32),
+                read_elf_u16(data, 54),
+                read_elf_u16(data, 56),
+                8,
+                32,
+                56,
+            ),
+            _ => return Err(SyscallErr::ENOEXEC),
+        };
+    if data.len() < header_size {
+        return Err(SyscallErr::ENOEXEC);
+    }
+
+    let ph_offset = ph_offset.ok_or(SyscallErr::ENOEXEC)?;
+    let ph_entry_size = ph_entry_size.ok_or(SyscallErr::ENOEXEC)?;
+    let ph_count = ph_count.ok_or(SyscallErr::ENOEXEC)?;
+    if ph_count == 0 || ph_entry_size < min_entry {
+        return Err(SyscallErr::ENOEXEC);
+    }
+    let table_end = ph_entry_size
+        .checked_mul(ph_count)
+        .and_then(|size| ph_offset.checked_add(size))
+        .ok_or(SyscallErr::ENOEXEC)?;
+    if table_end > data.len() {
+        return Err(SyscallErr::ENOEXEC);
+    }
+
+    for index in 0..ph_count {
+        let base = ph_offset
+            .checked_add(ph_entry_size.checked_mul(index).ok_or(SyscallErr::ENOEXEC)?)
+            .ok_or(SyscallErr::ENOEXEC)?;
+        let segment_type = read_elf_u32(data, base).ok_or(SyscallErr::ENOEXEC)?;
+        if segment_type > 7 && !(0x6000_0000..=0x7fff_ffff).contains(&segment_type) {
+            return Err(SyscallErr::ENOEXEC);
+        }
+        let file_offset_pos = base
+            .checked_add(segment_offset)
+            .ok_or(SyscallErr::ENOEXEC)?;
+        let file_size_pos = base
+            .checked_add(segment_size)
+            .ok_or(SyscallErr::ENOEXEC)?;
+        let file_offset = if segment_offset == 4 {
+            read_elf_u32(data, file_offset_pos)
+        } else {
+            read_elf_u64(data, file_offset_pos)
+        }
+        .ok_or(SyscallErr::ENOEXEC)?;
+        let file_size = if segment_size == 16 {
+            read_elf_u32(data, file_size_pos)
+        } else {
+            read_elf_u64(data, file_size_pos)
+        }
+        .ok_or(SyscallErr::ENOEXEC)?;
+        let file_end = file_offset
+            .checked_add(file_size)
+            .ok_or(SyscallErr::ENOEXEC)?;
+        if file_end > data.len() {
+            return Err(SyscallErr::ENOEXEC);
+        }
+    }
+    Ok(())
+}
 
 extern "C" {
     fn stext();
@@ -682,14 +784,17 @@ impl MemorySpace {
     pub fn from_elf(
         elf_data: &[u8],
         elf_file: Option<&Arc<dyn File>>,
-    ) -> (Self, usize, usize, Vec<AuxHeader>) {
+    ) -> GeneralRet<(Self, usize, usize, Vec<AuxHeader>)> {
         let mut memory_space = Self::new_from_global();
 
         // map program headers of elf, with U flag
-        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        validate_elf_layout(elf_data)?;
+        let elf = xmas_elf::ElfFile::new(elf_data).map_err(|_| SyscallErr::ENOEXEC)?;
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
-        assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
+        if magic != [0x7f, 0x45, 0x4c, 0x46] {
+            return Err(SyscallErr::ENOEXEC);
+        }
         let ph_count = elf_header.pt2.ph_count();
 
         let mut entry_point = elf_header.pt2.entry_point() as usize;
@@ -709,7 +814,7 @@ impl MemorySpace {
             value: PAGE_SIZE as usize,
         });
 
-        if let Some(interp_entry_point) = memory_space.load_dl_interp_if_needed(&elf) {
+        if let Some(interp_entry_point) = memory_space.load_dl_interp_if_needed(&elf)? {
             auxv.push(AuxHeader {
                 aux_type: AT_BASE,
                 value: DL_INTERP_OFFSET,
@@ -825,30 +930,36 @@ impl MemorySpace {
             heap_end_va
         );
 
-        (memory_space, user_stack_top, entry_point, auxv)
+        Ok((memory_space, user_stack_top, entry_point, auxv))
     }
 
     /// Check whether the elf file is dynamic linked and
     /// if so, load the dl interpreter.
     /// Return the interpreter's entry point(at the base of DL_INTERP_OFFSET) if so.
-    fn load_dl_interp_if_needed(&mut self, elf: &ElfFile) -> Option<usize> {
+    fn load_dl_interp_if_needed(&mut self, elf: &ElfFile) -> GeneralRet<Option<usize>> {
         let elf_header = elf.header;
         let ph_count = elf_header.pt2.ph_count();
 
-        let mut is_dl = false;
+        let mut interp = None;
         for i in 0..ph_count {
-            let ph = elf.program_header(i).unwrap();
-            if ph.get_type().unwrap() == xmas_elf::program::Type::Interp {
-                is_dl = true;
+            let ph = elf.program_header(i).map_err(|_| SyscallErr::ENOEXEC)?;
+            if ph.get_type().map_err(|_| SyscallErr::ENOEXEC)? == Type::Interp {
+                let data = match ph.get_data(elf).map_err(|_| SyscallErr::ENOEXEC)? {
+                    SegmentData::Undefined(data) => data,
+                    _ => return Err(SyscallErr::ENOEXEC),
+                };
+                let data = data.strip_suffix(&[0]).unwrap_or(data);
+                interp = Some(
+                    core::str::from_utf8(data)
+                        .map_err(|_| SyscallErr::ENOEXEC)?
+                        .to_string(),
+                );
                 break;
             }
         }
 
-        if is_dl {
+        if let Some(interp) = interp {
             log::info!("[load_dl] encounter a dl elf");
-            let section = elf.find_section_by_name(".interp").unwrap();
-            let mut interp = String::from_utf8(section.raw_data(&elf).to_vec()).unwrap();
-            interp = interp.strip_suffix("\0").unwrap_or(&interp).to_string();
             log::info!("[load_dl] interp {}", interp);
 
             let mut interps: Vec<String> = vec![interp.clone()];
@@ -862,26 +973,38 @@ impl MemorySpace {
             }
 
             let mut interp_inode = None;
+            let cwd = current_process().inner_handler(|process| process.cwd.clone());
             for interp in interps {
-                if let Some(inode) = resolve_path(AT_FDCWD, &interp, OpenFlags::RDONLY).ok() {
-                    interp_inode = Some(inode);
+                let local_interp = alloc::format!(
+                    "{}/{}",
+                    cwd.trim_end_matches('/'),
+                    interp.trim_start_matches('/')
+                );
+                for candidate in [interp.as_str(), local_interp.as_str()] {
+                    if let Ok(inode) = resolve_path(AT_FDCWD, candidate, OpenFlags::RDONLY) {
+                        interp_inode = Some(inode);
+                        break;
+                    }
+                }
+                if interp_inode.is_some() {
                     break;
                 }
             }
-            let interp_inode = interp_inode.unwrap();
-            let interp_file = interp_inode.open(interp_inode.clone()).ok().unwrap();
+            let interp_inode = interp_inode.ok_or(SyscallErr::ENOENT)?;
+            let interp_file = interp_inode.open(interp_inode.clone())?;
             let mut interp_elf_data = Vec::new();
-            interp_file
-                .read_all_from_start(&mut interp_elf_data)
-                .ok()
-                .unwrap();
-            let interp_elf = xmas_elf::ElfFile::new(&interp_elf_data).unwrap();
+            interp_file.read_all_from_start(&mut interp_elf_data)?;
+            validate_elf_layout(&interp_elf_data)?;
+            let interp_elf =
+                xmas_elf::ElfFile::new(&interp_elf_data).map_err(|_| SyscallErr::ENOEXEC)?;
             self.map_elf(&interp_elf, Some(&interp_file), DL_INTERP_OFFSET.into());
 
-            Some(interp_elf.header.pt2.entry_point() as usize + DL_INTERP_OFFSET)
+            Ok(Some(
+                interp_elf.header.pt2.entry_point() as usize + DL_INTERP_OFFSET,
+            ))
         } else {
             debug!("[load_dl] encounter a static elf");
-            None
+            Ok(None)
         }
     }
 

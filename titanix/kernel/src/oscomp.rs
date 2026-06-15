@@ -2,15 +2,17 @@
 
 use alloc::{
     string::{String, ToString},
+    sync::Arc,
     vec,
     vec::Vec,
 };
 
 use crate::{
     driver::BLOCK_DEVICE,
-    fs::{File, InodeMode, FILE_SYSTEM_MANAGER},
+    fs::{FILE_SYSTEM_MANAGER, File, Inode, InodeMode},
     println,
 };
+use xmas_elf::{ElfFile, program::Type};
 
 const SECTOR_SIZE: usize = 512;
 const EXT4_MAGIC: u16 = 0xef53;
@@ -25,7 +27,6 @@ const GROUP_DESC_SIZE: usize = 64;
 const MAX_TEST_FILE_SIZE: usize = 4 * 1024 * 1024;
 const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
-const END_MARKER_FILE: &str = "oscomp-end";
 const MAX_BASIC_COMMANDS: usize = 32;
 
 #[derive(Clone, Copy)]
@@ -48,13 +49,22 @@ struct BasicCommand {
     executable_path: String,
 }
 
+#[derive(Clone, Copy)]
+enum BasicFlavor {
+    Glibc,
+    Musl,
+    Root,
+}
+
 struct BasicPlan {
     commands: Vec<BasicCommand>,
     start_marker: String,
     end_marker: String,
+    group_dir: String,
+    flavor: BasicFlavor,
 }
 
-/// Read the official basic script, stage its ELF queue in tmpfs, and enter the group.
+/// Read the official basic scripts and stage isolated glibc/musl queues in tmpfs.
 pub fn init() {
     let fs = match read_superblock() {
         Ok(fs) => fs,
@@ -64,39 +74,92 @@ pub fn init() {
         }
     };
 
-    let candidates: [(&str, &[&[u8]]); 3] = [
-        ("musl/basic_testcode.sh", &[b"musl", b"basic_testcode.sh"]),
-        ("glibc/basic_testcode.sh", &[b"glibc", b"basic_testcode.sh"]),
-        ("basic_testcode.sh", &[b"basic_testcode.sh"]),
+    let candidates: [(&str, &[&[u8]], &str, BasicFlavor); 2] = [
+        (
+            "glibc/basic_testcode.sh",
+            &[b"glibc", b"basic_testcode.sh"],
+            "oscomp-glibc",
+            BasicFlavor::Glibc,
+        ),
+        (
+            "musl/basic_testcode.sh",
+            &[b"musl", b"basic_testcode.sh"],
+            "oscomp-musl",
+            BasicFlavor::Musl,
+        ),
     ];
 
-    for (label, path) in candidates {
+    let mut queue = Vec::new();
+    let mut found_named_group = false;
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (label, path, group_dir, flavor) in candidates {
         if let Ok(Some(info)) = lookup_path(&fs, path) {
             if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
-                let plan = match build_basic_plan(&fs, label) {
+                found_named_group = true;
+                let plan = match build_basic_plan(&fs, label, group_dir, flavor) {
                     Ok(plan) => plan,
                     Err(message) => {
                         println!("oscomp: cannot parse {}: {}", label, message);
                         continue;
                     }
                 };
-                if let Err(message) = install_plan(&fs, &plan) {
-                    println!("oscomp: cannot stage basic testcase: {}", message);
+                if let Err(message) = install_plan(&fs, &plan, &mut queue) {
+                    println!("oscomp: cannot stage {}: {}", label, message);
                     continue;
                 }
 
                 println!("oscomp: found official basic script {}", label);
-                println!("oscomp: staged {} basic commands", plan.commands.len());
-                println!("{}", plan.start_marker);
-                return;
+                println!(
+                    "oscomp: staged {} basic commands for {}",
+                    plan.commands.len(),
+                    group_dir
+                );
+                installed_groups += 1;
+                installed_commands += plan.commands.len();
             }
         }
     }
 
-    println!("oscomp: official basic script not found");
+    if !found_named_group {
+        if let Ok(Some(info)) = lookup_path(&fs, &[b"basic_testcode.sh"]) {
+            if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
+                match build_basic_plan(&fs, "basic_testcode.sh", "oscomp-basic", BasicFlavor::Root)
+                    .and_then(|plan| {
+                        let command_count = plan.commands.len();
+                        install_plan(&fs, &plan, &mut queue)?;
+                        installed_commands += command_count;
+                        installed_groups += 1;
+                        Ok(())
+                    }) {
+                    Ok(()) => println!("oscomp: found official basic script basic_testcode.sh"),
+                    Err(message) => println!("oscomp: cannot stage basic_testcode.sh: {}", message),
+                }
+            }
+        }
+    }
+
+    if installed_groups == 0 {
+        println!("oscomp: official basic script not found or no runnable group");
+        return;
+    }
+
+    if let Err(message) = install_tmpfs_file_path(QUEUE_FILE, &queue) {
+        println!("oscomp: cannot install basic queue: {}", message);
+        return;
+    }
+    println!(
+        "oscomp: staged {} basic groups with {} commands",
+        installed_groups, installed_commands
+    );
 }
 
-fn build_basic_plan(fs: &Ext4, script_path: &str) -> Result<BasicPlan, &'static str> {
+fn build_basic_plan(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    flavor: BasicFlavor,
+) -> Result<BasicPlan, &'static str> {
     let script = read_text_file(fs, script_path)?;
     let start_marker = find_group_marker(&script, "START")
         .unwrap_or_else(|| "#### OS COMP TEST GROUP START basic ####".to_string());
@@ -107,6 +170,8 @@ fn build_basic_plan(fs: &Ext4, script_path: &str) -> Result<BasicPlan, &'static 
         commands,
         start_marker,
         end_marker,
+        group_dir: group_dir.to_string(),
+        flavor,
     })
 }
 
@@ -188,18 +253,28 @@ fn should_skip_basic_command(name: &str) -> bool {
     matches!(name, "mount" | "umount")
 }
 
-fn install_plan(fs: &Ext4, plan: &BasicPlan) -> Result<(), &'static str> {
-    let mut queue = Vec::new();
+fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), &'static str> {
+    let mut group_queue = Vec::new();
+    let group_path = alloc::format!("/{}", plan.group_dir);
+    push_queue_record(
+        &mut group_queue,
+        b'G',
+        &alloc::format!("{}\t{}", group_path, plan.start_marker),
+    );
+    install_tmpfs_dir_path(&plan.group_dir)?;
+
+    let mut needs_runtime = false;
     for command in &plan.commands {
         let name = file_name(&command.executable_path)?;
         let staged_name = alloc::format!("oscomp-basic-{}-elf", name);
+        let staged_path = alloc::format!("{}/{}", plan.group_dir, staged_name);
         let elf = read_file(fs, &command.executable_path)?;
         if elf.get(..4) != Some(b"\x7fELF") {
             return Err("basic command is not an ELF file");
         }
-        install_tmpfs_file(&staged_name, &elf)?;
-        queue.extend_from_slice(staged_name.as_bytes());
-        queue.push(0);
+        needs_runtime |= elf_has_interp(&elf)?;
+        install_tmpfs_file_path(&staged_path, &elf)?;
+        push_queue_record(&mut group_queue, b'X', &staged_name);
     }
 
     let basic_dir = plan
@@ -207,29 +282,148 @@ fn install_plan(fs: &Ext4, plan: &BasicPlan) -> Result<(), &'static str> {
         .first()
         .map(|command| parent_path(&command.executable_path))
         .ok_or("empty basic command queue")?;
-    install_optional_resource(fs, &basic_dir, "test_echo")?;
-    install_optional_resource(fs, &basic_dir, "text.txt")?;
-    install_tmpfs_dir("mnt")?;
+    install_optional_group_resource(fs, &basic_dir, &plan.group_dir, "test_echo")?;
+    install_optional_group_resource(fs, &basic_dir, &plan.group_dir, "text.txt")?;
+    install_tmpfs_dir_path(&alloc::format!("{}/mnt", plan.group_dir))?;
 
-    install_tmpfs_file(QUEUE_FILE, &queue)?;
-    install_tmpfs_file(END_MARKER_FILE, plan.end_marker.as_bytes())
+    if needs_runtime {
+        install_group_runtime(fs, plan.flavor, &plan.group_dir)?;
+    }
+
+    push_queue_record(&mut group_queue, b'E', &plan.end_marker);
+    queue.extend_from_slice(&group_queue);
+    Ok(())
 }
 
-fn install_optional_resource(fs: &Ext4, directory: &str, name: &str) -> Result<(), &'static str> {
+fn push_queue_record(queue: &mut Vec<u8>, kind: u8, payload: &str) {
+    queue.push(kind);
+    queue.extend_from_slice(payload.as_bytes());
+    queue.push(0);
+}
+
+fn elf_has_interp(elf: &[u8]) -> Result<bool, &'static str> {
+    let elf = ElfFile::new(elf).map_err(|_| "invalid ELF")?;
+    for index in 0..elf.header.pt2.ph_count() {
+        let header = elf
+            .program_header(index)
+            .map_err(|_| "invalid ELF program header")?;
+        if header.get_type().map_err(|_| "invalid ELF segment type")? == Type::Interp {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn install_optional_group_resource(
+    fs: &Ext4,
+    directory: &str,
+    group_dir: &str,
+    name: &str,
+) -> Result<(), &'static str> {
     let path = resolve_path(directory, name);
     if let Ok(Some(info)) = lookup_path_str(fs, &path) {
         if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
-            install_tmpfs_file(name, &read_file(fs, &path)?)?;
+            install_tmpfs_file_path(
+                &alloc::format!("{}/{}", group_dir, name),
+                &read_file(fs, &path)?,
+            )?;
         }
     }
     Ok(())
 }
 
-fn install_tmpfs_file(name: &str, data: &[u8]) -> Result<(), &'static str> {
-    let root = FILE_SYSTEM_MANAGER.root_inode();
-    let inode = match root.lookup(name).map_err(|_| "cannot lookup tmpfs inode")? {
+fn install_group_runtime(
+    fs: &Ext4,
+    flavor: BasicFlavor,
+    group_dir: &str,
+) -> Result<(), &'static str> {
+    match flavor {
+        BasicFlavor::Glibc => {
+            install_required_disk_file(
+                fs,
+                "glibc/lib/ld-linux-riscv64-lp64d.so.1",
+                &alloc::format!("{}/lib/ld-linux-riscv64-lp64d.so.1", group_dir),
+            )?;
+            install_required_disk_file(
+                fs,
+                "glibc/lib/libc.so",
+                &alloc::format!("{}/lib/libc.so", group_dir),
+            )?;
+            install_required_disk_file(
+                fs,
+                "glibc/lib/libc.so.6",
+                &alloc::format!("{}/lib/libc.so.6", group_dir),
+            )?;
+            install_optional_disk_file(
+                fs,
+                "glibc/lib/libm.so",
+                &alloc::format!("{}/lib/libm.so", group_dir),
+            )?;
+            install_optional_disk_file(
+                fs,
+                "glibc/lib/libm.so.6",
+                &alloc::format!("{}/lib/libm.so.6", group_dir),
+            )
+        }
+        BasicFlavor::Musl => {
+            let libc = read_file(fs, "musl/lib/libc.so")
+                .map_err(|_| "required musl/lib/libc.so not found")?;
+            for name in [
+                "libc.so",
+                "lib/libc.so",
+                "lib/ld-musl-riscv64.so.1",
+                "lib/ld-musl-riscv64-sf.so.1",
+            ] {
+                install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, name), &libc)?;
+            }
+            install_tmpfs_file_path(
+                &alloc::format!("{}/etc/ld-musl-riscv64.path", group_dir),
+                b"/\n/lib\n",
+            )?;
+            install_tmpfs_file_path(
+                &alloc::format!("{}/etc/ld-musl-riscv64-sf.path", group_dir),
+                b"/\n/lib\n",
+            )
+        }
+        BasicFlavor::Root => Err("dynamic root basic group has no isolated runtime"),
+    }
+}
+
+fn install_required_disk_file(
+    fs: &Ext4,
+    source: &str,
+    destination: &str,
+) -> Result<(), &'static str> {
+    let data = read_file(fs, source).map_err(|_| "required dynamic runtime file not found")?;
+    install_tmpfs_file_path(destination, &data)
+}
+
+fn install_optional_disk_file(
+    fs: &Ext4,
+    source: &str,
+    destination: &str,
+) -> Result<(), &'static str> {
+    if lookup_path_str(fs, source)?.is_some() {
+        install_tmpfs_file_path(destination, &read_file(fs, source)?)?;
+    }
+    Ok(())
+}
+
+fn install_tmpfs_file_path(path: &str, data: &[u8]) -> Result<(), &'static str> {
+    let (parent_path, name) = path
+        .trim_matches('/')
+        .rsplit_once('/')
+        .unwrap_or(("", path.trim_matches('/')));
+    if name.is_empty() {
+        return Err("invalid tmpfs file path");
+    }
+    let parent = ensure_tmpfs_dir_path(parent_path)?;
+    let inode = match parent
+        .lookup(name)
+        .map_err(|_| "cannot lookup tmpfs inode")?
+    {
         Some(inode) => inode,
-        None => root
+        None => parent
             .mknod_v(name, InodeMode::FileREG, None)
             .map_err(|_| "cannot create tmpfs inode")?,
     };
@@ -245,17 +439,21 @@ fn install_tmpfs_file(name: &str, data: &[u8]) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn install_tmpfs_dir(name: &str) -> Result<(), &'static str> {
-    let root = FILE_SYSTEM_MANAGER.root_inode();
-    if root
-        .lookup(name)
-        .map_err(|_| "cannot lookup tmpfs dir")?
-        .is_none()
-    {
-        root.mkdir_v(name, InodeMode::FileDIR)
-            .map_err(|_| "cannot create tmpfs dir")?;
+fn install_tmpfs_dir_path(path: &str) -> Result<(), &'static str> {
+    ensure_tmpfs_dir_path(path).map(|_| ())
+}
+
+fn ensure_tmpfs_dir_path(path: &str) -> Result<Arc<dyn Inode>, &'static str> {
+    let mut parent = FILE_SYSTEM_MANAGER.root_inode();
+    for name in path.split('/').filter(|name| !name.is_empty()) {
+        parent = match parent.lookup(name).map_err(|_| "cannot lookup tmpfs dir")? {
+            Some(inode) => inode,
+            None => parent
+                .mkdir_v(name, InodeMode::FileDIR)
+                .map_err(|_| "cannot create tmpfs dir")?,
+        };
     }
-    Ok(())
+    Ok(parent)
 }
 
 fn file_name(path: &str) -> Result<&str, &'static str> {

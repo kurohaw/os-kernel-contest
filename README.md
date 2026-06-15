@@ -4,25 +4,28 @@
 异步执行器、网络和驱动架构上完成 2026 官方评测适配。
 
 旧自建内核曾取得官方线上 `basic=102`。当前 `main` 使用 Titanix 重写路线，
-已跑通首个真实 basic ELF。
+已能在同一次 RISC-V 启动中串行运行 glibc、musl basic。
 
 ## 当前进度
 
 - 根目录 `make all` 可完全离线构建 Titanix。
 - 生成官方要求的 RISC-V executable ELF `kernel-rv`。
-- 使用官方风格 `256M`、单核 QEMU 命令启动并主动关机。
+- 使用官方完整 `1G`、单核、网络设备与 RTC 参数启动并主动关机。
 - 从 x0 virtio-blk 测试盘识别 EXT4。
-- 命中 `musl/basic_testcode.sh`、`glibc/basic_testcode.sh` 或根目录 fixed path。
+- 固定按 `glibc`、`musl` 顺序收集 basic；两者均不存在时才使用根目录 fixed path。
 - 读取 basic 脚本和嵌套 `run-all.sh`，解析并串行执行 basic 测试队列。
-- 将 30 个安全 basic ELF、`test_echo` 和 `text.txt` 暂存到 tmpfs。
+- 将每组 basic ELF、资源和动态运行时暂存到独立 tmpfs 工作目录。
+- 动态解释器缺失或无效时向 `execve` 返回错误，不再触发 loader panic。
 - 主动跳过当前会触发内核 panic 的 `mount`、`umount`。
 - 本地官方 `test_runner.py` 对完整队列的解析结果为 `91/102`。
+- 双组静态镜像依次输出 glibc、musl START/END；动态 glibc 探针已进入 `main`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果仍是
-2026-06-11 19:44:39 的旧提交：`0.00 / Compile Error`；该结果尚未覆盖
-2026-06-12 已推送到 `gitlab/main` 的离线构建修复提交 `bab4cd0`，也尚未覆盖
-当前未提交的完整 basic 队列实现。
+官方页面最后可见结果为 2026-06-13 19:30:50：编译状态 `Accpted`，总分
+`0.0`。RISC-V 已找到 `musl/basic_testcode.sh` 并暂存 30 个命令，但首个动态
+ELF 因 tmpfs 缺少解释器，在 `memory_space/mod.rs:871` 的 `unwrap()` panic。
+当前未提交改动已修复该调用链并加入 glibc、musl 双组隔离队列，尚待下一次
+官方评测确认得分。
 
 ## 构建
 
@@ -34,17 +37,19 @@ make all
 无测试盘启动：
 
 ```bash
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
-  -smp 1 -bios default -no-reboot
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
+  -smp 1 -bios default -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
 ```
 
 带官方风格 EXT4 测试盘：
 
 ```bash
-qemu-system-riscv64 -machine virt -kernel kernel-rv -m 256M -nographic \
+qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
   -smp 1 -bios default \
   -drive file=/path/to/test.img,if=none,format=raw,id=x0 \
-  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot
+  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot \
+  -device virtio-net-device,netdev=net -netdev user,id=net -rtc base=utc
 ```
 
 ## 目录

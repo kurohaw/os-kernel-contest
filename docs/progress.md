@@ -4,14 +4,46 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-12 |
+| 当前日期 | 2026-06-14 |
 | 当前分支 | `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | Titanix 已串行执行 30 个官方 basic ELF |
-| 当前提交 | `bab4cd0`，已推送至 `gitlab/main` |
-| 最新可见线上结果 | 2026-06-11 19:44:39，`0.00 / Compile Error`，尚未评测 `bab4cd0` |
+| 当前里程碑 | 同一次 RISC-V 启动串行执行 glibc、musl basic，动态 loader 不再 panic |
+| 当前提交 | `a6c614a`；双组与 loader 修复当前未提交 |
+| 最新可见线上结果 | 2026-06-13 19:30:50，`Accpted / 0.0`，首个 musl 动态 ELF 触发 loader panic |
 | 本地得分闭环 | 官方 basic 解析器 `91/102` |
+
+## 2026-06-14 动态 loader 与双组队列
+
+### 线上证据
+
+- 2026-06-13 19:30:50 的官方提交已编译成功，状态为 `Accpted`。
+- RISC-V 找到 `musl/basic_testcode.sh` 并暂存 30 个 basic ELF。
+- 首个动态 ELF 执行时，tmpfs 缺少 musl 动态解释器；
+  `memory_space/mod.rs:871` 对解释器 inode 执行 `unwrap()`，导致内核 panic。
+- LoongArch 因 `kernel-la` 仍是 RISC-V 占位 ELF 无法加载，本轮未处理。
+
+### 已完成
+
+- basic 探测顺序固定为 `glibc -> musl`，仅在两者都不存在时使用根目录脚本。
+- 两组分别暂存到 `/oscomp-glibc`、`/oscomp-musl`，隔离 ELF、资源和运行时。
+- `/oscomp-queue` 改为 NUL 分隔的 `G/X/E` 记录；runner 切换工作目录后串行执行。
+- 扫描 ELF `PT_INTERP`，只为动态组暂存 glibc 或 musl 运行时。
+- `MemorySpace::from_elf` 与动态解释器加载改为返回错误；缺失、无法打开或无效
+  的解释器向 `execve` 传播 `ENOENT/ENOEXEC`，不再 panic。
+
+### 本地验证
+
+- 单组 glibc basic：官方解析器 `91/102`；一次复跑因 pipe 串口输出交错得到
+  `88/102`，再次复跑恢复 `91/102`。
+- 双组静态镜像：一次启动依次输出 glibc、musl START/END，执行 60 个命令后
+  输出 `!TEST FINISH!` 并主动关机。
+- RISC-V glibc 动态探针：成功通过私有 loader/libc 进入 `main`。
+- 损坏 glibc loader 探针：`execve` 返回失败，runner 继续输出组 END 并主动关机，
+  无 kernel panic。
+- 故障注入：glibc 静态组加缺少 musl 运行时的动态组时，musl 被跳过，glibc
+  仍完整执行并正常关机。
+- 无盘与外部 BusyBox 镜像：无 panic、无超时并主动关机。
 
 ## 2026-06-12 完整 basic 串行队列
 
@@ -63,10 +95,10 @@
 - 外部官方 BusyBox 镜像：60 秒内无 panic，输出允许的
   `official basic script not found` 后主动关机。
 
-### 尚待线上确认
+### 后续线上结果
 
-- 当前官方页面仍显示旧提交的 Compile Error，不能据此判断 `bab4cd0` 的线上结果。
-- 今天必须先触发新评测；若仍编译失败，暂停所有提分功能，优先修复新的编译日志。
+- 2026-06-13 19:30:50 的评测状态为 `Accpted`，确认离线工具链和 vendor 修复已
+  通过 Compile 阶段；后续 0 分原因已转为运行期动态 loader panic。
 
 ## 2026-06-11 首个真实 basic ELF
 
@@ -133,6 +165,6 @@
 
 ## 下一里程碑
 
-先取得当前完整 basic 队列的线上 Compile 与得分结果。稳定线上 `91/102` 基线后，
-优先修复 `getdents` 的最后 1 项，再单独处理 `mount/umount` 的未实现挂载路径；
-详细执行顺序见 `docs/next-evaluation-roadmap.md`。
+先提交当前 loader 与双组修复，确认 glibc-rv basic 得分非零、musl-rv 至少开始
+执行真实测试且全程无 `Panicked`。稳定线上基线后，再按首个 musl 失败日志补 ABI；
+`getdents`、`mount/umount` 与 LoongArch 暂不混入本轮。
