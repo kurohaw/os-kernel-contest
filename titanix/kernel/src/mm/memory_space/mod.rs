@@ -8,8 +8,8 @@ use alloc::{
 use log::{debug, error, info, trace, warn};
 use riscv::register::scause::Scause;
 use xmas_elf::{
-    ElfFile,
     program::{SegmentData, Type},
+    ElfFile,
 };
 
 use crate::{
@@ -112,14 +112,16 @@ fn validate_elf_layout(data: &[u8]) -> GeneralRet<()> {
 
     for index in 0..ph_count {
         let base = ph_offset
-            .checked_add(ph_entry_size.checked_mul(index).ok_or(SyscallErr::ENOEXEC)?)
+            .checked_add(
+                ph_entry_size
+                    .checked_mul(index)
+                    .ok_or(SyscallErr::ENOEXEC)?,
+            )
             .ok_or(SyscallErr::ENOEXEC)?;
         let file_offset_pos = base
             .checked_add(segment_offset)
             .ok_or(SyscallErr::ENOEXEC)?;
-        let file_size_pos = base
-            .checked_add(segment_size)
-            .ok_or(SyscallErr::ENOEXEC)?;
+        let file_size_pos = base.checked_add(segment_size).ok_or(SyscallErr::ENOEXEC)?;
         let file_offset = if segment_offset == 4 {
             read_elf_u32(data, file_offset_pos)
         } else {
@@ -140,6 +142,16 @@ fn validate_elf_layout(data: &[u8]) -> GeneralRet<()> {
         }
     }
     Ok(())
+}
+
+fn is_riscv64_musl_interp(path: &str) -> bool {
+    matches!(
+        path,
+        "/lib/ld-musl-riscv64.so.1"
+            | "/lib/ld-musl-riscv64-lp64.so.1"
+            | "/lib/ld-musl-riscv64-lp64d.so.1"
+            | "/lib/ld-musl-riscv64-sf.so.1"
+    )
 }
 
 extern "C" {
@@ -820,10 +832,12 @@ impl MemorySpace {
         });
 
         if let Some(interp_entry_point) =
-            memory_space.load_dl_interp_if_needed(&elf).map_err(|error| {
-                warn!("[elf-loader] interpreter load failed: {:?}", error);
-                error
-            })?
+            memory_space
+                .load_dl_interp_if_needed(&elf)
+                .map_err(|error| {
+                    warn!("[elf-loader] interpreter load failed: {:?}", error);
+                    error
+                })?
         {
             auxv.push(AuxHeader {
                 aux_type: AT_BASE,
@@ -976,7 +990,7 @@ impl MemorySpace {
 
             log::info!("interp {}", interp);
 
-            if interp.eq("/lib/ld-musl-riscv64-sf.so.1") || interp.eq("/lib/ld-musl-riscv64.so.1") {
+            if is_riscv64_musl_interp(&interp) {
                 // interp = "/lib/libc.so".to_string();
                 interps.push("/libc.so".to_string());
                 interps.push("/lib/libc.so".to_string());
@@ -992,6 +1006,7 @@ impl MemorySpace {
                 );
                 for candidate in [local_interp.as_str(), interp.as_str()] {
                     if let Ok(inode) = resolve_path(AT_FDCWD, candidate, OpenFlags::RDONLY) {
+                        log::info!("[load_dl] resolved interp candidate {}", candidate);
                         interp_inode = Some(inode);
                         break;
                     }
@@ -1001,7 +1016,7 @@ impl MemorySpace {
                 }
             }
             let interp_inode = interp_inode.ok_or_else(|| {
-                warn!("[elf-loader] interpreter not found");
+                warn!("[elf-loader] interpreter not found: {}", interp);
                 SyscallErr::ENOENT
             })?;
             let interp_file = interp_inode.open(interp_inode.clone())?;

@@ -9,7 +9,7 @@ use alloc::{
 
 use crate::{
     driver::BLOCK_DEVICE,
-    fs::{FILE_SYSTEM_MANAGER, File, Inode, InodeMode},
+    fs::{File, Inode, InodeMode, FILE_SYSTEM_MANAGER},
     println,
 };
 use xmas_elf::{
@@ -252,8 +252,8 @@ fn find_commands(
     Err("no executable command found")
 }
 
-fn should_skip_basic_command(name: &str) -> bool {
-    matches!(name, "mount" | "umount")
+fn should_skip_basic_command(_name: &str) -> bool {
+    false
 }
 
 fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), &'static str> {

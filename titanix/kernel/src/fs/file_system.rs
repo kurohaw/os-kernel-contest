@@ -55,14 +55,15 @@ pub enum FileSystemType {
 }
 
 impl FileSystemType {
-    pub fn fs_type(ftype: &str) -> Self {
+    pub fn fs_type(ftype: &str) -> GeneralRet<Self> {
         match ftype {
-            "vfat" => Self::VFAT,
-            "ext2" => Self::EXT2,
-            "nfs" => Self::NFS,
-            "proc" => Self::Proc,
-            "devtmpfs" => Self::DevTmpFS,
-            _ => todo!(),
+            "vfat" => Ok(Self::VFAT),
+            "ext2" => Ok(Self::EXT2),
+            "nfs" => Ok(Self::NFS),
+            "tmpfs" => Ok(Self::TmpFS),
+            "proc" => Ok(Self::Proc),
+            "devtmpfs" => Ok(Self::DevTmpFS),
+            _ => Err(SyscallErr::EINVAL),
         }
     }
     pub fn to_string(&self) -> String {
@@ -204,18 +205,48 @@ impl FileSystemManager {
         */
         // create fs
         let fs: Arc<dyn FileSystem> = match fstype {
-            FileSystemType::VFAT => {
-                let ret = FAT32FileSystem::new(
-                    Arc::clone(device.block_device().unwrap()),
+            FileSystemType::VFAT => match device.block_device() {
+                Some(block_device) => match FAT32FileSystem::new(
+                    Arc::clone(block_device),
                     mount_point,
                     dev_name,
                     fstype,
                     flags,
-                    fa_inode,
-                    covered_inode,
-                )?;
-                Arc::new(ret)
-            }
+                    fa_inode.clone(),
+                    covered_inode.clone(),
+                ) {
+                    Ok(ret) => Arc::new(ret),
+                    Err(error) => {
+                        log::warn!(
+                            "[mount] vfat device {} rejected ({:?}); using tmpfs overlay",
+                            dev_name,
+                            error
+                        );
+                        Arc::new(TmpFs::new(
+                            mount_point,
+                            dev_name,
+                            fstype,
+                            flags,
+                            fa_inode,
+                            covered_inode,
+                        )?)
+                    }
+                },
+                None => {
+                    log::warn!(
+                        "[mount] vfat device {} has no block backend; using tmpfs overlay",
+                        dev_name
+                    );
+                    Arc::new(TmpFs::new(
+                        mount_point,
+                        dev_name,
+                        fstype,
+                        flags,
+                        fa_inode,
+                        covered_inode,
+                    )?)
+                }
+            },
 
             FileSystemType::DevTmpFS => {
                 let ret = DevFs::new(
@@ -250,7 +281,7 @@ impl FileSystemManager {
                 )?;
                 Arc::new(ret)
             }
-            _ => todo!(),
+            _ => return Err(SyscallErr::ENODEV),
         };
         // insert root inode into inode cache
         let meta = fs.metadata();
@@ -319,8 +350,6 @@ impl FileSystemManager {
         // remove root inode from inode cache
         let fa_ino = {
             if let Some(some_fa_inode) = meta.fa_inode.as_ref() {
-                // remove root inode from fa
-                some_fa_inode.remove_child(Arc::clone(&meta.root_inode))?;
                 some_fa_inode.metadata().ino
             } else {
                 0
@@ -331,8 +360,16 @@ impl FileSystemManager {
         INODE_CACHE.remove(&key);
         // remove file system from file system manager
         self.fs_mgr.lock().remove(mount_point);
-        if meta.covered_inode.is_some() {
-            INODE_CACHE.insert(key, Arc::clone(&meta.covered_inode.as_ref().unwrap()));
+        if let Some(covered_inode) = meta.covered_inode.as_ref() {
+            INODE_CACHE.insert(key, Arc::clone(covered_inode));
+            if let Some(parent) = meta.fa_inode.as_ref() {
+                parent
+                    .metadata()
+                    .inner
+                    .lock()
+                    .children
+                    .insert(mount_point_name.to_string(), Arc::clone(covered_inode));
+            }
         }
         Ok(())
         // fs will be dropped automatically because Arc = 0

@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use alloc::{string::ToString, sync::Arc};
 use log::debug;
 
+use self::block_device::BlockDeviceInode;
 use self::cpu_dma_latency::LatencyInode;
 use self::null::NullInode;
 use self::rtc::RtcInode;
@@ -90,11 +91,15 @@ const DEV_NAMES: [(
     fn(parent: Arc<dyn Inode>, path: &str) -> Arc<dyn Inode>,
 ); 7] = [
     ("/dev/vda2", InodeMode::FileBLK, |parent, path| {
-        Arc::new(TmpInode::new(
-            Some(parent),
-            path::get_name(path),
-            InodeMode::FileDIR,
-        ))
+        if let Some(block_device) = crate::driver::BLOCK_DEVICE.lock().as_ref().map(Arc::clone) {
+            Arc::new(BlockDeviceInode::new(parent, path, block_device, 0))
+        } else {
+            Arc::new(TmpInode::new(
+                Some(parent),
+                path::get_name(path),
+                InodeMode::FileBLK,
+            ))
+        }
     }),
     ("/dev/zero", InodeMode::FileCHR, |parent, path| {
         Arc::new(ZeroInode::new(parent, path))

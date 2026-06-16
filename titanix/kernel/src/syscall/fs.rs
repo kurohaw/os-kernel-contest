@@ -277,8 +277,8 @@ pub fn sys_mount(
         return Err(SyscallErr::EACCES);
     }
 
-    let ftype = path::path_process(AT_FDCWD, ftype)?;
-    let ftype = FileSystemType::fs_type(&ftype);
+    let ftype = c_str_to_string(ftype);
+    let ftype = FileSystemType::fs_type(&ftype)?;
 
     let dev = <dyn Inode>::lookup_from_root(&dev_name)?.0;
     let dev = match dev {
