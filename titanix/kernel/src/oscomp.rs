@@ -12,7 +12,10 @@ use crate::{
     fs::{FILE_SYSTEM_MANAGER, File, Inode, InodeMode},
     println,
 };
-use xmas_elf::{ElfFile, program::Type};
+use xmas_elf::{
+    program::{SegmentData, Type},
+    ElfFile,
+};
 
 const SECTOR_SIZE: usize = 512;
 const EXT4_MAGIC: u16 = 0xef53;
@@ -264,6 +267,7 @@ fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), 
     install_tmpfs_dir_path(&plan.group_dir)?;
 
     let mut needs_runtime = false;
+    let mut interp_paths = Vec::new();
     for command in &plan.commands {
         let name = file_name(&command.executable_path)?;
         let staged_name = alloc::format!("oscomp-basic-{}-elf", name);
@@ -272,7 +276,13 @@ fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), 
         if elf.get(..4) != Some(b"\x7fELF") {
             return Err("basic command is not an ELF file");
         }
-        needs_runtime |= elf_has_interp(&elf)?;
+        if let Some(interp) = elf_interp_path(&elf)? {
+            needs_runtime = true;
+            if !interp_paths.iter().any(|known| known == &interp) {
+                println!("oscomp: {} PT_INTERP {}", plan.group_dir, interp);
+                interp_paths.push(interp);
+            }
+        }
         install_tmpfs_file_path(&staged_path, &elf)?;
         push_queue_record(&mut group_queue, b'X', &staged_name);
     }
@@ -287,7 +297,7 @@ fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), 
     install_tmpfs_dir_path(&alloc::format!("{}/mnt", plan.group_dir))?;
 
     if needs_runtime {
-        install_group_runtime(fs, plan.flavor, &plan.group_dir)?;
+        install_group_runtime(fs, plan.flavor, &plan.group_dir, &interp_paths)?;
     }
 
     push_queue_record(&mut group_queue, b'E', &plan.end_marker);
@@ -301,17 +311,31 @@ fn push_queue_record(queue: &mut Vec<u8>, kind: u8, payload: &str) {
     queue.push(0);
 }
 
-fn elf_has_interp(elf: &[u8]) -> Result<bool, &'static str> {
-    let elf = ElfFile::new(elf).map_err(|_| "invalid ELF")?;
+fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {
+    let elf = ElfFile::new(elf_data).map_err(|_| "invalid ELF")?;
     for index in 0..elf.header.pt2.ph_count() {
         let header = elf
             .program_header(index)
             .map_err(|_| "invalid ELF program header")?;
         if header.get_type().ok() == Some(Type::Interp) {
-            return Ok(true);
+            let data = match header
+                .get_data(&elf)
+                .map_err(|_| "invalid ELF interpreter segment")?
+            {
+                SegmentData::Undefined(data) => data,
+                _ => return Err("invalid ELF interpreter segment"),
+            };
+            let data = data.strip_suffix(&[0]).unwrap_or(data);
+            let interp = core::str::from_utf8(data)
+                .map_err(|_| "ELF interpreter path is not UTF-8")?
+                .trim();
+            if interp.is_empty() {
+                return Err("empty ELF interpreter path");
+            }
+            return Ok(Some(interp.to_string()));
         }
     }
-    Ok(false)
+    Ok(None)
 }
 
 fn install_optional_group_resource(
@@ -336,14 +360,19 @@ fn install_group_runtime(
     fs: &Ext4,
     flavor: BasicFlavor,
     group_dir: &str,
+    interp_paths: &[String],
 ) -> Result<(), &'static str> {
     match flavor {
         BasicFlavor::Glibc => {
-            install_required_disk_file(
-                fs,
-                "glibc/lib/ld-linux-riscv64-lp64d.so.1",
+            let loader = read_file(fs, "glibc/lib/ld-linux-riscv64-lp64d.so.1")
+                .map_err(|_| "required dynamic runtime file not found")?;
+            install_tmpfs_file_path(
                 &alloc::format!("{}/lib/ld-linux-riscv64-lp64d.so.1", group_dir),
+                &loader,
             )?;
+            for interp in interp_paths {
+                install_interp_alias(group_dir, interp, &loader)?;
+            }
             install_required_disk_file(
                 fs,
                 "glibc/lib/libc.so",
@@ -370,8 +399,12 @@ fn install_group_runtime(
                 fs,
                 &[
                     "musl/lib/libc.so",
+                    "musl/lib/ld-musl-riscv64-lp64d.so.1",
+                    "musl/lib/ld-musl-riscv64-lp64.so.1",
                     "musl/lib/ld-musl-riscv64.so.1",
                     "musl/lib/ld-musl-riscv64-sf.so.1",
+                    "lib/ld-musl-riscv64-lp64d.so.1",
+                    "lib/ld-musl-riscv64-lp64.so.1",
                     "lib/ld-musl-riscv64.so.1",
                     "lib/ld-musl-riscv64-sf.so.1",
                 ],
@@ -380,10 +413,18 @@ fn install_group_runtime(
             for name in [
                 "libc.so",
                 "lib/libc.so",
+                "lib/ld-musl-riscv64-lp64d.so.1",
+                "lib/ld-musl-riscv64-lp64.so.1",
                 "lib/ld-musl-riscv64.so.1",
                 "lib/ld-musl-riscv64-sf.so.1",
             ] {
                 install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, name), &libc)?;
+            }
+            for interp in interp_paths {
+                install_interp_alias(group_dir, interp, &libc)?;
+                if let Ok(name) = file_name(interp) {
+                    install_tmpfs_file_path(&alloc::format!("{}/lib/{}", group_dir, name), &libc)?;
+                }
             }
             install_tmpfs_file_path(
                 &alloc::format!("{}/etc/ld-musl-riscv64.path", group_dir),
@@ -396,6 +437,14 @@ fn install_group_runtime(
         }
         BasicFlavor::Root => Err("dynamic root basic group has no isolated runtime"),
     }
+}
+
+fn install_interp_alias(group_dir: &str, interp: &str, data: &[u8]) -> Result<(), &'static str> {
+    let path = interp.trim_start_matches('/');
+    if path.is_empty() || path.contains("..") {
+        return Err("invalid ELF interpreter path");
+    }
+    install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, path), data)
 }
 
 fn read_first_disk_file(fs: &Ext4, paths: &[&str]) -> Option<Vec<u8>> {

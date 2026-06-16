@@ -4,14 +4,52 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-15 |
+| 当前日期 | 2026-06-16 |
 | 当前分支 | `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 官方 glibc-rv basic 取得 91 分，正在恢复 musl-rv execve |
-| 当前提交 | `9a7fdb9`，已推送至 `gitlab/main` |
-| 最新可见线上结果 | 2026-06-15 15:43:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0 |
+| 当前里程碑 | 保持 glibc-rv 91 分基线，修复 musl-rv `ENOENT(-2)` |
+| 当前提交 | 远端基线 `0bc0dc9`，本地追加真实 `PT_INTERP` 路径暂存修复 |
+| 最新可见线上结果 | 2026-06-15 19:24:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0；该结果早于 `0bc0dc9` |
 | 本地得分闭环 | 官方 basic 解析器 `91/102` |
+
+## 2026-06-16 musl ENOENT 与真实解释器路径暂存
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-15 19:24:27 提交评测为
+  `Accpted / 91.0`，glibc-rv basic 保持 `91/102`。
+- 该页面结果早于 `gitlab/main` 的 `0bc0dc9 fix: improve musl runtime
+  compatibility`，因此不能作为 `0bc0dc9` 的验证结果。
+- RISC-V 串口中 musl 30 个 basic ELF 全部
+  `oscomp: execve ... failed: -2`，即 `ENOENT`。
+- 失败已从 panic/`ENOEXEC` 收敛为解释器或运行时路径不存在，下一步优先处理
+  musl `PT_INTERP` 的完整路径匹配。
+
+### 当前修复
+
+- 已快进同步 `gitlab/main` 到 `0bc0dc9`。
+- `oscomp` 从每个动态 ELF 的 `PT_INTERP` 读取真实解释器路径，并在组私有
+  tmpfs 中创建完全匹配的路径。
+- musl 运行时来源优先读取测试盘中的 `musl/lib/libc.so`，随后尝试
+  `musl/lib/ld-musl-riscv64*.so.1` 与 `lib/ld-musl-riscv64*.so.1`。
+- 找到一个有效 musl loader/libc 后，同时安装到 `/oscomp-musl/libc.so`、
+  `/oscomp-musl/lib/libc.so`、常见 `ld-musl-riscv64*.so.1` 别名，以及每个
+  ELF 实际声明的解释器路径。
+- 保留 runner 的负 errno 输出；若下一次线上 musl 仍失败，应能看到真实
+  `PT_INTERP` 与新的失败阶段。
+
+### 本地验证
+
+- vendor 校验：53 个 manifest，0 个问题。
+- 强制离线 `make all`：通过。
+- 无测试盘：输出 `!TEST FINISH!` 并主动关机。
+- 单组 glibc basic：官方解析器保持 `91/102`。
+- 双组静态镜像：依次输出 glibc、musl START/END，并主动关机。
+- glibc 动态探针：输出 `PT_INTERP /lib/ld-linux-riscv64-lp64d.so.1`，并进入
+  `main`。
+- 损坏 loader 探针：输出 `execve ... failed: -8`，无 panic，正常收尾。
+- 外部 BusyBox 镜像：无 panic、无卡死并主动关机。
 
 ## 2026-06-15 官方 91 分与 musl execve 诊断
 

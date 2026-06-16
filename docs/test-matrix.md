@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并得分 | 2026-06-15 15:43:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0 |
-| musl-rv basic | 待恢复 | 两组正常收尾，但 musl 30 个 ELF 全部在 `execve` 阶段失败 |
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-15 19:24:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0；该结果早于远端 `0bc0dc9` |
+| musl-rv basic | 待恢复 | 两组正常收尾，但 musl 30 个 ELF 全部 `execve ... failed: -2`，即 `ENOENT` |
 | 根目录 `make all` | 通过 | 离线构建，生成 `kernel-rv`、`kernel-la` |
 | 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-01`，构建日志无联网安装请求 |
 | 隐藏文件过滤后 vendor 校验 | 通过 | 删除全部隐藏文件后，53 个 manifest、0 个问题 |
@@ -23,6 +23,7 @@
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
 | glibc 动态 ELF 探针 | 通过 | 暂存私有 loader/libc 后成功进入动态程序 `main` |
+| 动态 ELF `PT_INTERP` 解析 | 通过 | 从 ELF 读取真实解释器路径，并按组私有目录创建完整匹配路径 |
 | 损坏动态 loader 探针 | 通过 | 安全 ELF 布局校验返回失败，runner 继续并主动关机 |
 | execve errno 诊断 | 通过 | 损坏 loader 输出 `execve ... failed: -8` |
 | 未知扩展 program header | 通过 | loader 跳过未使用类型，动态 ELF 仍进入 `main` |
