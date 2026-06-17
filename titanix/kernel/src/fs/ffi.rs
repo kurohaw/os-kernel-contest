@@ -1,7 +1,7 @@
 use core::mem::size_of;
 
 use super::fat32::SECTOR_SIZE;
-use super::Inode;
+use super::{Inode, InodeMode};
 use crate::timer::current_time_duration;
 use crate::timer::ffi::TimeSpec;
 use alloc::string::{String, ToString};
@@ -111,6 +111,9 @@ use crate::utils::string::{str_to_array_65, string_to_array};
 
 pub const DIRENT_SIZE: u16 = size_of::<Dirent>() as u16;
 const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
+const DT_UNKNOWN: u8 = 0;
+const DT_DIR: u8 = 4;
+const DT_REG: u8 = 8;
 
 pub const MAX_NAME_LEN: usize = 256;
 
@@ -133,32 +136,57 @@ impl Dirent {
     pub fn get_dirents(inode: Arc<dyn Inode>, start_index: usize) -> Vec<Self> {
         debug!("[dirent] start_index: {}", start_index);
         let inode_meta = inode.metadata();
-        let child = inode_meta.inner.lock().children.clone();
+        let (parent, child) = {
+            let inner = inode_meta.inner.lock();
+            (inner.parent.clone(), inner.children.clone())
+        };
         let mut dirents: Vec<Dirent> = Vec::new();
+
+        let parent_ino = parent
+            .and_then(|parent| parent.upgrade())
+            .map(|parent| parent.metadata().ino)
+            .unwrap_or(inode_meta.ino);
+        let special_entries = [
+            (0usize, ".", inode_meta.ino, InodeMode::FileDIR),
+            (1usize, "..", parent_ino, InodeMode::FileDIR),
+        ];
+        for (index, name, ino, mode) in special_entries {
+            if index >= start_index {
+                dirents.push(Self::new(ino, index + 1, mode, name.to_string()));
+            }
+        }
+
         for (i, (_, value)) in child.into_iter().enumerate() {
-            if i < start_index {
+            let index = i + special_entries.len();
+            if index < start_index {
                 continue;
             }
             let name = value.metadata().name.clone();
-            let mut dirent = Dirent {
-                d_ino: value.metadata().ino,
-                d_off: i + 1,
-                d_reclen: 0,
-                d_type: value.metadata().mode as u8,
-                d_name: string_to_array(name.clone()),
-            };
-            dirent.d_reclen = align_up(LINUX_DIRENT64_NAME_OFFSET + name.len() + 1, 8) as u16;
+            let mode = value.metadata().mode;
+            let dirent = Self::new(value.metadata().ino, index + 1, mode, name.clone());
             debug!(
                 "[dirent] i is: {}, d_name is: {}, d_ino is: {}, d_type: {:?}, d_reclen: {}",
-                i,
+                index,
                 name,
                 value.metadata().ino,
-                value.metadata().mode,
+                mode,
                 dirent.d_reclen
             );
             dirents.push(dirent);
         }
         dirents
+    }
+
+    fn new(ino: usize, next_index: usize, mode: InodeMode, name: String) -> Self {
+        let mut dirent = Dirent {
+            d_ino: ino,
+            d_off: next_index,
+            d_reclen: 0,
+            d_type: linux_dirent_type(mode),
+            d_name: string_to_array(name.clone()),
+        };
+        dirent.d_reclen = align_up(LINUX_DIRENT64_NAME_OFFSET + name.len() + 1, 8) as u16;
+        dirent
     }
 
     #[allow(unused)]
@@ -179,6 +207,14 @@ impl Dirent {
 
 const fn align_up(value: usize, align: usize) -> usize {
     (value + align - 1) & !(align - 1)
+}
+
+const fn linux_dirent_type(mode: InodeMode) -> u8 {
+    match mode {
+        InodeMode::FileDIR => DT_DIR,
+        InodeMode::FileREG => DT_REG,
+        _ => DT_UNKNOWN,
+    }
 }
 
 /// STATFS
