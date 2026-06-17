@@ -368,7 +368,11 @@ pub fn sys_getdents(fd: usize, dirp: usize, count: usize) -> SyscallRet {
                 }
                 num_bytes = temp;
                 unsafe {
-                    copy_nonoverlapping(&*dirent as *const Dirent, dirp_ptr as *mut Dirent, 1);
+                    copy_nonoverlapping(
+                        dirent as *const Dirent as *const u8,
+                        dirp_ptr as *mut u8,
+                        dirent.d_reclen as usize,
+                    );
                     dirp_ptr += dirent.d_reclen as usize;
                 }
                 index = i + 1;

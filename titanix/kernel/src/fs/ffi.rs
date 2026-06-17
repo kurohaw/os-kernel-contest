@@ -107,9 +107,10 @@ impl UtsName {
 }
 
 /// Dirent
-use crate::utils::string::{array_str_len, str_to_array_65, string_to_array};
+use crate::utils::string::{str_to_array_65, string_to_array};
 
 pub const DIRENT_SIZE: u16 = size_of::<Dirent>() as u16;
+const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
 
 pub const MAX_NAME_LEN: usize = 256;
 
@@ -138,19 +139,19 @@ impl Dirent {
             if i < start_index {
                 continue;
             }
+            let name = value.metadata().name.clone();
             let mut dirent = Dirent {
                 d_ino: value.metadata().ino,
-                d_off: 0,
+                d_off: i + 1,
                 d_reclen: 0,
                 d_type: value.metadata().mode as u8,
-                d_name: string_to_array(value.metadata().name.clone()),
+                d_name: string_to_array(name.clone()),
             };
-            dirent.d_reclen =
-                (DIRENT_SIZE as usize - (MAX_NAME_LEN - array_str_len(&dirent.d_name))) as u16;
+            dirent.d_reclen = align_up(LINUX_DIRENT64_NAME_OFFSET + name.len() + 1, 8) as u16;
             debug!(
                 "[dirent] i is: {}, d_name is: {}, d_ino is: {}, d_type: {:?}, d_reclen: {}",
                 i,
-                value.metadata().name.clone(),
+                name,
                 value.metadata().ino,
                 value.metadata().mode,
                 dirent.d_reclen
@@ -174,6 +175,10 @@ impl Dirent {
             &self.d_name[0] as *const u8 as usize
         );
     }
+}
+
+const fn align_up(value: usize, align: usize) -> usize {
+    (value + align - 1) & !(align - 1)
 }
 
 /// STATFS
