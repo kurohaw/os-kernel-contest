@@ -4,7 +4,7 @@
 异步执行器、网络和驱动架构上完成 2026 官方评测适配。
 
 旧自建内核曾取得官方线上 `basic=102`。当前 `main` 使用 Titanix 重写路线，
-已能在同一次 RISC-V 启动中串行运行 glibc、musl basic。
+已能在同一次 RISC-V 启动中串行运行 glibc、musl basic 和 BusyBox。
 
 ## 当前进度
 
@@ -17,15 +17,16 @@
 - 读取 basic 脚本和嵌套 `run-all.sh`，解析并串行执行 basic 测试队列。
 - 将每组 basic ELF、资源和动态运行时暂存到独立 tmpfs 工作目录。
 - 动态解释器缺失或无效时向 `execve` 返回错误，不再触发 loader panic。
-- 主动跳过当前会触发内核 panic 的 `mount`、`umount`。
-- 本地官方 `test_runner.py` 对完整队列的解析结果为 `91/102`。
-- 双组静态镜像依次输出 glibc、musl START/END；动态 glibc 探针已进入 `main`。
+- basic 的 `mount`、`umount` 已恢复执行，线上 RISC-V basic 为 `102 + 102`。
+- BusyBox 已按官方脚本暂存并执行，线上 RISC-V BusyBox 为 `49 + 49`。
+- Lua 官方脚本、`lua`、`busybox` 和 `.lua` 资源已接入 tmpfs staging，等待下一次线上确认。
+- 本地官方 `test_runner.py` 对双组 basic 的解析结果为 `102/102`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果为 2026-06-15 15:43:27：编译状态 `Accpted`，总分
-`91.0`。glibc-rv basic 得到 `91/102`；musl 组已正常开始和结束，但 30 个 ELF
-全部在 `execve` 阶段失败。当前改动增加精确 errno/loader 阶段诊断，并放宽
-loader 不使用的合法扩展 program-header 类型，等待下一次官方评测确认。
+官方页面最后可见结果为 2026-06-18 08:55:11：编译状态 `Accepted`，总分
+`302.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc
+`49`、musl `49`。当前新增 Lua staging，下一次评测重点看 Lua 是否开始得分并
+保持 basic/BusyBox 不回退。
 
 ## 构建
 

@@ -4,8 +4,9 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并得分 | 2026-06-15 19:24:27，`Accpted / 91.0`；glibc-rv=91，musl-rv=0；该结果早于远端 `0bc0dc9` |
-| musl-rv basic | 待恢复 | 两组正常收尾，但 musl 30 个 ELF 全部 `execve ... failed: -2`，即 `ENOENT` |
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-18 08:55:11，`Accepted / 302.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49 |
+| musl-rv basic | 通过 | 线上 `102/102` |
+| RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | 根目录 `make all` | 通过 | 离线构建，生成 `kernel-rv`、`kernel-la` |
 | 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-01`，构建日志无联网安装请求 |
 | 隐藏文件过滤后 vendor 校验 | 通过 | 删除全部隐藏文件后，53 个 manifest、0 个问题 |
@@ -30,11 +31,12 @@
 | 缺少 musl 运行时故障注入 | 通过 | 跳过 musl 动态组，已暂存的 glibc 组完整执行并主动关机 |
 | `test_brk` | 通过 | 官方 `test_runner.py` 解析 `3/3` |
 | 官方 basic 解析器总量 | 已确认 | 32 个测试，共 102 项断言 |
-| basic 串行命令队列 | 通过 | 单组执行 30 个测试，官方解析器稳定复跑 `91/102` |
-| `getdents` | 部分通过 | `4/5`，已执行测试中唯一未满分项 |
-| `mount`、`umount` | 主动跳过 | 当前会在 `src/fs/file_system.rs:65` 触发 kernel panic |
+| basic 串行命令队列 | 通过 | 双组官方布局镜像完整运行，官方解析器 `102/102` |
+| `getdents` | 通过 | 本地官方解析器 `5/5` |
+| `mount`、`umount` | 通过 | 本地官方解析器均 `5/5`，线上 basic 已满分 |
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
-| 外部官方 BusyBox 镜像探针 | 通过 | 无 panic、未超时、主动关机；当前不执行 BusyBox 测试入口 |
+| 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
+| Lua staging | 待线上确认 | 本地官方布局夹具盘识别 glibc/musl `lua_testcode.sh`，暂存 2 组并主动关机；未缓存真实 Lua 二进制，真实得分等线上评测 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
 未直接运行 `zhouzhouyi/os-contest:20260510` Docker 镜像，因为当前机器没有
@@ -56,15 +58,13 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
 当前完整 basic 队列通过标准：
 
 ```text
-oscomp: skip known unsafe basic command mount
-oscomp: skip known unsafe basic command umount
-oscomp: staged 30 basic commands
+oscomp: staged 2 test groups with 60 commands
 #### OS COMP TEST GROUP START basic-glibc ####
 ========== START test_brk ==========
 ========== END test_brk ==========
 ...
 ========== END test_yield ==========
-#### OS COMP TEST GROUP END basic-glibc ####
+#### OS COMP TEST GROUP END basic-musl ####
  !TEST FINISH!
 [kernel] kernel will shutdown...
 ```
