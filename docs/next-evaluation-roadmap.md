@@ -4,14 +4,14 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-18 08:55:11，`Accepted / 302.0` |
-| 线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49` |
-| 当前修复方向 | 新增 Lua 脚本型测试组 staging，保持 basic/BusyBox 不回退 |
+| 最新可见官方结果 | 2026-06-18 09:16:08，`Accepted / 320.0` |
+| 线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9` |
+| 当前修复方向 | 新增 libcbench 脚本型测试组 staging，保持 basic/BusyBox/Lua 不回退 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
-| 本地 Lua staging | glibc/musl Lua 脚本和资源可从 EXT4 暂存到 tmpfs，真实 Lua 二进制运行待线上确认 |
-| 当前已知边界 | LoongArch 占位 ELF；Lua、libcbench、lmbench、ltp、网络/性能测试仍未得分 |
+| 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，真实 libc-bench 运行待线上确认 |
+| 当前已知边界 | LoongArch 占位 ELF；libcbench、lmbench、ltp、网络/性能测试仍未得分 |
 
-这轮目标是保持 RISC-V `302.0` 基线，同时让 Lua 组开始产生线上反馈或得分。
+这轮目标是保持 RISC-V `320.0` 基线，同时让 libcbench 组开始产生线上反馈或得分。
 
 ## 本轮提交门禁
 
@@ -27,26 +27,27 @@
 
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
-- Lua glibc-rv 或 musl-rv 至少开始输出官方 `lua` START/END 或 testcase 行。
-- 如果 Lua 不得分，串口应能看到 `oscomp: found official lua script ...`，用于区分
-  staging 问题和 Lua 运行期 syscall/脚本问题。
+- RISC-V Lua 保持 `18/18`。
+- libcbench glibc-rv 或 musl-rv 至少开始输出官方 `libcbench` START/END。
+- 如果 libcbench 不得分，串口应能看到 `oscomp: found official libcbench script ...`，
+  用于区分 staging 问题和 libc-bench 运行期 syscall/线程问题。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 
-若 Lua 仍为 0 分，先保存完整串口日志并按以下顺序定位：
+若 libcbench 仍为 0 分，先保存完整串口日志并按以下顺序定位：
 
-1. 若没有 `found official lua script`，检查官方目录结构和 EXT4 path 探测。
-2. 若脚本已暂存但没有 START marker，检查 `/busybox sh lua_testcode.sh` 的 execve。
-3. 若 Lua testcase 输出 fail，按首个失败脚本补文件、时间、随机数或 math 相关 syscall/ABI。
-4. 若 Lua 卡住或 panic，先收窄到单个脚本资源，再做最小 syscall 修复。
+1. 若没有 `found official libcbench script`，检查官方目录结构和 EXT4 path 探测。
+2. 若脚本已暂存但没有 START marker，检查 `/busybox sh libcbench_testcode.sh` 的 execve。
+3. 若 `libc-bench` 启动后失败，按首个 benchmark 输出定位 pthread、time、regex 或 stdio 缺口。
+4. 若 libcbench 卡住或 panic，先收窄到单个源码 benchmark，再做最小 syscall 修复。
 
 ## 后续提分顺序
 
-1. 根据下一次官方 Lua 日志补首个阻塞 syscall/ABI，保持 `302.0` 基线。
-2. 若 Lua 能稳定得分，继续评估 libcbench；它也是静态脚本组，但运行压力更高。
-3. 再推进 libctest、lmbench、ltp 等更容易暴露动态运行时或多进程语义的问题。
+1. 根据下一次官方 libcbench 日志补首个阻塞 syscall/ABI，保持 `320.0` 基线。
+2. 若 libcbench 能稳定得分，继续评估 lmbench 或 libctest。
+3. 再推进 ltp、iozone、iperf、netperf 等更容易暴露文件系统、网络或多进程语义的问题。
 4. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
 
 ## 本轮暂缓
 
 - 不处理网络、性能、多核和 LoongArch。
-- 不为 Lua 之外的测试组做大范围架构重构。
+- 不为 libcbench 之外的测试组做大范围架构重构。

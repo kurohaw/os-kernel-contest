@@ -162,6 +162,10 @@ pub fn init() {
     installed_groups += lua_groups;
     installed_commands += lua_commands;
 
+    let (libcbench_groups, libcbench_commands) = install_libcbench_groups(&fs, &mut queue);
+    installed_groups += libcbench_groups;
+    installed_commands += libcbench_commands;
+
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
         return;
@@ -399,6 +403,68 @@ fn install_lua_group(
 
     push_queue_record(queue, b'G', &alloc::format!("/{}\t", group_dir));
     push_queue_record(queue, b'X', "lua_testcode.sh");
+    Ok(())
+}
+
+fn install_libcbench_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [
+        ("glibc/libcbench_testcode.sh", "oscomp-libcbench-glibc"),
+        ("musl/libcbench_testcode.sh", "oscomp-libcbench-musl"),
+        ("libcbench_testcode.sh", "oscomp-libcbench"),
+    ];
+
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (script_path, group_dir) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_libcbench_group(fs, script_path, group_dir, queue) {
+            Ok(()) => {
+                println!("oscomp: found official libcbench script {}", script_path);
+                installed_groups += 1;
+                installed_commands += 1;
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (installed_groups, installed_commands)
+}
+
+fn install_libcbench_group(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    queue: &mut Vec<u8>,
+) -> Result<(), &'static str> {
+    let source_dir = parent_path(script_path);
+    let busybox_path = resolve_path(&source_dir, "busybox");
+    let bench_path = resolve_path(&source_dir, "libc-bench");
+    let script = read_file(fs, script_path)?;
+    let busybox = read_file(fs, &busybox_path)?;
+    let bench = read_file(fs, &bench_path)?;
+    if busybox.get(..4) != Some(b"\x7fELF") {
+        return Err("busybox is not an ELF file");
+    }
+    if bench.get(..4) != Some(b"\x7fELF") {
+        return Err("libc-bench is not an ELF file");
+    }
+
+    install_tmpfs_file_path("busybox", &busybox)?;
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_file_path(&alloc::format!("{}/busybox", group_dir), &busybox)?;
+    install_tmpfs_file_path(&alloc::format!("{}/libc-bench", group_dir), &bench)?;
+    install_tmpfs_file_path(
+        &alloc::format!("{}/libcbench_testcode.sh", group_dir),
+        &script,
+    )?;
+
+    push_queue_record(queue, b'G', &alloc::format!("/{}\t", group_dir));
+    push_queue_record(queue, b'X', "libcbench_testcode.sh");
     Ok(())
 }
 

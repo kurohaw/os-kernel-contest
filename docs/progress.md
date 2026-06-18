@@ -8,10 +8,40 @@
 | 当前开发分支 | `codex/titanix-architecture`，完成后推送到远端 `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 保持 RISC-V `302.0` 基线，新增 Lua 组 staging |
-| 当前提交 | 在 `aa1a844` 之后追加 Lua 官方脚本、资源和 ELF 暂存 |
-| 最新可见线上结果 | 2026-06-18 08:55:11，`Accepted / 302.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49 |
+| 当前里程碑 | 保持 RISC-V `320.0` 基线，新增 libcbench 组 staging |
+| 当前提交 | 在 `74f0da2` 之后追加 libcbench 官方脚本和静态 ELF 暂存 |
+| 最新可见线上结果 | 2026-06-18 09:16:08，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-18 320 分基线与 libcbench staging
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-18 09:16:08 提交评测为
+  `Accepted / 320.0`。
+- RISC-V basic 保持满分：glibc-rv `102/102`，musl-rv `102/102`。
+- RISC-V BusyBox 保持得分：glibc-rv `49/49`，musl-rv `49/49`。
+- RISC-V Lua 已开始得分：glibc-rv `9/9`，musl-rv `9/9`。
+
+### 当前修复
+
+- `oscomp` 新增 libcbench 组扫描顺序：`glibc/libcbench_testcode.sh`、
+  `musl/libcbench_testcode.sh`、根目录 `libcbench_testcode.sh`。
+- 每个 libcbench 组会暂存 `busybox`、静态 `libc-bench` 和官方
+  `libcbench_testcode.sh` 到独立 tmpfs 工作目录。
+- libcbench 队列沿用现有 `G/X` 协议，由官方脚本自身输出 START/END marker。
+- 仅新增 libcbench staging，不改 runner 协议，不改 basic/BusyBox/Lua 执行顺序。
+
+### 本地验证
+
+- `make all RUST_TOOLCHAIN=nightly-2025-02-18`：通过。
+- 无测试盘 QEMU：输出 `!TEST FINISH!` 并主动关机。
+- 双组官方布局 basic 镜像：glibc、musl 均完整 START/END，官方 parser 得到
+  `102/102`。
+- libcbench 官方布局夹具盘：识别 `glibc/libcbench_testcode.sh` 和
+  `musl/libcbench_testcode.sh`，暂存 2 个 libcbench 测试组并主动关机。
+- 本机 `nightly-2025-02-01` 安装不完整，缺 RISC-V target 和 rustfmt 动态库；
+  本地验证继续使用已完整安装的 `nightly-2025-02-18`。Makefile 默认官方工具链未改。
 
 ## 2026-06-18 302 分基线与 Lua staging
 

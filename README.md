@@ -19,14 +19,20 @@
 - 动态解释器缺失或无效时向 `execve` 返回错误，不再触发 loader panic。
 - basic 的 `mount`、`umount` 已恢复执行，线上 RISC-V basic 为 `102 + 102`。
 - BusyBox 已按官方脚本暂存并执行，线上 RISC-V BusyBox 为 `49 + 49`。
-- Lua 官方脚本、`lua`、`busybox` 和 `.lua` 资源已接入 tmpfs staging，等待下一次线上确认。
+- Lua 官方脚本、`lua`、`busybox` 和 `.lua` 资源已接入 tmpfs staging，线上 RISC-V
+  Lua 为 `9 + 9`。
+- libcbench 官方脚本、`busybox` 和静态 `libc-bench` 已接入 tmpfs staging，等待下一次线上确认。
 - 本地官方 `test_runner.py` 对双组 basic 的解析结果为 `102/102`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果为 2026-06-18 08:55:11：编译状态 `Accepted`，总分
+官方页面最后可见结果为 2026-06-18 09:16:08：编译状态 `Accepted`，总分
+`320.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc
+`49`、musl `49`，Lua 为 glibc `9`、musl `9`。当前新增 libcbench staging，
+下一次评测重点看 libcbench 是否开始得分并保持已有分数不回退。
+
+上一轮可见结果为 2026-06-18 08:55:11：编译状态 `Accepted`，总分
 `302.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc
-`49`、musl `49`。当前新增 Lua staging，下一次评测重点看 Lua 是否开始得分并
-保持 basic/BusyBox 不回退。
+`49`、musl `49`。
 
 ## 构建
 
