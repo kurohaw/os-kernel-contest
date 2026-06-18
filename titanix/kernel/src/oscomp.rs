@@ -166,6 +166,10 @@ pub fn init() {
     installed_groups += libcbench_groups;
     installed_commands += libcbench_commands;
 
+    let (iozone_groups, iozone_commands) = install_iozone_groups(&fs, &mut queue);
+    installed_groups += iozone_groups;
+    installed_commands += iozone_commands;
+
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
         return;
@@ -465,6 +469,79 @@ fn install_libcbench_group(
 
     push_queue_record(queue, b'G', &alloc::format!("/{}\t", group_dir));
     push_queue_record(queue, b'X', "libcbench_testcode.sh");
+    Ok(())
+}
+
+fn install_iozone_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [
+        (
+            "glibc/iozone_testcode.sh",
+            "oscomp-iozone-glibc",
+            BasicFlavor::Glibc,
+        ),
+        (
+            "musl/iozone_testcode.sh",
+            "oscomp-iozone-musl",
+            BasicFlavor::Musl,
+        ),
+        ("iozone_testcode.sh", "oscomp-iozone", BasicFlavor::Root),
+    ];
+
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (script_path, group_dir, flavor) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_iozone_group(fs, script_path, group_dir, flavor, queue) {
+            Ok(()) => {
+                println!("oscomp: found official iozone script {}", script_path);
+                installed_groups += 1;
+                installed_commands += 1;
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (installed_groups, installed_commands)
+}
+
+fn install_iozone_group(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    flavor: BasicFlavor,
+    queue: &mut Vec<u8>,
+) -> Result<(), &'static str> {
+    let source_dir = parent_path(script_path);
+    let busybox_path = resolve_path(&source_dir, "busybox");
+    let iozone_path = resolve_path(&source_dir, "iozone");
+    let script = read_file(fs, script_path)?;
+    let busybox = read_file(fs, &busybox_path)?;
+    let iozone = read_file(fs, &iozone_path)?;
+    if busybox.get(..4) != Some(b"\x7fELF") {
+        return Err("busybox is not an ELF file");
+    }
+    if iozone.get(..4) != Some(b"\x7fELF") {
+        return Err("iozone is not an ELF file");
+    }
+
+    install_tmpfs_file_path("busybox", &busybox)?;
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_file_path(&alloc::format!("{}/busybox", group_dir), &busybox)?;
+    install_tmpfs_file_path(&alloc::format!("{}/iozone", group_dir), &iozone)?;
+    install_tmpfs_file_path(&alloc::format!("{}/iozone_testcode.sh", group_dir), &script)?;
+
+    if let Some(interp) = elf_interp_path(&iozone)? {
+        println!("oscomp: {} PT_INTERP {}", group_dir, interp);
+        install_group_runtime(fs, flavor, group_dir, &[interp])?;
+    }
+
+    push_queue_record(queue, b'G', &alloc::format!("/{}\t", group_dir));
+    push_queue_record(queue, b'X', "iozone_testcode.sh");
     Ok(())
 }
 
