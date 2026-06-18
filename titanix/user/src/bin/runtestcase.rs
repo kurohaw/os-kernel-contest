@@ -70,7 +70,10 @@ fn enter_group(record: &[u8]) {
         println!("oscomp: cannot enter group {}", path);
         return;
     }
-    if let Ok(marker) = core::str::from_utf8(marker) {
+    if !marker.is_empty() {
+        let Ok(marker) = core::str::from_utf8(marker) else {
+            return;
+        };
         println!("{}", marker);
     }
 }

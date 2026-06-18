@@ -27,7 +27,7 @@ const EXT4_MODE_TYPE_MASK: u16 = 0xf000;
 const MAX_BLOCK_SIZE: usize = 4096;
 const INODE_SIZE: usize = 160;
 const GROUP_DESC_SIZE: usize = 64;
-const MAX_TEST_FILE_SIZE: usize = 4 * 1024 * 1024;
+const MAX_TEST_FILE_SIZE: usize = 16 * 1024 * 1024;
 const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
@@ -142,8 +142,12 @@ pub fn init() {
         }
     }
 
+    let (busybox_groups, busybox_commands) = install_busybox_groups(&fs, &mut queue);
+    installed_groups += busybox_groups;
+    installed_commands += busybox_commands;
+
     if installed_groups == 0 {
-        println!("oscomp: official basic script not found or no runnable group");
+        println!("oscomp: official script not found or no runnable group");
         return;
     }
 
@@ -152,7 +156,7 @@ pub fn init() {
         return;
     }
     println!(
-        "oscomp: staged {} basic groups with {} commands",
+        "oscomp: staged {} test groups with {} commands",
         installed_groups, installed_commands
     );
 }
@@ -254,6 +258,66 @@ fn find_commands(
 
 fn should_skip_basic_command(_name: &str) -> bool {
     false
+}
+
+fn install_busybox_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [
+        ("glibc/busybox_testcode.sh", "oscomp-busybox-glibc"),
+        ("musl/busybox_testcode.sh", "oscomp-busybox-musl"),
+        ("busybox_testcode.sh", "oscomp-busybox"),
+    ];
+
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (script_path, group_dir) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_busybox_group(fs, script_path, group_dir, queue) {
+            Ok(()) => {
+                println!("oscomp: found official busybox script {}", script_path);
+                installed_groups += 1;
+                installed_commands += 1;
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (installed_groups, installed_commands)
+}
+
+fn install_busybox_group(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    queue: &mut Vec<u8>,
+) -> Result<(), &'static str> {
+    let source_dir = parent_path(script_path);
+    let busybox_path = resolve_path(&source_dir, "busybox");
+    let command_path = resolve_path(&source_dir, "busybox_cmd.txt");
+    let script = read_file(fs, script_path)?;
+    let commands = read_file(fs, &command_path)?;
+    let busybox = read_file(fs, &busybox_path)?;
+    if busybox.get(..4) != Some(b"\x7fELF") {
+        return Err("busybox is not an ELF file");
+    }
+
+    install_tmpfs_file_path("busybox", &busybox)?;
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_file_path(&alloc::format!("{}/busybox", group_dir), &busybox)?;
+    install_tmpfs_file_path(&alloc::format!("{}/ls", group_dir), &busybox)?;
+    install_tmpfs_file_path(
+        &alloc::format!("{}/busybox_testcode.sh", group_dir),
+        &script,
+    )?;
+    install_tmpfs_file_path(&alloc::format!("{}/busybox_cmd.txt", group_dir), &commands)?;
+
+    push_queue_record(queue, b'G', &alloc::format!("/{}\t", group_dir));
+    push_queue_record(queue, b'X', "busybox_testcode.sh");
+    Ok(())
 }
 
 fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), &'static str> {
