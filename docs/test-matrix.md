@@ -4,7 +4,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并得分 | 2026-06-18 09:16:08，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9 |
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-18 09:33:47，`Accepted / 326.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=6 |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | RISC-V Lua | 通过并得分 | 线上 glibc-rv=9、musl-rv=9 |
@@ -38,7 +38,8 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 待线上确认 | 本地官方布局夹具盘识别 glibc/musl `libcbench_testcode.sh`，暂存 2 组并主动关机；未缓存真实 libc-bench 二进制，真实得分等线上评测 |
+| libcbench staging | 通过并部分得分 | 线上 glibc-rv=6，musl-rv=0；当前继续补 futex/pthread 兼容 |
+| futex bitset | 待线上确认 | 本地构建和 basic 回归通过；`WAIT_BITSET/WAKE_BITSET` 已按普通 wait/wake 处理，未知 futex op 不再 panic |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
 未直接运行 `zhouzhouyi/os-contest:20260510` Docker 镜像，因为当前机器没有

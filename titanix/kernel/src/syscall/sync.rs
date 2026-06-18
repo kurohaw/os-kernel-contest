@@ -17,9 +17,11 @@ const FUTEX_WAIT: u32 = 0;
 const FUTEX_WAKE: u32 = 1;
 const FUTEX_REQUEUE: u32 = 3;
 const FUTEX_CMP_REQUEUE: u32 = 4;
+const FUTEX_WAIT_BITSET: u32 = 9;
+const FUTEX_WAKE_BITSET: u32 = 10;
 const FUTEX_PRIVATE_FLAG: u32 = 128;
 #[allow(unused)]
-const FUTEX_REAL_TIME: u32 = 256;
+const FUTEX_CLOCK_REALTIME: u32 = 256;
 
 pub async fn sys_futex(
     uaddr: usize,
@@ -30,13 +32,13 @@ pub async fn sys_futex(
     val3: u32,
 ) -> SyscallRet {
     stack_trace!();
-    futex_op &= !FUTEX_PRIVATE_FLAG;
+    futex_op &= !(FUTEX_PRIVATE_FLAG | FUTEX_CLOCK_REALTIME);
     info!(
         "[sys_futex] uaddr {:#x}, futex_op {:#x}, val {:#x}, timeout_ptr(or val2) {:#x}, uaddr2 {:#x}, val3 {:#x}",
         uaddr, futex_op, val, timeout_ptr, uaddr2, val3
     );
     match futex_op {
-        FUTEX_WAIT => {
+        FUTEX_WAIT | FUTEX_WAIT_BITSET => {
             let _sum_guard = SumGuard::new();
             UserCheck::new()
                 .check_readable_slice(uaddr as *const u8, core::mem::size_of::<usize>())?;
@@ -66,7 +68,7 @@ pub async fn sys_futex(
                 return Err(SyscallErr::EAGAIN);
             }
         }
-        FUTEX_WAKE => {
+        FUTEX_WAKE | FUTEX_WAKE_BITSET => {
             let ret = futex_wake(uaddr, val);
             log::info!("[sys_futex] futex wake number {:?}", ret);
             // Yield and let the waiter to fetch the lock
@@ -97,7 +99,8 @@ pub async fn sys_futex(
             }));
         }
         _ => {
-            panic!("Unplemented futex op, {}", futex_op)
+            log::warn!("[sys_futex] unsupported futex op {}", futex_op);
+            return Err(SyscallErr::ENOSYS);
         }
     }
     Ok(0)

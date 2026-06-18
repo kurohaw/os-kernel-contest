@@ -4,14 +4,14 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-18 09:16:08，`Accepted / 320.0` |
-| 线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9` |
-| 当前修复方向 | 新增 libcbench 脚本型测试组 staging，保持 basic/BusyBox/Lua 不回退 |
+| 最新可见官方结果 | 2026-06-18 09:33:47，`Accepted / 326.0` |
+| 线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `6` |
+| 当前修复方向 | 补 futex bitset 和未知 op 降级，继续推进 libcbench pthread/futex 段 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，真实 libc-bench 运行待线上确认 |
 | 当前已知边界 | LoongArch 占位 ELF；libcbench、lmbench、ltp、网络/性能测试仍未得分 |
 
-这轮目标是保持 RISC-V `320.0` 基线，同时让 libcbench 组开始产生线上反馈或得分。
+这轮目标是保持 RISC-V `326.0` 基线，同时让 libcbench 继续进分，并尽量让 musl-rv libcbench 也跑到。
 
 ## 本轮提交门禁
 
@@ -28,21 +28,21 @@
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
-- libcbench glibc-rv 或 musl-rv 至少开始输出官方 `libcbench` START/END。
-- 如果 libcbench 不得分，串口应能看到 `oscomp: found official libcbench script ...`，
-  用于区分 staging 问题和 libc-bench 运行期 syscall/线程问题。
+- libcbench glibc-rv 不低于 `6`。
+- libcbench musl-rv 尽量不再是 `0`；若仍为 0，串口应能显示 glibc 组后续失败点或 musl 组入口。
+- 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 
-若 libcbench 仍为 0 分，先保存完整串口日志并按以下顺序定位：
+若 libcbench 不再进分，先保存完整串口日志并按以下顺序定位：
 
-1. 若没有 `found official libcbench script`，检查官方目录结构和 EXT4 path 探测。
-2. 若脚本已暂存但没有 START marker，检查 `/busybox sh libcbench_testcode.sh` 的 execve。
-3. 若 `libc-bench` 启动后失败，按首个 benchmark 输出定位 pthread、time、regex 或 stdio 缺口。
+1. 若只到第 6 个 benchmark，优先看 `b_malloc_thread_stress` 的 clone/futex 日志。
+2. 若 glibc 组跑完但 musl 仍为 0，检查 musl `libc-bench` 的 syscall 差异。
+3. 若出现 unsupported futex op，按日志补最小 op 语义。
 4. 若 libcbench 卡住或 panic，先收窄到单个源码 benchmark，再做最小 syscall 修复。
 
 ## 后续提分顺序
 
-1. 根据下一次官方 libcbench 日志补首个阻塞 syscall/ABI，保持 `320.0` 基线。
+1. 根据下一次官方 libcbench 日志补首个阻塞 syscall/ABI，保持 `326.0` 基线。
 2. 若 libcbench 能稳定得分，继续评估 lmbench 或 libctest。
 3. 再推进 ltp、iozone、iperf、netperf 等更容易暴露文件系统、网络或多进程语义的问题。
 4. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。

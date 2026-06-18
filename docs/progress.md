@@ -8,10 +8,35 @@
 | 当前开发分支 | `codex/titanix-architecture`，完成后推送到远端 `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 保持 RISC-V `320.0` 基线，新增 libcbench 组 staging |
-| 当前提交 | 在 `74f0da2` 之后追加 libcbench 官方脚本和静态 ELF 暂存 |
-| 最新可见线上结果 | 2026-06-18 09:16:08，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9 |
+| 当前里程碑 | 保持 RISC-V `326.0` 基线，继续推进 libcbench pthread/futex 段 |
+| 当前提交 | 在 `048e637` 之后追加 futex bitset 兼容修复 |
+| 最新可见线上结果 | 2026-06-18 09:33:47，`Accepted / 326.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=6 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-18 326 分基线与 futex bitset 修复
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-18 09:33:47 提交评测为
+  `Accepted / 326.0`。
+- RISC-V basic、BusyBox、Lua 均未回退。
+- libcbench glibc-rv 从 0 提升到 `6.0`，musl-rv 仍为 0。
+- 结合 libc-bench 顺序，当前很可能已经跑过前 6 个 malloc benchmark，后续阻塞点
+  落在 malloc 线程压力或 pthread/futex 相关路径。
+
+### 当前修复
+
+- futex syscall 现在会同时清除 `FUTEX_PRIVATE_FLAG` 和 `FUTEX_CLOCK_REALTIME`。
+- 新增 `FUTEX_WAIT_BITSET` 与 `FUTEX_WAKE_BITSET`，按普通 wait/wake 路径处理。
+- 未支持的 futex op 改为返回 `ENOSYS`，避免直接 panic 中断整轮测试。
+
+### 本地验证
+
+- `cargo +nightly-2025-02-18 fmt --manifest-path titanix/kernel/Cargo.toml --check`：通过。
+- `make all RUST_TOOLCHAIN=nightly-2025-02-18`：通过。
+- 无测试盘 QEMU：输出 `!TEST FINISH!` 并主动关机。
+- 双组官方布局 basic 镜像：官方 parser 得到 `102/102`。
+- libcbench 官方布局夹具盘：识别 glibc/musl `libcbench_testcode.sh`，暂存 2 组并主动关机。
 
 ## 2026-06-18 320 分基线与 libcbench staging
 
