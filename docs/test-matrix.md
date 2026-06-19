@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 编译失败 | 2026-06-19 16:31:18，`Compile Error / 0.00`；`managed` crate 在 `SWTC/vendor` directory source 中未被 Cargo 找到 |
-| 上一条通过基线 | 通过并得分 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；basic=204、BusyBox=98、Lua=18、libcbench=57.2007905583205、lmbench=0 |
+| 上一条通过基线 | 通过并得分 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；basic=204、BusyBox=98、Lua=18、libcbench=57.2007905583205 |
 | 上一条编译错误 | 已修复 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`SWTC/vendor/allocator-api2-0.2.21` checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 通过并得分 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
@@ -46,9 +46,9 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=30.07126205049758、musl-rv=27.166961800614022 |
+| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=30.12274508733359、musl-rv=27.07823396849846 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
-| lmbench-lite staging | 本地探针通过 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open` |
+| lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；本轮改用官方 marker、`lat_syscall` argv0 和 readlinkat 长度返回 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 

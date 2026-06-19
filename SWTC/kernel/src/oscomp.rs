@@ -542,6 +542,20 @@ fn install_lmbench_group(
     }
 
     let script = read_file(fs, script_path)?;
+    let (start_marker, end_marker) = match core::str::from_utf8(&script) {
+        Ok(script) => (
+            find_group_marker(script, "START").unwrap_or_else(|| {
+                alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name)
+            }),
+            find_group_marker(script, "END").unwrap_or_else(|| {
+                alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name)
+            }),
+        ),
+        Err(_) => (
+            alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name),
+            alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
+        ),
+    };
     install_tmpfs_dir_path(group_dir)?;
     install_tmpfs_file_path(
         &alloc::format!("{}/lmbench_testcode.sh", group_dir),
@@ -563,20 +577,12 @@ fn install_lmbench_group(
     push_queue_record(
         queue,
         b'G',
-        &alloc::format!(
-            "/{}\t#### OS COMP TEST GROUP START {} ####",
-            group_dir,
-            marker_name
-        ),
+        &alloc::format!("/{}\t{}", group_dir, start_marker),
     );
     for args in LMBENCH_LITE_COMMANDS {
         push_argv_record(queue, LMBENCH_TIMEOUT_MS, "lmbench_all", args);
     }
-    push_queue_record(
-        queue,
-        b'E',
-        &alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
-    );
+    push_queue_record(queue, b'E', &end_marker);
     Ok(LMBENCH_LITE_COMMANDS.len())
 }
 

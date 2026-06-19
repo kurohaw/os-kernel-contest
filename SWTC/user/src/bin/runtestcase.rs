@@ -64,7 +64,10 @@ fn wait_for_child(pid: isize, timeout_ms: Option<usize>) {
             return;
         }
         if elapsed >= timeout_ms {
-            println!("oscomp: timeout after {} ms, killing pid {}", timeout_ms, pid);
+            println!(
+                "oscomp: timeout after {} ms, killing pid {}",
+                timeout_ms, pid
+            );
             let result = kill(pid, SIGKILL);
             if result < 0 {
                 println!("oscomp: kill {} failed: {}", pid, result);
@@ -85,14 +88,26 @@ fn wait_for_child(pid: isize, timeout_ms: Option<usize>) {
     }
 }
 
-fn run_test_with_args(name: &[u8], args: &[&[u8]], timeout_ms: Option<usize>) {
+fn run_test_with_argv(
+    name: &[u8],
+    argv0: Option<&[u8]>,
+    args: &[&[u8]],
+    timeout_ms: Option<usize>,
+) {
     let mut path = Vec::new();
     path.extend_from_slice(b"./");
     path.extend_from_slice(name);
     path.push(0);
 
     let mut argv_buffers = Vec::new();
-    argv_buffers.push(path.clone());
+    if let Some(argv0) = argv0 {
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(argv0);
+        buffer.push(0);
+        argv_buffers.push(buffer);
+    } else {
+        argv_buffers.push(path.clone());
+    }
     for arg in args {
         let mut buffer = Vec::new();
         buffer.extend_from_slice(arg);
@@ -122,7 +137,7 @@ fn run_test_with_args(name: &[u8], args: &[&[u8]], timeout_ms: Option<usize>) {
 }
 
 fn run_test(name: &[u8]) {
-    run_test_with_args(name, &[], None);
+    run_test_with_argv(name, None, &[], None);
 }
 
 fn parse_usize(bytes: &[u8]) -> Option<usize> {
@@ -149,8 +164,13 @@ fn run_argv_record(record: &[u8]) {
         println!("oscomp: malformed argv executable record");
         return;
     };
-    let args: Vec<&[u8]> = fields.collect();
-    run_test_with_args(name, &args, Some(timeout));
+    let mut args: Vec<&[u8]> = fields.collect();
+    let argv0 = if name == b"lmbench_all" && !args.is_empty() {
+        Some(args.remove(0))
+    } else {
+        None
+    };
+    run_test_with_argv(name, argv0, &args, Some(timeout));
 }
 
 fn enter_group(record: &[u8]) {

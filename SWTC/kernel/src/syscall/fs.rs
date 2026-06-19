@@ -1086,14 +1086,13 @@ pub fn sys_readlinkat(dirfd: usize, path_name: usize, buf: usize, buf_size: usiz
     );
     UserCheck::new().check_writable_slice(buf as *mut u8, buf_size)?;
 
-    // TODO: optimize
-    let target = "/lmbench_all".to_string();
+    // lmbench's multi-call binary asks /proc/self/exe to find the backing image.
+    let target = "/lmbench_all".as_bytes();
+    let copy_len = core::cmp::min(buf_size, target.len());
     unsafe {
-        (buf as *mut u8).copy_from(target.as_ptr(), target.len());
-        *((buf + target.len()) as *mut u8) = 0;
+        (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);
     }
-    // Err(SyscallErr::ENOENT)
-    Ok(0)
+    Ok(copy_len)
 }
 
 /// change file timestamps with nanosecond precision

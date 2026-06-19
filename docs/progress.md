@@ -8,13 +8,34 @@
 | 当前开发分支 | `main`，已快进同步 `gitlab/main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 修复 `managed` vendored crate 离线解析 Compile Error |
-| 当前提交 | 远端基线 `e85c3ac`，工作区追加 `managed` path/patch 修复 |
-| 最新可见线上结果 | 2026-06-19 16:31:18，`Compile Error / 0.00`；内核 Cargo 离线解析时报 `no matching package named managed found` |
-| 上一条通过基线 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
+| 当前里程碑 | `lmbench-lite` 线上 0 分后的 marker、argv0 与 readlinkat 修正 |
+| 当前提交 | 已快进同步 GitLab `3e465b4`，工作区继续修正 lmbench 执行入口 |
+| 最新可见线上结果 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；lmbench 仍为 0，现有 8 组未明显回退 |
+| 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；basic=204、BusyBox=98、Lua=18、libcbench=57.2007905583205 |
 | 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-19 lmbench-lite argv0 修正
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-19 17:00:35 提交评测为
+  `Accepted / 377.200790558321`。
+- RISC-V basic、BusyBox、Lua 仍保持既有得分。
+- libcbench 为 glibc-rv `30.12274508733359`、musl-rv
+  `27.07823396849846`，总计 `57.2007905583205`。
+- `lmbench` 仍为 0，说明 `e85c3ac` 的第一版 `lmbench-lite` 没有被官方解析为
+  有效得分，但也没有破坏现有 377 基线。
+
+### 当前修复
+
+- `lmbench` START/END marker 改为优先使用官方 `lmbench_testcode.sh` 内的真实
+  marker，避免手写组名与官方 parser 不一致。
+- `runtestcase` 对 `lmbench_all` 使用队列第一个参数作为 `argv[0]`，让
+  多调用二进制以 `lat_syscall` 名义运行。
+- `readlinkat` 保持返回 `/lmbench_all` 的兼容路径，但返回 Linux 语义的实际
+  字节数，避免调用方按返回值得到空路径。
 
 ## 2026-06-19 managed vendor 离线解析错误
 

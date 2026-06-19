@@ -4,20 +4,21 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-19 16:31:18，`Compile Error / 0.00` |
-| 当前直接失败原因 | 内核 Cargo 离线解析 `managed` 时，在 `SWTC/vendor` directory source 中报 `no matching package named managed found` |
-| 上一条通过基线 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116` |
-| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2382238511116` |
+| 最新可见官方结果 | 2026-06-19 17:00:35，`Accepted / 377.200790558321` |
+| 当前直接失败原因 | `lmbench-lite` 已不影响既有基线，但 lmbench 仍为 0，优先修 marker、argv0 和 readlinkat |
+| 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321` |
+| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2007905583205` |
 | 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；vendor checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187` |
-| 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.07126205049758`、musl-rv `27.166961800614022` |
-| 当前修复方向 | 先恢复 Compile 阶段通过；将 `managed` 统一改为本地 path/patch 依赖 |
+| 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.12274508733359`、musl-rv `27.07823396849846` |
+| 当前修复方向 | 保持现有 377 基线，只修 `lmbench-lite` 执行入口与评分 marker |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮目标是先恢复官方 Compile 阶段通过，不继续混入运行期 ABI 或新增测试组。
-`lmbench-lite` 改动已经在 `e85c3ac` 中提交；本轮只处理 `managed` 依赖解析。
+这轮目标是在不扩大测试范围的前提下修正 `lmbench-lite`：继续只执行
+`lat_syscall null/read/write/stat/fstat/open`，但改为使用官方脚本 marker、
+`lat_syscall` argv0 和正确的 `readlinkat` 返回长度。
 
 ## 本轮提交门禁
 
@@ -25,7 +26,7 @@
 2. 隐藏文件过滤后的干净导出仍能恢复 Cargo 配置并构建。
 3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
 4. `SWTC/kernel/Cargo.lock` 中 `managed` 不再记录 registry source/checksum。
-5. 官方完整参数下，无盘和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
+5. 官方完整参数下，无盘、basic 和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
 6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
@@ -36,8 +37,8 @@
 - RISC-V Lua 保持 `18/18`。
 - libcbench glibc-rv 不低于 `30.07126205049758` 附近。
 - libcbench musl-rv 不低于 `27.166961800614022` 附近。
-- 新增 `lmbench-glibc`、`lmbench-musl` START/END；若仍为 0，也必须有明确
-  execve 失败或 timeout 日志。
+- 新增 lmbench START/END 使用官方脚本 marker；若仍为 0，也必须有明确
+  execve 失败、readlinkat 异常或 timeout 日志。
 - `lmbench-lite` 不能把现有 8 组或 libcbench 拉回 0。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
