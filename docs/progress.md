@@ -4,16 +4,35 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-18 |
+| 当前日期 | 2026-06-19 |
 | 当前开发分支 | `codex/titanix-architecture`，完成后推送到远端 `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 保持 RISC-V `377.3228370332187` 基线，继续推进 iozone |
-| 当前提交 | 在 `9d1944f` 之后追加 iozone staging |
-| 最新可见线上结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
+| 当前里程碑 | 撤回 iozone 回归，优先恢复 RISC-V `377.3228370332187` 基线 |
+| 当前提交 | 撤回 `b10e9f0` 的 iozone staging |
+| 最新可见线上结果 | 2026-06-18 16:00:21，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench=0；iozone=0 |
+| 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
-## 2026-06-18 377 分基线与 iozone staging
+## 2026-06-19 iozone 回归止血
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-18 16:00:21 提交评测为
+  `Accepted / 320.0`。
+- RISC-V basic、BusyBox、Lua 保持原分数。
+- libcbench 从上一条高分结果的 `57.32283703321875` 总分回退为 0，iozone 仍为 0。
+- 该回归发生在 `b10e9f0 feat: stage iozone test group` 之后，说明 iozone staging
+  当前不能直接进入主线。
+
+### 当前修复
+
+- 撤回 `b10e9f0` 中新增的 iozone 组扫描、暂存和运行时复制逻辑。
+- 保留已线上验证有增益的 libcbench futex bitset 修复路径。
+- 下一次评测先确认 libcbench 是否回到 2026-06-18 09:46:55 的高分线，再重新拆分
+  iozone 为更小的诊断提交。
+
+## 2026-06-18 377 分 libcbench 高分基线
 
 ### 线上证据
 
@@ -21,25 +40,7 @@
   `Accepted / 377.3228370332187`。
 - RISC-V basic、BusyBox、Lua 均未回退。
 - libcbench 已由上一轮 `6.0` 提升到 glibc-rv `30.15271484677692`、
-  musl-rv `27.170122186441827`，说明 futex bitset 兼容修复已经带来新增得分。
-
-### 当前修复
-
-- `oscomp` 新增 iozone 组扫描顺序：`glibc/iozone_testcode.sh`、
-  `musl/iozone_testcode.sh`、根目录 `iozone_testcode.sh`。
-- 每个 iozone 组会暂存 `busybox`、`iozone` 和官方 `iozone_testcode.sh`
-  到独立 tmpfs 工作目录。
-- 如果 `iozone` 是动态 ELF，会读取真实 `PT_INTERP` 并在组目录内暂存对应
-  loader/libc/libm，避免复用全局运行时污染其他组。
-- iozone 队列沿用现有 `G/X` 协议，不改 basic、BusyBox、Lua、libcbench 的执行顺序。
-
-### 本地验证
-
-- `cargo +nightly-2025-02-18 fmt --manifest-path titanix/kernel/Cargo.toml --check`：通过。
-- `make all RUST_TOOLCHAIN=nightly-2025-02-18`：通过。
-- 无测试盘 QEMU：输出 `!TEST FINISH!` 并主动关机。
-- 双组官方布局 basic 镜像：官方 parser 得到 `102/102`。
-- iozone 官方脚本夹具盘：识别 glibc/musl `iozone_testcode.sh`，暂存 2 组并主动关机。
+  musl-rv `27.170122186441827`，说明 futex bitset 兼容修复带来新增得分。
 
 ## 2026-06-18 326 分基线与 futex bitset 修复
 

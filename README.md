@@ -22,21 +22,26 @@
 - Lua 官方脚本、`lua`、`busybox` 和 `.lua` 资源已接入 tmpfs staging，线上 RISC-V
   Lua 为 `9 + 9`。
 - libcbench 官方脚本、`busybox` 和静态 `libc-bench` 已接入 tmpfs staging，线上
-  glibc-rv 已开始得分。
+  glibc-rv、musl-rv 均已开始得分。
 - futex 已补 `WAIT_BITSET`/`WAKE_BITSET`，未知 futex op 返回错误而不是 panic，
   用于推进 libcbench pthread 段。
-- iozone 官方脚本和 `iozone` 已接入 tmpfs staging，并为动态 ELF 暂存组内运行时，
-  等待下一次线上确认。
+- 上一次 iozone staging 尝试导致线上分数回退，当前已撤回该接入，优先恢复
+  libcbench 得分基线。
 - 本地官方 `test_runner.py` 对双组 basic 的解析结果为 `102/102`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果为 2026-06-18 09:46:55：编译状态 `Accepted`，总分
+官方页面最后可见结果为 2026-06-18 16:00:21：编译状态 `Accepted`，总分
+`320.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc `49`、
+musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 和 iozone 均为 0。该结果来自
+iozone staging 尝试后的回归，本轮已撤回 iozone 接入，下一次评测优先确认
+libcbench 回到上一条有效得分线。
+
+上一条高分可见结果为 2026-06-18 09:46:55：编译状态 `Accepted`，总分
 `377.3228370332187`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为
 glibc `49`、musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 为 glibc
-`30.15271484677692`、musl `27.170122186441827`。当前新增 iozone staging，
-下一次评测重点看 iozone 是否开始得分并保持已有分数不回退。
+`30.15271484677692`、musl `27.170122186441827`。
 
-上一轮可见结果为 2026-06-18 09:33:47：编译状态 `Accepted`，总分
+更早一轮可见结果为 2026-06-18 09:33:47：编译状态 `Accepted`，总分
 `326.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc
 `49`、musl `49`，Lua 为 glibc `9`、musl `9`，libcbench glibc 为 `6`。当前修复
 futex bitset 兼容性，下一次评测重点看 libcbench 是否继续进分并保持已有分数不回退。
