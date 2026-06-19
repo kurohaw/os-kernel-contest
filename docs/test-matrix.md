@@ -4,15 +4,16 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并恢复 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
+| 官方页面最后可见结果 | 编译失败 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`SWTC/vendor/allocator-api2-0.2.21` checksum mismatch |
+| 上一条通过基线 | 通过并恢复 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
 | 上一条高分结果 | 通过并得分 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | RISC-V Lua | 通过并得分 | 线上 glibc-rv=9、musl-rv=9 |
-| 根目录 `make all` | 通过 | 离线构建，生成 `kernel-rv`、`kernel-la` |
+| 根目录 `make all` | 通过 | 修复 `allocator-api2` checksum 后，强制离线构建生成 `kernel-rv`、`kernel-la` |
 | 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-01`，构建日志无联网安装请求 |
-| 隐藏文件过滤后 vendor 校验 | 通过 | 删除全部隐藏文件后，53 个 manifest、0 个问题 |
+| vendor checksum | 已本地修复 | `tools/vendor_checksums.py --check` 为 53 个 manifest、0 个问题 |
 | 隐藏文件过滤后构建 | 通过 | 干净导出删除全部隐藏文件后可自动恢复并全量构建 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
 | 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；SWTC 启动并主动关机 |

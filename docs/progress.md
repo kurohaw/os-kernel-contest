@@ -5,14 +5,42 @@
 | 项目 | 内容 |
 |---|---|
 | 当前日期 | 2026-06-19 |
-| 当前开发分支 | `codex/swtc-architecture`，完成后推送到远端 `main` |
+| 当前开发分支 | `main`，已快进同步 `gitlab/main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | RISC-V `377.02594320298937` 基线已恢复，后续小步推进 iozone/lmbench/libctest |
-| 当前提交 | `cead874` 撤回 iozone staging 后已线上确认恢复 |
-| 最新可见线上结果 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
+| 当前里程碑 | 修复 `SWTC/` 重命名后的 vendor checksum Compile Error，恢复官方编译 |
+| 当前提交 | 远端基线 `ea2b5ac`，本地追加 `allocator-api2` checksum 修复 |
+| 最新可见线上结果 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch |
+| 上一条通过基线 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-19 SWTC vendor checksum 编译错误
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-19 14:51:46 提交评测为
+  `Compile Error / 0.00`。
+- 编译已进入 `SWTC/kernel` 的 Cargo 阶段，没有发生 rustup 联网下载或 target 缺失。
+- 失败点为 `SWTC/vendor/allocator-api2-0.2.21/src/stable/macros.rs` checksum
+  mismatch：官方日志中期望值为 `74490796...`，实际值为 `c05b6bbc...`。
+- 本地复查发现同一个 crate 共有 22 个文件哈希与 `cargo-checksum.json` 不一致，
+  官网只是在第一个触发点停止。
+
+### 当前修复
+
+- 已快进同步 `gitlab/main` 到 `ea2b5ac chore: rename kernel tree to SWTC`。
+- `tools/vendor_checksums.py` 已指向 `SWTC/vendor`，无需再兼容旧 `titanix/vendor`
+  路径。
+- 使用现有工具重建 53 个 vendor manifest，仅
+  `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json` 发生变化。
+- 保留原 `package` checksum，只更新 Git 实际追踪的非隐藏 vendor 文件哈希。
+
+### 本地验证
+
+- `tools/vendor_checksums.py --check`：53 个 manifest，0 个问题。
+- 强制离线 `CARGO_NET_OFFLINE=true make all`：通过，无 Cargo checksum mismatch。
+- 删除全部隐藏文件后的干净导出副本：vendor 校验 `53/0`，离线 `make all` 通过。
 
 ## 2026-06-19 libcbench 基线恢复确认
 

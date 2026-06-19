@@ -4,15 +4,18 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937` |
+| 最新可见官方结果 | 2026-06-19 14:51:46，`Compile Error / 0.00` |
+| 当前直接失败原因 | `SWTC/vendor/allocator-api2-0.2.21` 的 `cargo-checksum.json` 未匹配实际 vendor 文件 |
+| 上一条通过基线 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937` |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `29.86218129302594`、musl-rv `27.163761909963373` |
-| 当前修复方向 | 保持 377 基线，后续只用小探针推进 iozone/lmbench/libctest |
+| 当前修复方向 | 只修复 vendor checksum，先恢复 Compile 阶段通过 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮目标是在守住 `377.02594320298937` 基线的前提下，小步探测下一个可得分测试组。
+这轮目标是先恢复官方编译，不混入运行期 ABI、iozone、lmbench、libctest 或
+LoongArch 改动。
 
 ## 本轮提交门禁
 
@@ -26,6 +29,7 @@
 
 ## 下一次官方评测验收
 
+- Compile 阶段通过，不再出现 Cargo checksum mismatch。
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
@@ -52,5 +56,6 @@
 
 ## 本轮暂缓
 
+- 不改运行期 ABI、syscall、loader 或测试组 staging。
 - 不处理网络、性能、多核和 LoongArch。
 - 不一次性重新合入完整 iozone。
