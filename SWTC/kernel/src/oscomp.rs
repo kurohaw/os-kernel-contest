@@ -31,6 +31,7 @@ const MAX_TEST_FILE_SIZE: usize = 16 * 1024 * 1024;
 const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
+const LMBENCH_TIMEOUT_MS: usize = 5_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -42,6 +43,14 @@ const LUA_RESOURCES: &[&str] = &[
     "sin30.lua",
     "sort.lua",
     "strings.lua",
+];
+const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
+    &["lat_syscall", "-P", "1", "null"],
+    &["lat_syscall", "-P", "1", "read"],
+    &["lat_syscall", "-P", "1", "write"],
+    &["lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench"],
+    &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
+    &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
 ];
 
 #[derive(Clone, Copy)]
@@ -165,6 +174,10 @@ pub fn init() {
     let (libcbench_groups, libcbench_commands) = install_libcbench_groups(&fs, &mut queue);
     installed_groups += libcbench_groups;
     installed_commands += libcbench_commands;
+
+    let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
+    installed_groups += lmbench_groups;
+    installed_commands += lmbench_commands;
 
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
@@ -468,6 +481,152 @@ fn install_libcbench_group(
     Ok(())
 }
 
+fn install_lmbench_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [
+        (
+            "glibc/lmbench_testcode.sh",
+            "oscomp-lmbench-glibc",
+            "lmbench-glibc",
+            BasicFlavor::Glibc,
+        ),
+        (
+            "musl/lmbench_testcode.sh",
+            "oscomp-lmbench-musl",
+            "lmbench-musl",
+            BasicFlavor::Musl,
+        ),
+    ];
+
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (script_path, group_dir, marker_name, flavor) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_lmbench_group(fs, script_path, group_dir, marker_name, flavor, queue) {
+            Ok(command_count) => {
+                println!("oscomp: found official lmbench script {}", script_path);
+                installed_groups += 1;
+                installed_commands += command_count;
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (installed_groups, installed_commands)
+}
+
+fn install_lmbench_group(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    marker_name: &str,
+    flavor: BasicFlavor,
+    queue: &mut Vec<u8>,
+) -> Result<usize, &'static str> {
+    let source_dir = parent_path(script_path);
+    let lmbench_path = find_first_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "lmbench_all"),
+            resolve_path(&source_dir, "bin/lmbench_all"),
+            resolve_path(&source_dir, "lmbench/bin/lmbench_all"),
+        ],
+    )?;
+    let lmbench = read_file(fs, &lmbench_path)?;
+    if lmbench.get(..4) != Some(b"\x7fELF") {
+        return Err("lmbench_all is not an ELF file");
+    }
+
+    let script = read_file(fs, script_path)?;
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_file_path(
+        &alloc::format!("{}/lmbench_testcode.sh", group_dir),
+        &script,
+    )?;
+    install_tmpfs_file_path(&alloc::format!("{}/lmbench_all", group_dir), &lmbench)?;
+
+    let mut interp_paths = Vec::new();
+    remember_interp(group_dir, &lmbench, &mut interp_paths)?;
+    install_optional_lmbench_resource(fs, &source_dir, group_dir, "hello", &mut interp_paths)?;
+
+    if !interp_paths.is_empty() {
+        install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
+    }
+
+    install_tmpfs_dir_path("var/tmp")?;
+    install_tmpfs_file_path("var/tmp/lmbench", b"")?;
+
+    push_queue_record(
+        queue,
+        b'G',
+        &alloc::format!(
+            "/{}\t#### OS COMP TEST GROUP START {} ####",
+            group_dir,
+            marker_name
+        ),
+    );
+    for args in LMBENCH_LITE_COMMANDS {
+        push_argv_record(queue, LMBENCH_TIMEOUT_MS, "lmbench_all", args);
+    }
+    push_queue_record(
+        queue,
+        b'E',
+        &alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
+    );
+    Ok(LMBENCH_LITE_COMMANDS.len())
+}
+
+fn find_first_regular_path(fs: &Ext4, paths: &[String]) -> Result<String, &'static str> {
+    for path in paths {
+        if let Ok(Some(info)) = lookup_path_str(fs, path) {
+            if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
+                return Ok(path.clone());
+            }
+        }
+    }
+    Err("required executable not found")
+}
+
+fn remember_interp(
+    group_dir: &str,
+    elf: &[u8],
+    interp_paths: &mut Vec<String>,
+) -> Result<(), &'static str> {
+    if let Some(interp) = elf_interp_path(elf)? {
+        if !interp_paths.iter().any(|known| known == &interp) {
+            println!("oscomp: {} PT_INTERP {}", group_dir, interp);
+            interp_paths.push(interp);
+        }
+    }
+    Ok(())
+}
+
+fn install_optional_lmbench_resource(
+    fs: &Ext4,
+    source_dir: &str,
+    group_dir: &str,
+    name: &str,
+    interp_paths: &mut Vec<String>,
+) -> Result<(), &'static str> {
+    let path = resolve_path(source_dir, name);
+    let Ok(Some(info)) = lookup_path_str(fs, &path) else {
+        return Ok(());
+    };
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+        return Ok(());
+    }
+    let data = read_file(fs, &path)?;
+    install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, name), &data)?;
+    if data.get(..4) == Some(b"\x7fELF") {
+        remember_interp(group_dir, &data, interp_paths)?;
+    }
+    Ok(())
+}
+
 fn install_plan(fs: &Ext4, plan: &BasicPlan, queue: &mut Vec<u8>) -> Result<(), &'static str> {
     let mut group_queue = Vec::new();
     let group_path = alloc::format!("/{}", plan.group_dir);
@@ -521,6 +680,15 @@ fn push_queue_record(queue: &mut Vec<u8>, kind: u8, payload: &str) {
     queue.push(kind);
     queue.extend_from_slice(payload.as_bytes());
     queue.push(0);
+}
+
+fn push_argv_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, args: &[&str]) {
+    let mut payload = alloc::format!("{}\t{}", timeout_ms, executable);
+    for arg in args {
+        payload.push('\t');
+        payload.push_str(arg);
+    }
+    push_queue_record(queue, b'A', &payload);
 }
 
 fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {

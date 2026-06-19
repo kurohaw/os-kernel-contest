@@ -193,6 +193,9 @@ pub fn wait(exit_code: &mut i32) -> isize {
 pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
     sys_waitpid(pid as isize, exit_code as *mut _)
 }
+pub fn waitpid_options(pid: isize, exit_code: &mut i32, options: i32) -> isize {
+    sys_waitpid_options(pid, exit_code as *mut _, options)
+}
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,

@@ -251,7 +251,14 @@ pub fn sys_mmap(
 }
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
-    syscall(SYSCALL_WAITPID, [pid as usize, exit_code as usize, 0])
+    sys_waitpid_options(pid, exit_code, 0)
+}
+
+pub fn sys_waitpid_options(pid: isize, exit_code: *mut i32, options: i32) -> isize {
+    syscall(
+        SYSCALL_WAITPID,
+        [pid as usize, exit_code as usize, options as usize],
+    )
 }
 pub fn sys_pipe(pipe: &mut [i32]) -> isize {
     syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])

@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 编译失败 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`SWTC/vendor/allocator-api2-0.2.21` checksum mismatch |
-| 上一条通过基线 | 通过并恢复 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
+| 官方页面最后可见结果 | 通过并得分 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
+| 上一条编译错误 | 已修复 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`SWTC/vendor/allocator-api2-0.2.21` checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 通过并得分 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
@@ -26,6 +26,9 @@
 | 从 EXT4 加载 basic ELF | 通过 | 每组使用私有 tmpfs 目录，双组镜像串行执行 60 个命令 |
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
+| `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
+| 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
+| 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
 | glibc 动态 ELF 探针 | 通过 | 暂存私有 loader/libc 后成功进入动态程序 `main` |
 | 动态 ELF `PT_INTERP` 解析 | 通过 | 从 ELF 读取真实解释器路径，并按组私有目录创建完整匹配路径 |
@@ -41,8 +44,9 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
+| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=30.07126205049758、musl-rv=27.166961800614022 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
+| lmbench-lite staging | 本地探针通过 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open` |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
@@ -87,6 +91,8 @@ oscomp: staged 2 test groups with 60 commands
 | `driver/qemu` | x0 virtio block 设备初始化失败 |
 | `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
 | `runtestcase.rs` | `G/X/E` 队列、工作目录切换、argv 或 END 标记退化 |
+| `A` 队列记录 | 超时轮询、kill 或 argv 构造错误会拖死后续组 |
+| lmbench-lite | 真实官方 `lmbench_all` 资源路径或参数不匹配可能导致 0 分，但不得影响现有 8 组 |
 | 动态 loader | 缺失/无效解释器重新触发 panic，或组间 libc 相互覆盖 |
 | nightly 升级 | 旧 RISC-V crate、汇编或 async API 再次不兼容 |
 | 日志 | basic START/END 被调试输出污染 |

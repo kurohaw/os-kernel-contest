@@ -8,12 +8,53 @@
 | 当前开发分支 | `main`，已快进同步 `gitlab/main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 修复 `SWTC/` 重命名后的 vendor checksum Compile Error，恢复官方编译 |
-| 当前提交 | 远端基线 `ea2b5ac`，本地追加 `allocator-api2` checksum 修复 |
-| 最新可见线上结果 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch |
-| 上一条通过基线 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
+| 当前里程碑 | 稳住 377 分基线，新增带 argv/timeout 的队列协议与 `lmbench-lite` 探针 |
+| 当前提交 | 远端基线 `0acac92`，工作区追加 `lmbench-lite` 本地改动 |
+| 最新可见线上结果 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
+| 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-19 lmbench-lite 提分探针
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-19 15:50:35 提交评测为
+  `Accepted / 377.2382238511116`。
+- 当前已稳定执行 8 组：RISC-V `basic`、`busybox`、`lua`、`libcbench`
+  的 glibc 与 musl 版本。
+- 当前得分构成为：basic `204`、BusyBox `98`、Lua `18`、libcbench
+  `57.2382238511116`。
+- `cyclictest`、`iozone`、`iperf`、`libctest`、`lmbench`、`ltp`、
+  `netperf` 仍为 0。
+- LoongArch 仍为 0，直接原因是 `kernel-la` 仍为 RISC-V 占位 ELF，
+  QEMU 报 `Failed to load ELF`。
+
+### 当前修复
+
+- 扩展 `/oscomp-queue`，保留原有 `G/X/E` 记录，新增
+  `A<timeout_ms>\t<argv0>\t<arg1>...` 记录，用于执行带参数 ELF。
+- `runtestcase` 从固定 4 KiB 读取队列改为分块读取，最大 64 KiB，
+  避免后续小批量测试命令被截断。
+- `A` 记录使用 `wait4(WNOHANG)` 轮询；超过记录内 timeout 后发送
+  `SIGKILL` 并继续下一条记录，防止单个性能测试拖死整轮评测。
+- 第一轮只新增 `lmbench-lite`：探测 `glibc/lmbench_testcode.sh` 与
+  `musl/lmbench_testcode.sh`，每组只暂存 `lmbench_all`、可选 `hello`、
+  必要动态运行时和空 `/var/tmp/lmbench`。
+- 当前 allowlist 只执行轻量命令：
+  `lat_syscall null/read/write/stat/fstat/open`，每条 5 秒超时。
+- 暂不接入 `libctest`、完整 `iozone`、网络测试或 LoongArch，避免把
+  已有 377 分基线和 libcbench 拉回 0。
+
+### 本地验证
+
+- 强制离线 `CARGO_NET_OFFLINE=true make all`：通过。
+- 无测试盘官方风格 QEMU：输出 `!TEST FINISH!` 并主动关机。
+- 外部官方 BusyBox 镜像：仍能执行 BusyBox 组并主动关机。
+- 构造 `glibc/lmbench_testcode.sh` 与假 `lmbench_all` 的 EXT4 探针盘：
+  能识别 `lmbench-glibc`，输出 START/END，执行 6 条 `A` 记录并主动关机。
+- 本地没有官方真实 `lmbench_all` 镜像，本轮只验证队列协议、资源暂存和
+  超时保护；真实 lmbench 得分需要下一次官方评测确认。
 
 ## 2026-06-19 SWTC vendor checksum 编译错误
 
