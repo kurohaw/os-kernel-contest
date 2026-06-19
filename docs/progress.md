@@ -8,12 +8,44 @@
 | 当前开发分支 | `main`，已快进同步 `gitlab/main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 稳住 377 分基线，新增带 argv/timeout 的队列协议与 `lmbench-lite` 探针 |
-| 当前提交 | 远端基线 `0acac92`，工作区追加 `lmbench-lite` 本地改动 |
-| 最新可见线上结果 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
+| 当前里程碑 | 修复 `managed` vendored crate 离线解析 Compile Error |
+| 当前提交 | 远端基线 `e85c3ac`，工作区追加 `managed` path/patch 修复 |
+| 最新可见线上结果 | 2026-06-19 16:31:18，`Compile Error / 0.00`；内核 Cargo 离线解析时报 `no matching package named managed found` |
+| 上一条通过基线 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116`；basic=204、BusyBox=98、Lua=18、libcbench=57.2382238511116 |
 | 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-19 managed vendor 离线解析错误
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-19 16:31:18 提交评测为
+  `Compile Error / 0.00`。
+- 编译已通过 `SWTC/user`，失败发生在 `SWTC/kernel` 的 Cargo 阶段。
+- 失败日志为：`error: no matching package named managed found`，搜索位置是
+  `/coursegrader/submit/SWTC/kernel/../vendor`，且 Cargo 处于 offline 模式。
+
+### 当前修复
+
+- `SWTC/vendor/managed-0.8.0` 在 GitLab fresh clone 中存在，且 vendor 校验为
+  53 个 manifest、0 个问题；本地无法复现该缺失。
+- 为降低官方 directory source 对 `managed` 识别失败的风险，内核直接依赖改为
+  `path = "../vendor/managed-0.8.0"`。
+- 新增 `[patch.crates-io] managed = { path = "../vendor/managed-0.8.0" }`，
+  让 `smoltcp` 等间接依赖也统一使用本地 path crate。
+- `SWTC/kernel/Cargo.lock` 中 `managed` 不再带 registry source/checksum，
+  避免该 crate 继续走 directory source 解析。
+
+### 本地验证
+
+- GitLab fresh clone `e85c3ac` 原始源码：vendor 目录包含
+  `SWTC/vendor/managed-0.8.0`，离线 `make all` 可通过，说明线上失败更像官方
+  源快照或 directory source 识别异常。
+- 修复后主工作区：`tools/vendor_checksums.py --check` 为 53/0，
+  `CARGO_NET_OFFLINE=true make all` 通过。
+- 删除全部隐藏文件后的干净副本：vendor 校验 53/0，离线 `make all` 通过，
+  `kernel-rv` 入口仍为 `0x80200000`。
 
 ## 2026-06-19 lmbench-lite 提分探针
 

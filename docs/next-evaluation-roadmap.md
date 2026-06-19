@@ -4,30 +4,33 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116` |
-| 当前得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2382238511116` |
+| 最新可见官方结果 | 2026-06-19 16:31:18，`Compile Error / 0.00` |
+| 当前直接失败原因 | 内核 Cargo 离线解析 `managed` 时，在 `SWTC/vendor` directory source 中报 `no matching package named managed found` |
+| 上一条通过基线 | 2026-06-19 15:50:35，`Accepted / 377.2382238511116` |
+| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2382238511116` |
 | 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；vendor checksum mismatch，已由 `0acac92` 修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.07126205049758`、musl-rv `27.166961800614022` |
-| 当前修复方向 | 先加可控的 argv/timeout 队列协议，再以 `lmbench-lite` 小批量探测下一组 |
+| 当前修复方向 | 先恢复 Compile 阶段通过；将 `managed` 统一改为本地 path/patch 依赖 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮目标是稳住 377 分基线，在不改变现有 8 组输出的前提下，让 runner 具备
-带参数执行和单测超时能力，并用 `lmbench-lite` 验证下一组是否能安全进入。
+这轮目标是先恢复官方 Compile 阶段通过，不继续混入运行期 ABI 或新增测试组。
+`lmbench-lite` 改动已经在 `e85c3ac` 中提交；本轮只处理 `managed` 依赖解析。
 
 ## 本轮提交门禁
 
 1. 强制离线 `make all`，vendor checksum 保持 `53/0`。
 2. 隐藏文件过滤后的干净导出仍能恢复 Cargo 配置并构建。
 3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
-4. 官方完整参数下，无盘和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
-5. `lmbench-lite` 探针盘能输出 START/END，执行 6 条 `A` 记录后继续关机。
+4. `SWTC/kernel/Cargo.lock` 中 `managed` 不再记录 registry source/checksum。
+5. 官方完整参数下，无盘和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
 6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
 
+- Compile 阶段通过，不再出现 `no matching package named managed found`。
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
