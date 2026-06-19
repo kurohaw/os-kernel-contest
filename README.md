@@ -30,16 +30,21 @@
 - 本地官方 `test_runner.py` 对双组 basic 的解析结果为 `102/102`。
 - 官方镜像同版本工具链 `nightly-2025-02-01` 下完成隐藏文件过滤、强制离线构建验证。
 
-官方页面最后可见结果为 2026-06-18 16:00:21：编译状态 `Accepted`，总分
-`320.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc `49`、
-musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 和 iozone 均为 0。该结果来自
-iozone staging 尝试后的回归，本轮已撤回 iozone 接入，下一次评测优先确认
-libcbench 回到上一条有效得分线。
+官方页面最后可见结果为 2026-06-19 14:05:15：编译状态 `Accepted`，总分
+`377.02594320298937`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为
+glibc `49`、musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 为 glibc
+`29.86218129302594`、musl `27.163761909963373`。这说明撤回 iozone 后已恢复
+libcbench 高分基线，下一步继续以小探针方式推进 iozone、lmbench 或 libctest。
 
 上一条高分可见结果为 2026-06-18 09:46:55：编译状态 `Accepted`，总分
 `377.3228370332187`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为
 glibc `49`、musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 为 glibc
 `30.15271484677692`、musl `27.170122186441827`。
+
+上一轮回归结果为 2026-06-18 16:00:21：编译状态 `Accepted`，总分
+`320.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc `49`、
+musl `49`，Lua 为 glibc `9`、musl `9`，libcbench 和 iozone 均为 0。该结果来自
+iozone staging 尝试后的回归，本轮已撤回 iozone 接入。
 
 更早一轮可见结果为 2026-06-18 09:33:47：编译状态 `Accepted`，总分
 `326.0`。其中 RISC-V basic 为 glibc `102`、musl `102`，BusyBox 为 glibc

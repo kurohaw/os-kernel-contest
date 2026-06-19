@@ -4,8 +4,9 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过但回退 | 2026-06-18 16:00:21，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench=0；iozone=0 |
+| 官方页面最后可见结果 | 通过并恢复 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
 | 上一条高分结果 | 通过并得分 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
+| iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | RISC-V Lua | 通过并得分 | 线上 glibc-rv=9、musl-rv=9 |
@@ -39,7 +40,7 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 通过并部分得分 | 高分结果为 glibc-rv=30.15271484677692、musl-rv=27.170122186441827；最新 iozone 尝试回退后已撤回 |
+| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |

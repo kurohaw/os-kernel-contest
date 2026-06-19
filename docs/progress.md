@@ -8,11 +8,22 @@
 | 当前开发分支 | `codex/titanix-architecture`，完成后推送到远端 `main` |
 | 当前内核主体 | `titanix/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 撤回 iozone 回归，优先恢复 RISC-V `377.3228370332187` 基线 |
-| 当前提交 | 撤回 `b10e9f0` 的 iozone staging |
-| 最新可见线上结果 | 2026-06-18 16:00:21，`Accepted / 320.0`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench=0；iozone=0 |
+| 当前里程碑 | RISC-V `377.02594320298937` 基线已恢复，后续小步推进 iozone/lmbench/libctest |
+| 当前提交 | `cead874` 撤回 iozone staging 后已线上确认恢复 |
+| 最新可见线上结果 | 2026-06-19 14:05:15，`Accepted / 377.02594320298937`；basic glibc-rv=102、musl-rv=102；BusyBox glibc-rv=49、musl-rv=49；Lua glibc-rv=9、musl-rv=9；libcbench glibc-rv=29.86218129302594、musl-rv=27.163761909963373 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-19 libcbench 基线恢复确认
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-19 14:05:15 提交评测为
+  `Accepted / 377.02594320298937`。
+- RISC-V basic、BusyBox、Lua 保持满分。
+- libcbench 恢复到 glibc-rv `29.86218129302594`、musl-rv `27.163761909963373`，
+  与 2026-06-18 09:46:55 的 `377.3228370332187` 属于同一高分基线。
+- iozone 仍为 0，说明下一步不能再一次性接入完整 iozone staging，需要拆成更小探针。
 
 ## 2026-06-19 iozone 回归止血
 
