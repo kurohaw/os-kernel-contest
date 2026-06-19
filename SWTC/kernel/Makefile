@@ -11,7 +11,7 @@ FS_IMG := $(FS_IMG_SRC)/sdcard.img
 
 TEST := 23
 ifeq ($(TEST), rootfs)
-	TEST_DIR := "../Titanix-rootfs/rootfs"
+	TEST_DIR := "../SWTC-rootfs/rootfs"
 else
 	TEST_DIR := "../testcase/$(TEST)"
 endif

@@ -1,14 +1,16 @@
-# OS Kernel Contest
+# SWTC
 
-当前主线基于往届 GPLv3 开源作品 Titanix，目标是在其完整的进程、内存、VFS、
-异步执行器、网络和驱动架构上完成 2026 官方评测适配。
+SWTC 是面向 2026 操作系统大赛评测开发的 RISC-V 操作系统。项目参考往届
+GPLv3 开源作品 Titanix 的架构进行开发，在其进程、内存、VFS、异步执行器、
+网络和驱动等设计基础上，持续完成本队自己的官方评测适配、功能补全和稳定性修复。
 
-旧自建内核曾取得官方线上 `basic=102`。当前 `main` 使用 Titanix 重写路线，
-已能在同一次 RISC-V 启动中串行运行 glibc、musl basic 和 BusyBox。
+旧自建内核曾取得官方线上 `basic=102`。当前 `main` 使用 SWTC 主线，已能在
+同一次 RISC-V 启动中串行运行 glibc、musl basic、BusyBox、Lua 和 libcbench
+等测试组。
 
 ## 当前进度
 
-- 根目录 `make all` 可完全离线构建 Titanix。
+- 根目录 `make all` 可完全离线构建 SWTC。
 - 使用官方镜像预装的 Rust `nightly-2025-02-01`，评测时不依赖联网下载。
 - 生成官方要求的 RISC-V executable ELF `kernel-rv`。
 - 使用官方完整 `1G`、单核、网络设备与 RTC 参数启动并主动关机。
@@ -86,10 +88,11 @@ qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic \
 
 ## 目录
 
-- `titanix/kernel/`：当前内核主体。
-- `titanix/user/`：内置用户程序。
-- `titanix/vendor/`：离线 Cargo 依赖。
-- `titanix/dependencies/`：本地底层依赖。
+- `SWTC/kernel/`：SWTC 当前内核主体。
+- `SWTC/user/`：SWTC 内置用户程序，包含官方提交模式使用的 `runtestcase`。
+- `SWTC/vendor/`：SWTC 离线 Cargo 依赖，官方评测构建依赖它。
+- `SWTC/dependencies/`：SWTC 使用的本地底层依赖。
+- `SWTC/LICENSE`：上游 GPLv3 许可证和来源信息，必须保留。
 - `docs/`：路线、进度、测试矩阵和来源说明。
 
 开发前请先阅读 `AGENTS.md`。

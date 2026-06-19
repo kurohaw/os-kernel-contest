@@ -5,8 +5,8 @@
 | 项目 | 内容 |
 |---|---|
 | 当前日期 | 2026-06-19 |
-| 当前开发分支 | `codex/titanix-architecture`，完成后推送到远端 `main` |
-| 当前内核主体 | `titanix/` |
+| 当前开发分支 | `codex/swtc-architecture`，完成后推送到远端 `main` |
+| 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | RISC-V `377.02594320298937` 基线已恢复，后续小步推进 iozone/lmbench/libctest |
 | 当前提交 | `cead874` 撤回 iozone staging 后已线上确认恢复 |
@@ -72,7 +72,7 @@
 
 ### 本地验证
 
-- `cargo +nightly-2025-02-18 fmt --manifest-path titanix/kernel/Cargo.toml --check`：通过。
+- `cargo +nightly-2025-02-18 fmt --manifest-path SWTC/kernel/Cargo.toml --check`：通过。
 - `make all RUST_TOOLCHAIN=nightly-2025-02-18`：通过。
 - 无测试盘 QEMU：输出 `!TEST FINISH!` 并主动关机。
 - 双组官方布局 basic 镜像：官方 parser 得到 `102/102`。
@@ -241,7 +241,7 @@
 
 - 将 `tests="..."` 从只取首项改为解析完整有序队列。
 - 将 basic ELF 使用 `oscomp-basic-<name>-elf` 别名暂存到 tmpfs，避免 `sleep`
-  被 Titanix 的 BusyBox 命令重定向逻辑截获。
+  被 SWTC 的 BusyBox 命令重定向逻辑截获。
 - 额外暂存 `test_echo`、`text.txt`，并创建 `mnt` 目录。
 - 用户态 `runtestcase` 逐项执行 `fork + execve + waitpid`。
 - 普通测试失败后继续执行后续测试，全部完成后统一输出 END marker、
@@ -263,7 +263,7 @@
 
 - 官方页面最后一次提交时间为 2026-06-11 19:44:39。
 - 失败发生在 Compile 阶段，首先尝试联网下载 `nightly-2025-02-18`，随后因
-  `titanix/vendor/spin-0.7.1/Cargo.lock` 被官方隐藏文件过滤移除而校验失败。
+  `SWTC/vendor/spin-0.7.1/Cargo.lock` 被官方隐藏文件过滤移除而校验失败。
 - 页面分数为 `0.00`，没有产生任何运行阶段反馈。
 
 ### 已完成
@@ -326,7 +326,7 @@
 - 读取 `basic_testcode.sh`，处理 `cd` 和嵌套 `run-all.sh`。
 - 解析 `tests="..."` 中的首个测试名，当前得到 `musl/basic/brk`。
 - 从 EXT4 读取静态 RISC-V ELF，并校验 ELF magic。
-- 将 ELF、argv 和 END 标记写入 Titanix tmpfs。
+- 将 ELF、argv 和 END 标记写入 SWTC tmpfs。
 - 内置 `runtestcase` 检测暂存文件，使用 `fork + execve + wait4` 串行执行。
 - 保持真实输出位于 `basic-musl` START/END 区间内。
 - QEMU 执行结束后主动关机。
@@ -343,15 +343,15 @@
 
 - 当前跳过 `mount` 和 `umount`，避免未实现挂载路径导致整个评测 panic。
 - `getdents` 当前为 `4/5`。
-- EXT4 仍未整体挂载进 Titanix VFS，而是按需读取并复制到 tmpfs。
+- EXT4 仍未整体挂载进 SWTC VFS，而是按需读取并复制到 tmpfs。
 - 线上评测尚未重新确认，不能把本地解析结果视为线上成绩。
 
-## 2026-06-09 Titanix 重写
+## 2026-06-09 SWTC 主线重构
 
 ### 架构决策
 
 - 停止同时扩展旧自建内核和 rCore 迁移版本。
-- 使用 Titanix 作为唯一新内核主体。
+- 使用 SWTC 作为唯一新内核主体，参考 Titanix 架构推进。
 - 从新主线移除旧 `kernel/`、`user/` 和 `rCore-Tutorial-v3-main/`。
 - 旧自建内核的 `basic=102` 成果继续由归档分支保存。
 
@@ -365,11 +365,11 @@
 - 修复 PanicInfo、Poll、trap 汇编符号和 virtio-drivers API 兼容问题。
 - vendor 全部 Cargo 依赖，构建过程无需连接 crates.io。
 - 为 vendor 校验文件建立非隐藏备份，模拟官方隐藏文件过滤后仍可全量构建。
-- 根目录 `make all` 已切换为 Titanix 构建。
-- 新增 wrapper ELF 流程，把 Titanix 高虚拟地址 raw kernel 封装成物理入口
+- 根目录 `make all` 已切换为 SWTC 构建。
+- 新增 wrapper ELF 流程，把 SWTC 高虚拟地址 raw kernel 封装成物理入口
   `0x80200000` 的官方 `kernel-rv`。
 - 官方风格 `256M`、单核 QEMU 启动成功并主动关机。
-- 新增 `titanix/kernel/src/oscomp.rs`，通过 Titanix BlockDevice 只读探测 EXT4。
+- 新增 `SWTC/kernel/src/oscomp.rs`，通过 SWTC BlockDevice 只读探测 EXT4。
 - fixed path 命中 `musl/basic_testcode.sh` 后输出 basic START/END。
 
 ## 历史里程碑
@@ -378,8 +378,8 @@
 - 2026-06-08：旧自建内核加入 BusyBox 简单命令队列。
 - 2026-06-09：旧自建内核冻结在 `codex/basic-102-archive`。
 - 2026-06-09：rCore 迁移尝试能够启动到 shell，但未接入官方 EXT4。
-- 2026-06-09：路线切换为 Titanix 完整架构，并完成启动与 basic 入口。
-- 2026-06-11：Titanix 执行 `basic/brk`，本地官方解析器得到 `3/3`。
+- 2026-06-09：路线切换为 SWTC 主线，并完成启动与 basic 入口。
+- 2026-06-11：SWTC 执行 `basic/brk`，本地官方解析器得到 `3/3`。
 - 2026-06-12：修复官方离线工具链选择和 vendor 隐藏文件校验问题。
 
 ## 下一里程碑

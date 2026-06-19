@@ -10,23 +10,23 @@ use smoltcp::{
 
 type Mutex<T> = SpinNoIrqLock<T>;
 
-pub static NET_INTERFACE: TitanixNetInterface = TitanixNetInterface::new();
+pub static NET_INTERFACE: SwtcNetInterface = SwtcNetInterface::new();
 
 pub fn init() {
     NET_INTERFACE.init();
 }
 
-pub struct TitanixNetInterface<'a> {
-    inner: Mutex<Option<TitanixNetInterfaceInner<'a>>>,
+pub struct SwtcNetInterface<'a> {
+    inner: Mutex<Option<SwtcNetInterfaceInner<'a>>>,
 }
 
-pub struct TitanixNetInterfaceInner<'a> {
+pub struct SwtcNetInterfaceInner<'a> {
     pub device: Loopback,
     pub iface: Interface,
     pub sockets: SocketSet<'a>,
 }
 
-impl<'a> TitanixNetInterfaceInner<'a> {
+impl<'a> SwtcNetInterfaceInner<'a> {
     fn new() -> Self {
         let mut device = Loopback::new(Medium::Ethernet);
         let iface = {
@@ -60,9 +60,9 @@ impl<'a> TitanixNetInterfaceInner<'a> {
     }
 }
 
-impl<'a> TitanixNetInterface<'a> {
+impl<'a> SwtcNetInterface<'a> {
     pub fn init(&self) {
-        *self.inner.lock() = Some(TitanixNetInterfaceInner::new());
+        *self.inner.lock() = Some(SwtcNetInterfaceInner::new());
     }
     pub const fn new() -> Self {
         Self {
@@ -96,12 +96,12 @@ impl<'a> TitanixNetInterface<'a> {
             .get_mut::<udp::Socket>(handler))
     }
 
-    pub fn inner_handler<T>(&self, f: impl FnOnce(&mut TitanixNetInterfaceInner<'a>) -> T) -> T {
+    pub fn inner_handler<T>(&self, f: impl FnOnce(&mut SwtcNetInterfaceInner<'a>) -> T) -> T {
         f(&mut self.inner.lock().as_mut().unwrap())
     }
 
     pub fn poll(&self) {
-        log::debug!("[TitanixNetInterface::poll] poll...");
+        log::debug!("[SwtcNetInterface::poll] poll...");
         self.inner_handler(|inner| {
             inner.iface.poll(
                 Instant::from_millis(current_time_duration().as_millis() as i64),

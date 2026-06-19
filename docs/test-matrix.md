@@ -15,7 +15,7 @@
 | 隐藏文件过滤后 vendor 校验 | 通过 | 删除全部隐藏文件后，53 个 manifest、0 个问题 |
 | 隐藏文件过滤后构建 | 通过 | 干净导出删除全部隐藏文件后可自动恢复并全量构建 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
-| 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；Titanix 启动并主动关机 |
+| 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；SWTC 启动并主动关机 |
 | 无效/空测试盘 | 通过 | 输出无 EXT4 提示，继续运行提交 runner |
 | EXT4 superblock | 通过 | 从 x0 virtio-blk 识别无分区 EXT4 |
 | `musl/basic_testcode.sh` fixed path | 通过 | 与 glibc 同时存在时排在 glibc 后执行 |

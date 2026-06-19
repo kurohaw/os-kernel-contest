@@ -69,9 +69,9 @@ unsafe impl Send for Iovec {}
 unsafe impl Sync for Iovec {}
 
 /// UtsName
-// const SYSNAME: &str = "Titanix";
-// const NODENAME: &str = "Titanix";
-// const RELEASE: &str = "Titanix 1.0.0";
+// const SYSNAME: &str = "SWTC";
+// const NODENAME: &str = "SWTC";
+// const RELEASE: &str = "SWTC 1.0.0";
 // const VERSION: &str = "1.0.0";
 const SYSNAME: &str = "Linux";
 const NODENAME: &str = "Linux";
@@ -79,7 +79,7 @@ const RELEASE: &str = "5.19.0-42-generic";
 // const VERSION: &str = "6.4.0";
 const VERSION: &str = "#43~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Apr 21 16:51:08 UTC 2";
 const MACHINE: &str = "RISC-V SiFive Freedom U740 SoC";
-const DOMAINNAME: &str = "titanix.org";
+const DOMAINNAME: &str = "swtc.org";
 
 pub const UTSNAME_SIZE: usize = size_of::<UtsName>() as usize;
 

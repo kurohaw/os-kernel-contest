@@ -242,6 +242,6 @@ Rust user shell
 
 本文是 2026-05-18 阅读 rCore baseline 时形成的启动流程笔记，主要用于理解参考工程，不再作为当前开发计划。
 
-本文是 2026-05-18 形成的历史参考，不代表当前 Titanix 主线状态。当前进度、
+本文是 2026-05-18 形成的历史参考，不代表当前 SWTC 主线状态。当前进度、
 测试事实和提分顺序以 `docs/progress.md`、`docs/test-matrix.md` 和
 `docs/next-evaluation-roadmap.md` 为准。

@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR_REL = PurePosixPath("titanix/vendor")
+VENDOR_REL = PurePosixPath("SWTC/vendor")
 VENDOR_ROOT = REPO_ROOT / Path(VENDOR_REL.as_posix())
 CHECKSUM_NAME = "cargo-checksum.json"
 GENERATED_CHECKSUM_NAME = ".cargo-checksum.json"

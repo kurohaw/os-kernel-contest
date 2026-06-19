@@ -1,4 +1,4 @@
-# Titanix
+# SWTC
 <img src="./docs/fig/hitsz_logo.jpg" style="zoom: 43.7%;" />
 
 ### 项目描述
@@ -18,7 +18,7 @@
 ![](docs/fig/qemu.png)
 
 
-### Titanix内核介绍
+### SWTC 内核介绍
 
 - 进程管理：实现基本的进程与线程管理功能，支持libc的pthread库，能够通过比赛测试。支持动态链接。
 - 内存管理：实现基本的内存管理功能。实现文件页缓存即匿名页映射。使用 懒分配 和 Copy_on_write 优化策略。
@@ -55,7 +55,7 @@
   -  entry.S：起始代码
 - user: 用户程序
 - testcase: 测试用例
-- Titanix-rootfs: 一个精简的rootfs
+- SWTC-rootfs: 一个精简的 rootfs
 
 
 ### 运行：

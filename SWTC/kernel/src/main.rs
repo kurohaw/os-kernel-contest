@@ -133,12 +133,12 @@ pub fn rust_main(hart_id: usize) {
         hart::init(hart_id);
         utils::logging::init();
 
-        println!(r#"  _______ __              _     "#);
-        println!(r#" /_  __(_) /_____ _____  (_)  __"#);
-        println!(r#"  / / / / __/ __ `/ __ \/ / |/_/"#);
-        println!(r#" / / / / /_/ /_/ / / / / />  <  "#);
-        println!(r#"/_/ /_/\__/\__,_/_/ /_/_/_/|_|  "#);
-        println!("[kernel] Hello, world!");
+        println!(r#"  _____  __          _______  ______ "#);
+        println!(r#" / ___/ / /      __ /_  __/ / ____/ "#);
+        println!(r#" \__ \ / / | /| / /  / /   / /      "#);
+        println!(r#"___/ // /| |/ |/ /  / /   / /___    "#);
+        println!(r#"/____//_/ |__/|__/  /_/    \____/   "#);
+        println!("[kernel] SWTC booting");
         println!(
             "[kernel] ---------- main hart {} started ---------- ",
             hart_id
