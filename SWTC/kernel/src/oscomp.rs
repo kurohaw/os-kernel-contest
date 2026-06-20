@@ -32,7 +32,7 @@ const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
-const MAX_LIBCTEST_CASES: usize = 20;
+const MAX_LIBCTEST_CASES: usize = 24;
 const LMBENCH_TIMEOUT_MS: usize = 5_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
@@ -61,6 +61,10 @@ const LIBCTEST_ALLOWLIST: &[&str] = &[
     "env",
     "qsort",
     "random",
+    "search_hsearch",
+    "search_insque",
+    "search_lsearch",
+    "search_tsearch",
     "snprintf",
     "string",
     "string_memcpy",

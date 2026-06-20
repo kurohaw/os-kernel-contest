@@ -8,13 +8,24 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 稳住 392 基线后，以 4 个 case 一批推进 musl libctest |
-| 当前提交 | 在已验证 16 个 musl libctest case 的基础上，只新增 4 个低风险静态 case |
-| 最新可见线上结果 | 2026-06-20 17:52:16，`Accepted / 392.9002806839883`；libctest-musl=16，libcbench=56.9002806839883 |
-| 上一条通过基线 | 2026-06-20 17:52:16，`Accepted / 392.9002806839883`；basic=204、BusyBox=98、Lua=18、libcbench=56.9002806839883、libctest=16 |
+| 当前里程碑 | 稳住 397 基线后，以 4 个 case 一批推进 musl libctest |
+| 当前提交 | 在已验证 20 个 musl libctest case 的基础上，只新增 4 个低风险静态 case |
+| 最新可见线上结果 | 2026-06-20 21:09:40，`Accepted / 397.32511382265227`；libctest-musl=20，libcbench=57.325113822652256 |
+| 上一条通过基线 | 2026-06-20 21:09:40，`Accepted / 397.32511382265227`；basic=204、BusyBox=98、Lua=18、libcbench=57.325113822652256、libctest=20 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-20 17:52:16，`Accepted / 392.9002806839883`；libcbench glibc/musl 合计 56.9002806839883、libctest-musl=16 |
+| 上一条高分结果 | 2026-06-20 21:09:40，`Accepted / 397.32511382265227`；libcbench glibc/musl 合计 57.325113822652256、libctest-musl=20 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-20 21:09 基线恢复与 4-case libctest 探针
+
+- 最新官方结果为 2026-06-20 21:09:40，`Accepted / 397.32511382265227`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.325113822652256、
+  libctest=20；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
+- 这说明上一轮新增的 `strtod_simple`、`strtof`、`udiv`、`wcsstr`
+  四个 case 已稳定进分，且没有引发 libcbench 或退出路径回退。
+- 本轮继续沿同一策略，只新增 `search_hsearch`、`search_insque`、
+  `search_lsearch`、`search_tsearch` 四个低风险静态 case。验收标准是总分不低于
+  当前 397 基线，且 libctest 从 20 小幅上升或至少提供明确失败日志。
 
 ## 2026-06-20 17:52 基线恢复与 4-case libctest 探针
 
