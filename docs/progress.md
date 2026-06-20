@@ -8,13 +8,27 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 先恢复 385 基线，再继续小步提分 |
-| 当前提交 | 已 revert `4602678` 的 libctest 扩容，并修复 `exit.rs:74` 父进程 weak 失效 panic |
-| 最新可见线上结果 | 2026-06-20 14:24:44，`Accepted / 326.0`；`4602678` 扩容后在 libcbench-glibc 阶段触发内核 panic |
-| 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
+| 当前里程碑 | 稳住 384 基线后，以 4 个 case 一批推进 musl libctest |
+| 当前提交 | 在已修复 `exit.rs:74` orphan exit panic 的基础上，只把 musl libctest 从 8 个 case 扩到 12 个 case |
+| 最新可见线上结果 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；libctest-musl=8，libcbench=56.84113928835043 |
+| 上一条通过基线 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；basic=204、BusyBox=98、Lua=18、libcbench=56.84113928835043、libctest=8 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
+| 上一条高分结果 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；libcbench glibc/musl 合计 56.84113928835043、libctest-musl=8 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-20 14:43 基线恢复与 4-case libctest 探针
+
+- 最新官方结果为 2026-06-20 14:43:29，`Accepted / 384.8411392883504`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.84113928835043、
+  libctest=8；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
+- 串口日志显示启动时暂存 11 个测试组、90 条命令，basic、BusyBox、Lua、
+  libcbench、libctest、lmbench 两个 ABI 组均到达 END，最终主动关机。
+- `libctest-musl` 的 8 个稳定 case 仍输出 `Pass!`；此前 `4602678` 一次扩到
+  64 个 case 的回退已通过 revert 和 `exit.rs:74` 修复止血。
+- 本轮不恢复 64-case 扩容，只新增
+  `string_memcpy`、`string_memset`、`string_strchr`、`string_strstr` 四个纯字符串
+  静态 case。验收标准是总分不低于当前 384 基线，且 libctest 从 8 分小幅上升或
+  至少提供明确失败日志。
 
 ## 2026-06-20 14:24 libctest 扩容回退
 
