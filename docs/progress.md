@@ -8,13 +8,34 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 回退 `/proc/self/exe` 真实路径尝试，恢复 libcbench 377 基线 |
-| 当前提交 | 已 revert `b433976`，恢复 `e8d1b48` 的 `readlinkat` 行为，待验证并推送 |
+| 当前里程碑 | 只追一个新指标：尝试让 musl `libctest` 从 0 开始进分 |
+| 当前提交 | 已 revert `b433976`；本轮只新增 musl libctest 小批量 runner，不改 lmbench/readlinkat/argv |
 | 最新可见线上结果 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 导致 libcbench 从 57.425 掉到 6.0 |
 | 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-20 musl libctest 小批量探针
+
+### 当前策略
+
+- 本轮只追 `libctest` 一个指标，不同时改 `lmbench`、`readlinkat`、argv 或资源路径。
+- `oscomp` 只探测 musl 入口 `musl/libctest_testcode.sh`，不新增 glibc libctest。
+- 读取官方 `run-static.sh` 或 `run-static`，只从中筛出 `string`、`stdlib`、
+  `stdio` 三个 allowlist case。
+- 只暂存 `entry-static.exe` 和脚本元数据到 `oscomp-libctest-musl`，每个 case 用
+  新增 `C` 队列记录执行 `entry-static.exe <case>`。
+- `runtestcase` 对 `C` 记录按真实退出码输出 `Pass!` 或
+  `FAIL LIBCTEST CASE ...`，每条最多运行 3 秒，超时后继续后续队列。
+
+### 验收重点
+
+- 若官方仍为 0，优先看串口日志中是否出现 `RUN LIBCTEST CASE`、`Pass!`、
+  `FAIL`、`execve failed` 或 `timeout`。
+- basic、BusyBox、Lua 和 libcbench 不应因本轮 libctest 探针回退。
+- 若 libctest 有分，下一轮继续小批量扩大 allowlist；若回退，直接撤回该组
+  staging，保留 377 基线。
 
 ## 2026-06-20 readlinkat 真实路径回归
 

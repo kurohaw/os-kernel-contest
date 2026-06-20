@@ -31,6 +31,7 @@
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
+| `C` libctest 队列协议 | 待官方验证 | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 `Pass!` 或 `FAIL` |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
@@ -49,6 +50,7 @@
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
 | libcbench staging | 需恢复基线 | 稳定基线 glibc-rv=30.237213649762825、musl-rv=27.18801787119176；`b433976` 回退到 glibc-rv=6.0、musl-rv=0.0 |
+| musl libctest staging | 待官方验证 | 只探测 `musl/libctest_testcode.sh`，从 `run-static.sh` 筛出 `string`、`stdlib`、`stdio` 并执行 `entry-static.exe <case>` |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；本轮改用官方 marker、`lat_syscall` argv0 和 readlinkat 长度返回 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
@@ -97,6 +99,7 @@ oscomp: staged 2 test groups with 64 commands
 | `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
 | `runtestcase.rs` | `G/X/E` 队列、工作目录切换、argv 或 END 标记退化 |
 | `A` 队列记录 | 超时轮询、kill 或 argv 构造错误会拖死后续组 |
+| musl libctest | `run-static.sh` 或 `entry-static.exe` 布局不匹配可能仍为 0，但不得影响现有 8 组 |
 | lmbench-lite | 真实官方 `lmbench_all` 资源路径或参数不匹配可能导致 0 分，但不得影响现有 8 组 |
 | 动态 loader | 缺失/无效解释器重新触发 panic，或组间 libc 相互覆盖 |
 | nightly 升级 | 旧 RISC-V crate、汇编或 async API 再次不兼容 |

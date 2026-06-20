@@ -46,22 +46,24 @@ fn read_metadata(path: &str) -> Option<Vec<u8>> {
     Some(data)
 }
 
-fn wait_for_child(pid: isize, timeout_ms: Option<usize>) {
+fn wait_for_child(pid: isize, timeout_ms: Option<usize>) -> Option<i32> {
     let mut exit_code: i32 = 0;
     let Some(timeout_ms) = timeout_ms else {
-        waitpid(pid as usize, &mut exit_code);
-        return;
+        if waitpid(pid as usize, &mut exit_code) == pid {
+            return Some(exit_code);
+        }
+        return None;
     };
 
     let mut elapsed = 0usize;
     loop {
         let ret = waitpid_options(pid, &mut exit_code, WNOHANG);
         if ret == pid {
-            return;
+            return Some(exit_code);
         }
         if ret < 0 {
             println!("oscomp: waitpid {} failed: {}", pid, ret);
-            return;
+            return None;
         }
         if elapsed >= timeout_ms {
             println!(
@@ -71,17 +73,17 @@ fn wait_for_child(pid: isize, timeout_ms: Option<usize>) {
             let result = kill(pid, SIGKILL);
             if result < 0 {
                 println!("oscomp: kill {} failed: {}", pid, result);
-                return;
+                return None;
             }
             for _ in 0..100 {
                 let ret = waitpid_options(pid, &mut exit_code, WNOHANG);
                 if ret == pid || ret < 0 {
-                    return;
+                    return None;
                 }
                 sleep(WAIT_POLL_MS);
             }
             println!("oscomp: killed pid {} but it did not exit promptly", pid);
-            return;
+            return None;
         }
         sleep(WAIT_POLL_MS);
         elapsed += WAIT_POLL_MS;
@@ -93,7 +95,7 @@ fn run_test_with_argv(
     argv0: Option<&[u8]>,
     args: &[&[u8]],
     timeout_ms: Option<usize>,
-) {
+) -> Option<i32> {
     let mut path = Vec::new();
     path.extend_from_slice(b"./");
     path.extend_from_slice(name);
@@ -130,14 +132,15 @@ fn run_test_with_argv(
         }
         exit(-1);
     } else if pid > 0 {
-        wait_for_child(pid, timeout_ms);
+        wait_for_child(pid, timeout_ms)
     } else {
         println!("oscomp: fork failed");
+        None
     }
 }
 
 fn run_test(name: &[u8]) {
-    run_test_with_argv(name, None, &[], None);
+    let _ = run_test_with_argv(name, None, &[], None);
 }
 
 fn parse_usize(bytes: &[u8]) -> Option<usize> {
@@ -170,7 +173,31 @@ fn run_argv_record(record: &[u8]) {
     } else {
         None
     };
-    run_test_with_argv(name, argv0, &args, Some(timeout));
+    let _ = run_test_with_argv(name, argv0, &args, Some(timeout));
+}
+
+fn run_libctest_record(record: &[u8]) {
+    let mut fields = record.split(|byte| *byte == b'\t');
+    let Some(timeout) = fields.next().and_then(parse_usize) else {
+        println!("oscomp: malformed libctest timeout record");
+        return;
+    };
+    let Some(name) = fields.next().filter(|field| !field.is_empty()) else {
+        println!("oscomp: malformed libctest executable record");
+        return;
+    };
+    let Some(case) = fields.next().filter(|field| !field.is_empty()) else {
+        println!("oscomp: malformed libctest case record");
+        return;
+    };
+
+    let case_name = core::str::from_utf8(case).unwrap_or("unknown");
+    println!("RUN LIBCTEST CASE {}", case_name);
+    match run_test_with_argv(name, None, &[case], Some(timeout)) {
+        Some(0) => println!("Pass!"),
+        Some(status) => println!("FAIL LIBCTEST CASE {} : {}", case_name, status),
+        None => println!("FAIL LIBCTEST CASE {} : timeout", case_name),
+    }
 }
 
 fn enter_group(record: &[u8]) {
@@ -219,6 +246,10 @@ fn run_basic_queue() -> bool {
             b'A' => {
                 ran = true;
                 run_argv_record(&record[1..]);
+            }
+            b'C' => {
+                ran = true;
+                run_libctest_record(&record[1..]);
             }
             b'E' => {
                 if let Ok(marker) = core::str::from_utf8(&record[1..]) {

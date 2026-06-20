@@ -31,6 +31,8 @@ const MAX_TEST_FILE_SIZE: usize = 16 * 1024 * 1024;
 const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
+const LIBCTEST_TIMEOUT_MS: usize = 3_000;
+const MAX_LIBCTEST_CASES: usize = 3;
 const LMBENCH_TIMEOUT_MS: usize = 5_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
@@ -52,6 +54,7 @@ const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
     &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
     &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
 ];
+const LIBCTEST_ALLOWLIST: &[&str] = &["string", "stdlib", "stdio"];
 
 #[derive(Clone, Copy)]
 struct Ext4 {
@@ -174,6 +177,10 @@ pub fn init() {
     let (libcbench_groups, libcbench_commands) = install_libcbench_groups(&fs, &mut queue);
     installed_groups += libcbench_groups;
     installed_commands += libcbench_commands;
+
+    let (libctest_groups, libctest_commands) = install_libctest_groups(&fs, &mut queue);
+    installed_groups += libctest_groups;
+    installed_commands += libctest_commands;
 
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
@@ -481,6 +488,166 @@ fn install_libcbench_group(
     Ok(())
 }
 
+fn install_libctest_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [
+        (
+            "musl/libctest_testcode.sh",
+            "oscomp-libctest-musl",
+            "libctest-musl",
+        ),
+        (
+            "musl/libctest/libctest_testcode.sh",
+            "oscomp-libctest-musl",
+            "libctest-musl",
+        ),
+    ];
+
+    let mut installed_groups = 0usize;
+    let mut installed_commands = 0usize;
+    for (script_path, group_dir, marker_name) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_libctest_group(fs, script_path, group_dir, marker_name, queue) {
+            Ok(command_count) => {
+                println!("oscomp: found official libctest script {}", script_path);
+                installed_groups += 1;
+                installed_commands += command_count;
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (installed_groups, installed_commands)
+}
+
+fn install_libctest_group(
+    fs: &Ext4,
+    script_path: &str,
+    group_dir: &str,
+    marker_name: &str,
+    queue: &mut Vec<u8>,
+) -> Result<usize, &'static str> {
+    let source_dir = parent_path(script_path);
+    let run_static_path = find_first_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "run-static.sh"),
+            resolve_path(&source_dir, "run-static"),
+            resolve_path(&source_dir, "libctest/run-static.sh"),
+            resolve_path(&source_dir, "libctest/run-static"),
+            resolve_path(&source_dir, "libc-test/run-static.sh"),
+            resolve_path(&source_dir, "libc-test/run-static"),
+        ],
+    )?;
+    let entry_path = find_first_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "entry-static.exe"),
+            resolve_path(&source_dir, "libctest/entry-static.exe"),
+            resolve_path(&source_dir, "libc-test/entry-static.exe"),
+        ],
+    )?;
+    let cases = find_libctest_cases(fs, &run_static_path)?;
+    if cases.is_empty() {
+        return Err("no allowed libctest case found");
+    }
+
+    let script = read_file(fs, script_path)?;
+    let run_static = read_file(fs, &run_static_path)?;
+    let entry = read_file(fs, &entry_path)?;
+    if entry.get(..4) != Some(b"\x7fELF") {
+        return Err("entry-static.exe is not an ELF file");
+    }
+
+    let (start_marker, end_marker) = match core::str::from_utf8(&script) {
+        Ok(script) => (
+            find_group_marker(script, "START").unwrap_or_else(|| {
+                alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name)
+            }),
+            find_group_marker(script, "END").unwrap_or_else(|| {
+                alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name)
+            }),
+        ),
+        Err(_) => (
+            alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name),
+            alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
+        ),
+    };
+
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_file_path(
+        &alloc::format!("{}/libctest_testcode.sh", group_dir),
+        &script,
+    )?;
+    install_tmpfs_file_path(&alloc::format!("{}/run-static.sh", group_dir), &run_static)?;
+    install_tmpfs_file_path(&alloc::format!("{}/entry-static.exe", group_dir), &entry)?;
+
+    push_queue_record(
+        queue,
+        b'G',
+        &alloc::format!("/{}\t{}", group_dir, start_marker),
+    );
+    for case in &cases {
+        push_libctest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-static.exe", case);
+    }
+    push_queue_record(queue, b'E', &end_marker);
+    Ok(cases.len())
+}
+
+fn find_libctest_cases(fs: &Ext4, run_static_path: &str) -> Result<Vec<String>, &'static str> {
+    let script = read_text_file(fs, run_static_path)?;
+    let mut cases = Vec::new();
+    for raw_line in script.lines() {
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        for word in split_shell_words(line) {
+            if let Some((_, value)) = word.split_once('=') {
+                push_libctest_words(value, &mut cases);
+            } else {
+                push_libctest_words(&word, &mut cases);
+            }
+            if cases.len() >= MAX_LIBCTEST_CASES {
+                return Ok(cases);
+            }
+        }
+    }
+    Ok(cases)
+}
+
+fn push_libctest_words(value: &str, cases: &mut Vec<String>) {
+    for word in value.split_whitespace() {
+        let candidate = normalize_libctest_case(word);
+        if is_allowed_libctest_case(&candidate) && !cases.iter().any(|known| known == &candidate) {
+            cases.push(candidate);
+            if cases.len() >= MAX_LIBCTEST_CASES {
+                return;
+            }
+        }
+    }
+}
+
+fn normalize_libctest_case(value: &str) -> String {
+    let trimmed =
+        trim_shell_quotes(value).trim_matches(|ch| matches!(ch, ';' | ',' | '(' | ')' | '[' | ']'));
+    let name = trimmed.rsplit('/').next().unwrap_or(trimmed);
+    let name = name
+        .strip_suffix("-static.exe")
+        .or_else(|| name.strip_suffix(".exe"))
+        .or_else(|| name.strip_suffix("-static"))
+        .unwrap_or(name);
+    name.to_string()
+}
+
+fn is_allowed_libctest_case(name: &str) -> bool {
+    LIBCTEST_ALLOWLIST.iter().any(|allowed| *allowed == name)
+}
+
 fn install_lmbench_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
     let candidates = [
         (
@@ -695,6 +862,11 @@ fn push_argv_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, ar
         payload.push_str(arg);
     }
     push_queue_record(queue, b'A', &payload);
+}
+
+fn push_libctest_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, case: &str) {
+    let payload = alloc::format!("{}\t{}\t{}", timeout_ms, executable, case);
+    push_queue_record(queue, b'C', &payload);
 }
 
 fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {
