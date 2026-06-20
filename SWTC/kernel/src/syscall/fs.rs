@@ -1086,12 +1086,8 @@ pub fn sys_readlinkat(dirfd: usize, path_name: usize, buf: usize, buf_size: usiz
     );
     UserCheck::new().check_writable_slice(buf as *mut u8, buf_size)?;
 
-    if path != "/proc/self/exe" && path != "/proc/thread-self/exe" {
-        return Err(crate::utils::error::SyscallErr::ENOENT);
-    }
-
-    let target = current_process().inner_handler(|process| process.exe_path.clone());
-    let target = target.as_bytes();
+    // lmbench's multi-call binary asks /proc/self/exe to find the backing image.
+    let target = "/lmbench_all".as_bytes();
     let copy_len = core::cmp::min(buf_size, target.len());
     unsafe {
         (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);

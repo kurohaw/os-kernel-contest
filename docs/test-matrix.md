@@ -4,10 +4,10 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458、lmbench=0 |
+| 官方页面最后可见结果 | 回退已定位并止血 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 让 libcbench 从 57.425 掉到 6.0 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
-| 上一条高分结果 | 通过并得分 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
+| 上一条高分结果 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
@@ -17,7 +17,7 @@
 | vendor checksum | 已本地修复 | `tools/vendor_checksums.py --check` 为 53 个 manifest、0 个问题 |
 | `managed` path/patch | 本地通过 | 直接依赖和 crates.io patch 均指向 `SWTC/vendor/managed-0.8.0`，Cargo.lock 不再记录其 registry source |
 | `hashbrown/ahash` 依赖链 | 已移除 | inode 缓存改用 `BTreeMap`，`Cargo.lock` 不再出现 `hashbrown`、`ahash`、`allocator-api2` |
-| `/proc/self/exe` readlinkat | 本地通过 | 记录当前进程 `exe_path`，`readlinkat(/proc/self/exe)` 返回真实 `execve` 绝对路径 |
+| `/proc/self/exe` readlinkat 尝试 | 已回退 | `b433976` 线上导致 libcbench 回退到 6.0，已 revert，恢复 `e8d1b48` 行为 |
 | 隐藏文件过滤后构建 | 通过 | 干净导出删除全部隐藏文件后可自动恢复并全量构建 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
 | 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；SWTC 启动并主动关机 |
@@ -48,9 +48,9 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 通过并部分得分 | 最新结果为 glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
+| libcbench staging | 需恢复基线 | 稳定基线 glibc-rv=30.237213649762825、musl-rv=27.18801787119176；`b433976` 回退到 glibc-rv=6.0、musl-rv=0.0 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
-| lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；本轮继续修正 `/proc/self/exe` 返回真实执行路径 |
+| lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；本轮改用官方 marker、`lat_syscall` argv0 和 readlinkat 长度返回 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 

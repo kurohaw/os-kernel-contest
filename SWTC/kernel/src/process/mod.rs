@@ -86,8 +86,6 @@ pub struct ProcessInner {
     pub exit_code: i8,
     /// Current Work Directory
     pub cwd: String,
-    /// Absolute path of the current executable, used by /proc/self/exe.
-    pub exe_path: String,
     /// REAL, VIRTUAL, PROF timer
     pub timers: [ITimerval; 3],
     /// Process Resource
@@ -222,7 +220,6 @@ impl Process {
                 futex_queue: FutexQueue::new(),
                 exit_code: 0,
                 cwd: String::from("/"),
-                exe_path: String::from("/runtestcase"),
                 timers: [ITimerval::default(); 3],
                 rlimit: RLimit::new(0, 0),
                 pgid: pid.0,
@@ -273,7 +270,6 @@ impl Process {
         elf_file: Option<&Arc<dyn File>>,
         args: Vec<String>,
         envs: Vec<String>,
-        exe_path: String,
     ) -> SyscallRet {
         stack_trace!();
         log::debug!("[Process::exec] pid {}", current_process().pid());
@@ -305,7 +301,6 @@ impl Process {
             // proc.ustack_base = ustack_base;
             proc.memory_space = memory_space;
             proc.fd_table.close_on_exec();
-            proc.exe_path = exe_path;
         });
 
         let main_thread_inner = unsafe { &mut (*main_thread.inner.get()) };
@@ -632,7 +627,6 @@ impl Process {
                     futex_queue: FutexQueue::new(),
                     exit_code: 0,
                     cwd: parent_inner.cwd.clone(),
-                    exe_path: parent_inner.exe_path.clone(),
                     timers: [ITimerval::default(); 3],
                     rlimit: parent_inner.rlimit.clone(),
                     pgid: parent_inner.pgid,
