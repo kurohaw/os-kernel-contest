@@ -4,21 +4,21 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-19 19:09:49，`Compile Error / 0.00` |
-| 当前直接失败原因 | 官方离线 Cargo 在 `SWTC/vendor` directory source 中解析不到 `ahash`；它由内核直接依赖 `hashbrown` 拉入 |
-| 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321` |
-| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2007905583205` |
+| 最新可见官方结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
+| 当前直接失败原因 | `lmbench-lite` 仍为 0；怀疑真实 `lmbench_all` 通过 `/proc/self/exe` 找自身时拿到了不存在的 `/lmbench_all` |
+| 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
+| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.42523152095458` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187` |
-| 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.12274508733359`、musl-rv `27.07823396849846` |
-| 当前修复方向 | 先保证 Compile 阶段通过：内核 inode 缓存改用 `BTreeMap`，删除 `hashbrown/ahash/allocator-api2` 锁文件链路 |
+| 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
+| 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.237213649762825`、musl-rv `27.18801787119176` |
+| 当前修复方向 | 保持 377 基线，修正 `/proc/self/exe` 为当前进程真实执行路径，继续低风险探测 lmbench |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮目标先修官方 Compile Error：去掉 `hashbrown` 默认特性带来的
-`ahash/allocator-api2` 离线解析风险，保持 basic、本地启动和既有线上基线不回退。
-`lmbench-lite` 后续继续观察官方反馈再推进。
+这轮目标是在官方 Accepted 回归后继续小步推进 `lmbench-lite`：不增加新测试组，
+只把 `readlinkat(/proc/self/exe)` 从硬编码 `/lmbench_all` 改为当前进程的真实
+`execve` 路径，避免真实 `lmbench_all` 依赖自身路径时直接失败。
 
 ## 本轮提交门禁
 
@@ -28,7 +28,8 @@
 4. `SWTC/kernel/Cargo.lock` 中不再出现 `hashbrown`、`ahash` 或
    `allocator-api2`；`managed` 仍不记录 registry source/checksum。
 5. 官方完整参数下，无盘、basic 和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
-6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
+6. `readlinkat(/proc/self/exe)` 返回当前进程 `execve` 的绝对路径。
+7. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
 
@@ -39,8 +40,8 @@
 - RISC-V Lua 保持 `18/18`。
 - libcbench glibc-rv 不低于 `30.07126205049758` 附近。
 - libcbench musl-rv 不低于 `27.166961800614022` 附近。
-- 新增 lmbench START/END 使用官方脚本 marker；若仍为 0，也必须有明确
-  execve 失败、readlinkat 异常或 timeout 日志。
+- `lmbench-lite` 若仍为 0，下一步优先查看是否还有资源路径、argv0 或 timeout
+  线索；不要一次性扩大 lmbench 命令集。
 - `lmbench-lite` 不能把现有 8 组或 libcbench 拉回 0。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。

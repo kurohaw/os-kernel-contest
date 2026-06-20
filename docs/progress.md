@@ -8,13 +8,42 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 修复官方离线 `hashbrown -> ahash` 依赖解析编译错误 |
-| 当前提交 | 工作区已移除内核 `hashbrown` 依赖，待提交推送 |
-| 最新可见线上结果 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`ahash` 在官方离线 vendor directory source 中解析失败 |
-| 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；basic=204、BusyBox=98、Lua=18、libcbench=57.2007905583205 |
+| 当前里程碑 | 线上 Accepted 回归后修正 `/proc/self/exe` 语义，继续探测 lmbench |
+| 当前提交 | `e8d1b48` 已让官方回到 Accepted；工作区继续修 `readlinkat` 当前可执行路径 |
+| 最新可见线上结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458、lmbench=0 |
+| 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；现有 8 组稳定，libcbench 小幅高于上一轮 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
+| 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-20 Accepted 回归与 readlinkat 修正
+
+### 线上证据
+
+- 用户提供的官方 HTML 显示，2026-06-20 10:52:03 提交评测为
+  `Accepted / 377.42523152095464`。
+- `hashbrown -> ahash` 离线编译错误已消失，说明 `e8d1b48` 的依赖链修复有效。
+- RISC-V basic、BusyBox、Lua 仍保持既有满分；libcbench 为 glibc-rv
+  `30.237213649762825`、musl-rv `27.18801787119176`。
+- `lmbench` 仍为 0，说明当前 `lmbench-lite` 还没有被官方 parser 计分。
+
+### 当前修复
+
+- 为 `ProcessInner` 增加 `exe_path`，记录当前进程执行文件的绝对路径。
+- `fork` 时继承父进程 `exe_path`；`execve` 成功替换进程时保存解析后的真实路径。
+- `readlinkat(/proc/self/exe)` 与 `readlinkat(/proc/thread-self/exe)` 改为返回
+  当前进程的 `exe_path`，不再硬编码为不存在的 `/lmbench_all`。
+- 该修复面向真实 Linux 语义，也避免 lmbench 多调用二进制根据
+  `/proc/self/exe` 找回自身时打开错误路径。
+
+### 本地验证
+
+- `cargo +nightly-2025-02-18 fmt --manifest-path SWTC/kernel/Cargo.toml --check` 通过。
+- `CARGO_NET_OFFLINE=true make all RUST_TOOLCHAIN=nightly-2025-02-18` 通过。
+- `tools/vendor_checksums.py --check` 为 53/0。
+- 无测试盘官方风格 QEMU：输出 `!TEST FINISH!` 并主动关机。
+- 带官方 basic 双组镜像 QEMU：官方 `test_runner.py` 解析 `102/102`，失败数为 0。
+- `kernel-rv` 入口仍为 `0x80200000`。
 
 ## 2026-06-20 hashbrown/ahash 离线解析错误
 
@@ -44,6 +73,7 @@
 - 无测试盘官方风格 QEMU：输出 `!TEST FINISH!` 并主动关机。
 - 带官方 basic 双组镜像 QEMU：glibc/musl 共 64 条命令串行执行，
   官方 `test_runner.py` 解析 `102/102`，失败数为 0。
+
 ## 2026-06-19 lmbench-lite argv0 修正
 
 ### 线上证据
