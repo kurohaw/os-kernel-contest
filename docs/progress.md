@@ -8,25 +8,13 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 继续扩大 musl `libctest` 静态小测例覆盖，优先吃确定的 1 分 case |
-| 当前提交 | 保持 basic/BusyBox/Lua/libcbench/lmbench 现有路径，只扩大 musl libctest 静态 allowlist |
-| 最新可见线上结果 | 2026-06-20 13:57:28，`Accepted / 385.00317485255493`；libctest-musl=8，lmbench 仍为 0 |
+| 当前里程碑 | 只追一个新指标：尝试让 musl `libctest` 从 0 开始进分 |
+| 当前提交 | 已 revert `b433976`；本轮只新增 musl libctest 小批量 runner，不改 lmbench/readlinkat/argv |
+| 最新可见线上结果 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 导致 libcbench 从 57.425 掉到 6.0 |
 | 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
-
-## 2026-06-20 13:57 官方结果与 libctest 扩容
-
-- 最新官方结果为 2026-06-20 13:57:28，`Accepted / 385.00317485255493`。
-- 与 2026-06-20 12:03:02 的 `385.16527137512986` 相比，差值约
-  `0.16209652257493`，来源是 `libcbench` 性能分波动：功能项没有回退。
-- 当前稳定得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.003174852554935、
-  libctest=8。
-- `libctest-musl` 静态 8 个 case 已全部输出 `Pass!`。本轮继续沿这个确定路径
-  扩容到最多 64 个低风险静态 case，仍排除 pthread/socket/dlopen/fork 压力项。
-- `lmbench` 已经能进入真实 `lat_syscall` 路径并打印部分耗时，但官方表仍为 0；
-  本轮不继续扩大 lmbench，避免为了不确定收益影响当前 385 基线。
 
 ## 2026-06-20 13:19 官方结果与 lmbench argv 修复
 

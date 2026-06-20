@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 通过并保持当前高分 | 2026-06-20 13:57:28，`Accepted / 385.00317485255493`；basic=204、BusyBox=98、Lua=18、libcbench=57.003174852554935、libctest=8 |
-| 最新官方结果 | 通过并新增 libctest 得分 | 2026-06-20 13:57:28，`Accepted / 385.00317485255493`；相比 12:03 的 385.165 只少约 0.162，来自 libcbench 性能波动 |
+| 官方页面最后可见结果 | 回退已定位并止血 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 让 libcbench 从 57.425 掉到 6.0 |
+| 最新官方结果 | 通过并新增 libctest 得分 | 2026-06-20 13:19:00，`Accepted / 384.97435365207264`；libctest-musl=8，libcbench 小幅波动导致比上一条 385.165 低约 0.19 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
 | 上一条高分结果 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
@@ -33,7 +33,7 @@
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
-| `C` libctest 队列协议 | 已线上验证有增益 | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，8 个静态 case 已得分；本轮扩到最多 64 个低风险静态 case |
+| `C` libctest 队列协议 | 待官方验证 | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
@@ -51,8 +51,8 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 已恢复并有性能波动 | 最新线上 glibc-rv=29.86532810637954、musl-rv=27.13784674617539；短时分差按性能波动处理，不作为功能回退 |
-| musl libctest staging | 继续扩大覆盖 | 只探测 `musl/libctest_testcode.sh`，从 `run-static.sh` 筛出低风险静态 allowlist case，最多执行 64 个；继续排除 pthread/socket/dlopen/fork 压力项 |
+| libcbench staging | 需恢复基线 | 稳定基线 glibc-rv=30.237213649762825、musl-rv=27.18801787119176；`b433976` 回退到 glibc-rv=6.0、musl-rv=0.0 |
+| musl libctest staging | 待官方验证 | 只探测 `musl/libctest_testcode.sh`，从 `run-static.sh` 筛出 8 个基础 allowlist case，优先执行 `runtest.exe -w entry-static.exe <case>` |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；13:19 日志显示 `no match func -P`，本轮取消 `lat_syscall` argv0 特判 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
