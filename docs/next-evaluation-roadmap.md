@@ -5,23 +5,24 @@
 | 证据 | 结论 |
 |---|---|
 | 最新可见官方结果 | 2026-06-20 11:12:19，`Accepted / 326.0` |
+| 最新已提交结果 | 2026-06-20 13:19:00，`Accepted / 384.97435365207264`；libctest-musl 已进 8 分 |
 | 当前直接失败原因 | `b433976` 修改 `/proc/self/exe` readlinkat 后，libcbench 从 57.425 掉到 6.0 |
 | 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.42523152095458` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `6.0`、musl-rv `0.0` |
-| 当前修复方向 | 让 musl `libctest` 小批量探针改用官方 `runtest.exe`/per-case START-END 输出，目标是从 0 开始进分 |
+| 当前修复方向 | 修正 `lmbench_all` 参数形态；13:19 日志显示 `no match func -P`，说明 `lat_syscall` 不应作为 argv0 |
 | 本轮远端同步 | 已同步到 GitLab `main` 的 `aed0d6a fix: align libctest probe output` |
 | 本轮新增门禁修复 | 刷新 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`，消除 22 个 stale checksum |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮继续执行单指标策略：不再同时追 lmbench、readlinkat、argv 和资源路径，只把
-musl `libctest` 的执行输出改得更贴近官方脚本。若仍为 0，依据日志判断是
-`runtest.exe` 缺失、execve、超时还是 case 返回非 0；若导致回退，立即撤回
-libctest staging。
+这轮继续执行单指标策略：`libctest-musl` 已经拿到 8 分，不再扩大 allowlist。
+下一步只修 `lmbench_all` 的 argv 形态，让 `lat_syscall` 作为普通参数传入，
+避免再次输出 `no match func -P`。若导致 384/385 基线回退，立即撤回 lmbench
+staging 或该参数改动。
 
 ## 本轮提交门禁
 
@@ -44,10 +45,9 @@ libctest staging。
 - RISC-V Lua 保持 `18/18`。
 - libcbench glibc-rv 恢复到 `30.237213649762825` 附近。
 - libcbench musl-rv 恢复到 `27.18801787119176` 附近。
-- 若官方镜像包含 `musl/libctest_testcode.sh`、`run-static.sh` 和 `runtest.exe`，
-  串口日志应出现 `========== START entry-static.exe ... ==========` 这类
-  per-case 标记，以及对应 `Pass!` 或 `FAIL`。
-- libctest 不能把现有 8 组或 libcbench 拉回 0。
+- `libctest-musl` 保持 8 分，8 个基础 case 继续输出 `Pass!`。
+- `lmbench` 不再输出 `no match func -P`；若仍为 0，也必须进入 `lat_syscall`
+  真实路径或输出更具体的 errno/timeout。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 

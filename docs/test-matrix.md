@@ -5,6 +5,7 @@
 | 项目 | 状态 | 结果 |
 |---|---|---|
 | 官方页面最后可见结果 | 回退已定位并止血 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 让 libcbench 从 57.425 掉到 6.0 |
+| 最新官方结果 | 通过并新增 libctest 得分 | 2026-06-20 13:19:00，`Accepted / 384.97435365207264`；libctest-musl=8，libcbench 小幅波动导致比上一条 385.165 低约 0.19 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
 | 上一条高分结果 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
@@ -53,7 +54,7 @@
 | libcbench staging | 需恢复基线 | 稳定基线 glibc-rv=30.237213649762825、musl-rv=27.18801787119176；`b433976` 回退到 glibc-rv=6.0、musl-rv=0.0 |
 | musl libctest staging | 待官方验证 | 只探测 `musl/libctest_testcode.sh`，从 `run-static.sh` 筛出 8 个基础 allowlist case，优先执行 `runtest.exe -w entry-static.exe <case>` |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
-| lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；本轮改用官方 marker、`lat_syscall` argv0 和 readlinkat 长度返回 |
+| lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；13:19 日志显示 `no match func -P`，本轮取消 `lat_syscall` argv0 特判 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 

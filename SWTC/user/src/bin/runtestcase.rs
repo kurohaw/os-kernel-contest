@@ -167,13 +167,8 @@ fn run_argv_record(record: &[u8]) {
         println!("oscomp: malformed argv executable record");
         return;
     };
-    let mut args: Vec<&[u8]> = fields.collect();
-    let argv0 = if name == b"lmbench_all" && !args.is_empty() {
-        Some(args.remove(0))
-    } else {
-        None
-    };
-    let _ = run_test_with_argv(name, argv0, &args, Some(timeout));
+    let args: Vec<&[u8]> = fields.collect();
+    let _ = run_test_with_argv(name, None, &args, Some(timeout));
 }
 
 fn run_libctest_record(record: &[u8]) {

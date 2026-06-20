@@ -16,6 +16,20 @@
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
+## 2026-06-20 13:19 官方结果与 lmbench argv 修复
+
+- 最新可见官方结果为 2026-06-20 13:19:00，`Accepted / 384.97435365207264`。
+- 相比 2026-06-20 12:03:02 的 `385.16527137512986`，差值只有
+  `0.19091772305722`，来源是 `libcbench` 性能分波动：glibc-rv 从
+  `30.059660564398104` 到 `29.84938547814558`，musl-rv 从
+  `27.1056108107318` 到 `27.124968173927094`；不是测试项丢失。
+- `libctest-musl` 已稳定出现 8 个 case，且 `argv`、`basename`、`dirname`、
+  `env`、`qsort`、`random`、`snprintf`、`string` 均输出 `Pass!`，贡献 8 分。
+- `lmbench` 已进入 glibc/musl 两组，但每条命令输出 `no match func -P`。
+  这说明当前把 `lat_syscall` 当作 `argv[0]` 的兼容策略不符合官方
+  `lmbench_all` 的调度方式；下一步改为保留 `argv[0]=./lmbench_all`，
+  让 `lat_syscall` 作为第一个普通参数传入。
+
 ## 2026-06-20 远端同步与 checksum 门禁
 
 - 已同步 GitLab `main` 到 `aed0d6a fix: align libctest probe output`。
