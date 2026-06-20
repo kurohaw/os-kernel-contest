@@ -7,7 +7,6 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use hashbrown::HashMap;
 use log::debug;
 
 use crate::sync::mutex::SleepLock;
@@ -34,7 +33,7 @@ use super::{
 /// TODO: add max capacity limit and lru policy
 pub static INODE_CACHE: InodeCache = InodeCache::new();
 
-pub struct InodeCache(pub Mutex<Option<HashMap<HashKey, Arc<dyn Inode>>>>);
+pub struct InodeCache(pub Mutex<Option<BTreeMap<HashKey, Arc<dyn Inode>>>>);
 
 impl InodeCache {
     pub const fn new() -> Self {
@@ -42,7 +41,7 @@ impl InodeCache {
     }
 
     pub fn init(&self) {
-        *self.0.lock() = Some(HashMap::new());
+        *self.0.lock() = Some(BTreeMap::new());
     }
 
     pub fn get(&self, key: &HashKey) -> Option<Arc<dyn Inode>> {
@@ -60,7 +59,7 @@ impl InodeCache {
 
 pub static FAST_PATH_CACHE: FastPathCache = FastPathCache::new();
 
-pub struct FastPathCache(Mutex<Option<HashMap<String, Arc<dyn Inode>>>>);
+pub struct FastPathCache(Mutex<Option<BTreeMap<String, Arc<dyn Inode>>>>);
 
 impl FastPathCache {
     pub const fn new() -> Self {
@@ -68,7 +67,7 @@ impl FastPathCache {
     }
 
     pub fn init(&self) {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         for path in FAST_PATH {
             let (inode, _) = <dyn Inode>::lookup_from_root(path).ok().unwrap();
             let inode = inode.unwrap();

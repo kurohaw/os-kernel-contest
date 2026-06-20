@@ -4,34 +4,36 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-19 17:00:35，`Accepted / 377.200790558321` |
-| 当前直接失败原因 | `lmbench-lite` 已不影响既有基线，但 lmbench 仍为 0，优先修 marker、argv0 和 readlinkat |
+| 最新可见官方结果 | 2026-06-19 19:09:49，`Compile Error / 0.00` |
+| 当前直接失败原因 | 官方离线 Cargo 在 `SWTC/vendor` directory source 中解析不到 `ahash`；它由内核直接依赖 `hashbrown` 拉入 |
 | 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.2007905583205` |
-| 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；vendor checksum mismatch，已由 `0acac92` 修复 |
+| 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `30.12274508733359`、musl-rv `27.07823396849846` |
-| 当前修复方向 | 保持现有 377 基线，只修 `lmbench-lite` 执行入口与评分 marker |
+| 当前修复方向 | 先保证 Compile 阶段通过：内核 inode 缓存改用 `BTreeMap`，删除 `hashbrown/ahash/allocator-api2` 锁文件链路 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮目标是在不扩大测试范围的前提下修正 `lmbench-lite`：继续只执行
-`lat_syscall null/read/write/stat/fstat/open`，但改为使用官方脚本 marker、
-`lat_syscall` argv0 和正确的 `readlinkat` 返回长度。
+这轮目标先修官方 Compile Error：去掉 `hashbrown` 默认特性带来的
+`ahash/allocator-api2` 离线解析风险，保持 basic、本地启动和既有线上基线不回退。
+`lmbench-lite` 后续继续观察官方反馈再推进。
 
 ## 本轮提交门禁
 
 1. 强制离线 `make all`，vendor checksum 保持 `53/0`。
 2. 隐藏文件过滤后的干净导出仍能恢复 Cargo 配置并构建。
 3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
-4. `SWTC/kernel/Cargo.lock` 中 `managed` 不再记录 registry source/checksum。
+4. `SWTC/kernel/Cargo.lock` 中不再出现 `hashbrown`、`ahash` 或
+   `allocator-api2`；`managed` 仍不记录 registry source/checksum。
 5. 官方完整参数下，无盘、basic 和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
 6. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
 
-- Compile 阶段通过，不再出现 `no matching package named managed found`。
+- Compile 阶段通过，不再出现 `no matching package named managed found` 或
+  `no matching package found: ahash`。
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。

@@ -1,6 +1,6 @@
 use alloc::string::String;
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(Eq, Hash, PartialEq, Clone, Debug, Ord, PartialOrd)]
 pub struct HashKey {
     pub parent_ino: usize,
     pub child_name: String,

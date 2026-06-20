@@ -4,18 +4,46 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-19 |
-| 当前开发分支 | `main`，已快进同步 `gitlab/main` |
+| 当前日期 | 2026-06-20 |
+| 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | `lmbench-lite` 线上 0 分后的 marker、argv0 与 readlinkat 修正 |
-| 当前提交 | 已快进同步 GitLab `3e465b4`，工作区继续修正 lmbench 执行入口 |
-| 最新可见线上结果 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；lmbench 仍为 0，现有 8 组未明显回退 |
+| 当前里程碑 | 修复官方离线 `hashbrown -> ahash` 依赖解析编译错误 |
+| 当前提交 | 工作区已移除内核 `hashbrown` 依赖，待提交推送 |
+| 最新可见线上结果 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`ahash` 在官方离线 vendor directory source 中解析失败 |
 | 上一条通过基线 | 2026-06-19 17:00:35，`Accepted / 377.200790558321`；basic=204、BusyBox=98、Lua=18、libcbench=57.2007905583205 |
-| 上一条编译错误 | 2026-06-19 14:51:46，`Compile Error / 0.00`；`allocator-api2-0.2.21` vendor checksum mismatch，已由 `0acac92` 修复 |
+| 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-18 09:46:55，`Accepted / 377.3228370332187`；libcbench glibc-rv=30.15271484677692、musl-rv=27.170122186441827 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
+## 2026-06-20 hashbrown/ahash 离线解析错误
+
+### 线上证据
+
+- 用户提供的官方编译输出显示，2026-06-19 19:09:49 提交在
+  `SWTC/kernel` 的 Cargo 阶段失败。
+- 失败日志为：`error: no matching package found`，搜索包名为 `ahash`，
+  搜索位置是 `/coursegrader/submit/SWTC/kernel/../vendor`。
+- `ahash` 由 `hashbrown v0.14.5` 拉入，而 `hashbrown` 是内核
+  `Cargo.toml` 中的直接依赖。
+
+### 当前修复
+
+- `SWTC/kernel/src/fs/inode.rs` 的 `InodeCache` 和 `FastPathCache` 从
+  `hashbrown::HashMap` 改为 `alloc::collections::BTreeMap`。
+- `SWTC/kernel/src/fs/hash_key.rs` 为 `HashKey` 补充 `Ord/PartialOrd`，
+  满足 `BTreeMap` key 约束。
+- `SWTC/kernel/Cargo.toml` 删除 `hashbrown = "0.14"`。
+- `SWTC/kernel/Cargo.lock` 删除 `hashbrown`、`ahash`、`allocator-api2`、
+  `once_cell`、`version_check` 以及只被该链路使用的 `zerocopy 0.7` 条目。
+
+### 本地验证
+
+- `CARGO_NET_OFFLINE=true make all RUST_TOOLCHAIN=nightly-2025-02-18` 通过。
+- `kernel-rv` 仍为 RISC-V executable ELF，入口 `0x80200000`。
+- 无测试盘官方风格 QEMU：输出 `!TEST FINISH!` 并主动关机。
+- 带官方 basic 双组镜像 QEMU：glibc/musl 共 64 条命令串行执行，
+  官方 `test_runner.py` 解析 `102/102`，失败数为 0。
 ## 2026-06-19 lmbench-lite argv0 修正
 
 ### 线上证据
