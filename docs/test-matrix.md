@@ -15,6 +15,7 @@
 | 根目录 `make all` | 通过 | 移除 `hashbrown` 后，强制离线构建生成 `kernel-rv`、`kernel-la` |
 | 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-18`，构建日志无联网安装请求 |
 | vendor checksum | 已本地修复 | `tools/vendor_checksums.py --check` 为 53 个 manifest、0 个问题 |
+| `allocator-api2` checksum | 已刷新 | 同步 `aed0d6a` 后发现 22 个哈希不匹配；已重建 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json` |
 | `managed` path/patch | 本地通过 | 直接依赖和 crates.io patch 均指向 `SWTC/vendor/managed-0.8.0`，Cargo.lock 不再记录其 registry source |
 | `hashbrown/ahash` 依赖链 | 已移除 | inode 缓存改用 `BTreeMap`，`Cargo.lock` 不再出现 `hashbrown`、`ahash`、`allocator-api2` |
 | `/proc/self/exe` readlinkat 尝试 | 已回退 | `b433976` 线上导致 libcbench 回退到 6.0，已 revert，恢复 `e8d1b48` 行为 |

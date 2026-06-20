@@ -12,6 +12,8 @@
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `6.0`、musl-rv `0.0` |
 | 当前修复方向 | 让 musl `libctest` 小批量探针改用官方 `runtest.exe`/per-case START-END 输出，目标是从 0 开始进分 |
+| 本轮远端同步 | 已同步到 GitLab `main` 的 `aed0d6a fix: align libctest probe output` |
+| 本轮新增门禁修复 | 刷新 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`，消除 22 个 stale checksum |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |

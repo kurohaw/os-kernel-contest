@@ -16,6 +16,17 @@
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
+## 2026-06-20 远端同步与 checksum 门禁
+
+- 已同步 GitLab `main` 到 `aed0d6a fix: align libctest probe output`。
+- 同步后本地复查发现 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`
+  仍有 22 个文件哈希不匹配；虽然当前 `make all` 不再依赖该 crate，但它违反
+  vendor 门禁，后续依赖变化时可能再次触发官方 Compile Error。
+- 已用 `tools/vendor_checksums.py --fix` 刷新该 crate 的 checksum manifest，
+  复查结果为 53 个 manifest、0 个问题。
+- 本轮继续保持单指标策略：不扩大 lmbench/iozone/ltp/network，也不改
+  `readlinkat`；等待下一次官方日志确认 musl libctest 探针是否进分。
+
 ## 2026-06-20 musl libctest 小批量探针
 
 ### 当前策略
