@@ -4,26 +4,25 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504` |
-| 最新稳定结果 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；libctest-musl 已进 8 分 |
+| 最新可见官方结果 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934` |
+| 最新稳定结果 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934`；libctest-musl 已进 12 分 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
-| 上一条通过基线 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504` |
-| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `56.84113928835043`、libctest `8` |
+| 上一条通过基线 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934` |
+| 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.00362218124933`、libctest `12` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504` |
-| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `56.84113928835043`、libctest `8` |
-| 当前修复方向 | 在 384 基线上只把 musl libctest 从 8 个稳定 case 扩到 12 个，验证 4 个字符串类静态 case |
-| 本轮代码基线 | 已基于 GitLab `main` 的 `698d862 fix: avoid panic when exited child loses parent` |
+| 上一条高分结果 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934` |
+| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.00362218124933`、libctest `12` |
+| 当前修复方向 | 在 389 基线上只把 musl libctest 从 12 个稳定 case 扩到 16 个，验证 4 个低风险静态 case |
+| 本轮代码基线 | 已基于 GitLab `main` 的 `5d7ec29 chore: sync gitlab updates and vendor checksum` |
 | 本轮新增门禁修复 | 刷新 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`，消除 22 个 stale checksum |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮在 14:43 已恢复的 384 基线上继续小步提分：不恢复 `4602678` 的
-64-case libctest 扩容，只新增
-`string_memcpy`、`string_memset`、`string_strchr`、`string_strstr` 四个
-低风险静态字符串 case。下一次官方评测的核心要求是保持 basic、BusyBox、Lua、
-libcbench 与现有 8 个 libctest case，不因 4-case 探针回退。
+这轮在 16:16 已恢复的 389 基线上继续小步提分：不恢复 `4602678` 的
+64-case libctest 扩容，只新增 `string_memmem`、`string_strcspn`、`strtol`、
+`strverscmp` 四个低风险静态 case。下一次官方评测的核心要求是保持
+basic、BusyBox、Lua、libcbench 与现有 12 个 libctest case，不因 4-case 探针回退。
 
 ## 本轮提交门禁
 
@@ -34,7 +33,7 @@ libcbench 与现有 8 个 libctest case，不因 4-case 探针回退。
    `allocator-api2`；`managed` 仍不记录 registry source/checksum。
 5. 官方完整参数下，无盘、basic 和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
 6. `readlinkat` 行为与 `e8d1b48` 保持一致，不保留 `b433976` 的真实路径尝试。
-7. `C` 队列记录只服务 musl libctest，且本轮只从 8 个稳定 case 扩到 12 个 case。
+7. `C` 队列记录只服务 musl libctest，且本轮只从 12 个稳定 case 扩到 16 个 case。
 8. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
@@ -45,8 +44,8 @@ libcbench 与现有 8 个 libctest case，不因 4-case 探针回退。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
 - libcbench 维持约 `56` 到 `57` 分区间。
-- `libctest-musl` 至少保持 8 分；理想情况新增 1 到 4 分。
-- 新增 `string_memcpy`、`string_memset`、`string_strchr`、`string_strstr`
+- `libctest-musl` 至少保持 12 分；理想情况新增 1 到 4 分。
+- 新增 `string_memmem`、`string_strcspn`、`strtol`、`strverscmp`
   若失败，必须只表现为单 case `FAIL` 或 timeout，不能引发 kernel panic。
 - 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
@@ -62,8 +61,8 @@ libcbench 与现有 8 个 libctest case，不因 4-case 探针回退。
 
 ## 后续提分顺序
 
-1. 下一次先确认 384 基线不回退；若低于 377，优先回退本次 4-case 探针。
-2. 若 libctest 变为 9 到 12 分且无 panic，再继续按 4 到 8 个 case 一批扩容。
+1. 下一次先确认 389 基线不回退；若低于 384，优先回退本次 4-case 探针。
+2. 若 libctest 变为 13 到 16 分且无 panic，再继续按 4 到 8 个 case 一批扩容。
 3. `libctest` 稳定后，再回到 `lmbench-lite`，逐步加入 `lat_select file`、
    `lat_sig install/catch`；若 0 分，只根据 errno/timeout 修隔离 staging。
 4. iozone 先补齐安全返回路径，再只执行小文件 direct 命令，禁止恢复完整脚本。

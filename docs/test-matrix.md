@@ -4,11 +4,11 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 基线已恢复 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；basic=204、BusyBox=98、Lua=18、libcbench=56.84113928835043、libctest=8 |
-| 最新稳定官方结果 | 通过并新增 libctest 得分 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；libctest-musl=8，libcbench 约 56.84 分 |
+| 官方页面最后可见结果 | 基线已恢复 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934`；basic=204、BusyBox=98、Lua=18、libcbench=57.00362218124933、libctest=12 |
+| 最新稳定官方结果 | 通过并新增 libctest 得分 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934`；libctest-musl=12，libcbench 约 57.00 分 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
-| 上一条高分结果 | 通过并得分 | 2026-06-20 14:43:29，`Accepted / 384.8411392883504`；basic=204、BusyBox=98、Lua=18、libcbench=56.84113928835043、libctest=8 |
+| 上一条高分结果 | 通过并得分 | 2026-06-20 16:16:33，`Accepted / 389.00362218124934`；basic=204、BusyBox=98、Lua=18、libcbench=57.00362218124933、libctest=12 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
@@ -52,8 +52,8 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 已恢复基线 | 14:43 线上 libcbench 合计 56.84113928835043；`b433976` 的 readlinkat 回退问题已止血 |
-| musl libctest staging | 本轮小批量扩到 12 case | 已验证 8 case：`argv/basename/dirname/env/qsort/random/snprintf/string`；本轮只新增 `string_memcpy/string_memset/string_strchr/string_strstr` |
+| libcbench staging | 已恢复基线 | 16:16 线上 libcbench 合计 57.00362218124933；`b433976` 的 readlinkat 回退问题已止血 |
+| musl libctest staging | 本轮小批量扩到 16 case | 已验证 12 case；本轮只新增 `string_memmem/string_strcspn/strtol/strverscmp` |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | lmbench-lite staging | 线上仍 0，暂不扩大 | 14:43 glibc 已输出多条 `lat_syscall` 结果但未得分，musl 6 条 lite 命令超时；本轮不改 lmbench |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
