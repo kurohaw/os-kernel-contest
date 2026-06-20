@@ -4,25 +4,24 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-20 11:12:19，`Accepted / 326.0` |
-| 最新已提交结果 | 2026-06-20 13:19:00，`Accepted / 384.97435365207264`；libctest-musl 已进 8 分 |
-| 当前直接失败原因 | `b433976` 修改 `/proc/self/exe` readlinkat 后，libcbench 从 57.425 掉到 6.0 |
+| 最新可见官方结果 | 2026-06-20 14:24:44，`Accepted / 326.0` |
+| 最新稳定结果 | 2026-06-20 13:57:28，`Accepted / 385.00317485255493`；libctest-musl 已进 8 分 |
+| 当前直接失败原因 | `4602678` 扩容 libctest 后，libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic |
 | 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.42523152095458` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
-| 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `6.0`、musl-rv `0.0` |
-| 当前修复方向 | 修正 `lmbench_all` 参数形态；13:19 日志显示 `no match func -P`，说明 `lat_syscall` 不应作为 argv0 |
+| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `6.0`、libctest `0` |
+| 当前修复方向 | 先 revert `4602678` 回到 8 个稳定 libctest case，并修复 orphan exit 不再 panic |
 | 本轮远端同步 | 已同步到 GitLab `main` 的 `aed0d6a fix: align libctest probe output` |
 | 本轮新增门禁修复 | 刷新 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`，消除 22 个 stale checksum |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮继续执行单指标策略：`libctest-musl` 已经拿到 8 分，不再扩大 allowlist。
-下一步只修 `lmbench_all` 的 argv 形态，让 `lat_syscall` 作为普通参数传入，
-避免再次输出 `no match func -P`。若导致 384/385 基线回退，立即撤回 lmbench
-staging 或该参数改动。
+这轮先执行止血策略：撤回 `4602678` 的 64-case libctest 扩容，保留已验证的
+8 个 case；同时修复 `exit.rs:74` 的父进程 weak 指针失效 panic。下一次官方
+评测只要求恢复 385 左右基线，不继续扩大 libctest、lmbench、iozone 或网络组。
 
 ## 本轮提交门禁
 
@@ -33,7 +32,7 @@ staging 或该参数改动。
    `allocator-api2`；`managed` 仍不记录 registry source/checksum。
 5. 官方完整参数下，无盘、basic 和 BusyBox 外部探针均无 panic、无全局超时并主动关机。
 6. `readlinkat` 行为与 `e8d1b48` 保持一致，不保留 `b433976` 的真实路径尝试。
-7. 新增 `C` 队列记录只服务 musl libctest，不能改变既有 `G/X/A/E` 队列语义。
+7. `C` 队列记录只服务 musl libctest，且本轮只保留已验证 8 个 case。
 8. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
 ## 下一次官方评测验收
@@ -43,11 +42,10 @@ staging 或该参数改动。
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
-- libcbench glibc-rv 恢复到 `30.237213649762825` 附近。
-- libcbench musl-rv 恢复到 `27.18801787119176` 附近。
+- libcbench glibc-rv 恢复到约 `29` 到 `30` 分区间。
+- libcbench musl-rv 恢复到约 `27` 分区间。
 - `libctest-musl` 保持 8 分，8 个基础 case 继续输出 `Pass!`。
-- `lmbench` 不再输出 `no match func -P`；若仍为 0，也必须进入 `lat_syscall`
-  真实路径或输出更具体的 errno/timeout。
+- 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
 
@@ -61,14 +59,13 @@ staging 或该参数改动。
 
 ## 后续提分顺序
 
-1. 观察本轮 musl `libctest` 官方结果：若有得分，继续按 allowlist 小批量加入
-   `ctype`、`time`、`argv/env` 等基础 case；若 0 分，先看日志确认
-   `entry-static.exe <case>` 是否真正执行。
-2. `libctest` 稳定后，再回到 `lmbench-lite`，逐步加入 `lat_select file`、
+1. 下一次先确认 385 基线恢复；若仍为 326，优先查 libcbench-glibc 串口是否还有 panic。
+2. 基线恢复后，再考虑把 libctest 扩容拆成 4 到 8 个 case 一批，而不是一次扩到 64。
+3. `libctest` 稳定后，再回到 `lmbench-lite`，逐步加入 `lat_select file`、
    `lat_sig install/catch`；若 0 分，只根据 errno/timeout 修隔离 staging。
-3. iozone 先补齐安全返回路径，再只执行小文件 direct 命令，禁止恢复完整脚本。
-4. 再推进 ltp、iperf、netperf 等更容易暴露网络或多进程语义的问题。
-5. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
+4. iozone 先补齐安全返回路径，再只执行小文件 direct 命令，禁止恢复完整脚本。
+5. 再推进 ltp、iperf、netperf 等更容易暴露网络或多进程语义的问题。
+6. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
 
 ## 本轮暂缓
 

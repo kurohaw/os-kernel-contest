@@ -8,13 +8,26 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 只追一个新指标：尝试让 musl `libctest` 从 0 开始进分 |
-| 当前提交 | 已 revert `b433976`；本轮只新增 musl libctest 小批量 runner，不改 lmbench/readlinkat/argv |
-| 最新可见线上结果 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 导致 libcbench 从 57.425 掉到 6.0 |
+| 当前里程碑 | 先恢复 385 基线，再继续小步提分 |
+| 当前提交 | 已 revert `4602678` 的 libctest 扩容，并修复 `exit.rs:74` 父进程 weak 失效 panic |
+| 最新可见线上结果 | 2026-06-20 14:24:44，`Accepted / 326.0`；`4602678` 扩容后在 libcbench-glibc 阶段触发内核 panic |
 | 上一条通过基线 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-20 14:24 libctest 扩容回退
+
+- 最新官方结果为 2026-06-20 14:24:44，`Accepted / 326.0`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=6.0、libctest=0。
+- 串口日志显示启动时已暂存 11 个测试组、146 条命令，但在
+  `#### OS COMP TEST GROUP START libcbench-glibc ####` 后触发 panic：
+  `src/process/thread/exit.rs:74 called Option::unwrap() on a None value`。
+- 本轮判断：`4602678 feat: expand musl libctest static coverage` 将队列从约 90
+  条扩大到 146 条，提前暴露了退出路径中父进程 weak 指针失效的内核 bug。
+- 当前处理：先 revert `4602678`，恢复已验证的 8 个 libctest case；同时把
+  `exit.rs:74` 的 `upgrade().unwrap()` 改为父进程已释放时跳过 SIGCHLD 通知，
+  禁止同类 orphan exit 再次 panic。
 
 ## 2026-06-20 13:19 官方结果与 lmbench argv 修复
 

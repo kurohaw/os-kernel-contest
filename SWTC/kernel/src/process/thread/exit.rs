@@ -6,7 +6,7 @@ use crate::{
     stack_trace,
 };
 use alloc::{sync::Arc, vec::Vec};
-use log::{debug, info};
+use log::{debug, info, warn};
 
 use super::Thread;
 
@@ -69,20 +69,30 @@ pub fn handle_exit(thread: &Arc<Thread>) {
     // We must clear the children set here to avoid memeory leak.
     process_inner.children.clear();
 
-    let parent_prcess = {
-        if let Some(parent_process) = process_inner.parent.as_ref() {
-            parent_process.upgrade().unwrap()
-        } else {
-            panic!("initproc will die");
-        }
-    };
+    let parent_process = process_inner
+        .parent
+        .as_ref()
+        .and_then(|parent_process| parent_process.upgrade());
     // In order to avoid dead lock
     drop(process_inner);
 
     stack_trace!();
-    debug!("Send SIGCHILD to parent {}", parent_prcess.pid());
-    // parent_prcess.mailbox.send_event(Event::CHILD_EXIT);
-    parent_prcess.recv_signal(SIGCHLD).unwrap();
+    if let Some(parent_process) = parent_process {
+        debug!("Send SIGCHILD to parent {}", parent_process.pid());
+        // parent_process.mailbox.send_event(Event::CHILD_EXIT);
+        if let Err(err) = parent_process.recv_signal(SIGCHLD) {
+            warn!(
+                "failed to send SIGCHLD to parent {}: {:?}",
+                parent_process.pid(),
+                err
+            );
+        }
+    } else {
+        warn!(
+            "skip SIGCHLD for process {} because parent already exited",
+            thread.process.pid()
+        );
+    }
 }
 
 /// Exit and terminate all threads of the current process.

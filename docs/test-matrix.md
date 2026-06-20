@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 回退已定位并止血 | 2026-06-20 11:12:19，`Accepted / 326.0`；`b433976` 让 libcbench 从 57.425 掉到 6.0 |
-| 最新官方结果 | 通过并新增 libctest 得分 | 2026-06-20 13:19:00，`Accepted / 384.97435365207264`；libctest-musl=8，libcbench 小幅波动导致比上一条 385.165 低约 0.19 |
+| 官方页面最后可见结果 | 回退已定位并止血 | 2026-06-20 14:24:44，`Accepted / 326.0`；`4602678` 扩容 libctest 后在 libcbench-glibc 触发 `exit.rs:74` panic |
+| 最新稳定官方结果 | 通过并新增 libctest 得分 | 2026-06-20 13:57:28，`Accepted / 385.00317485255493`；libctest-musl=8，libcbench 约 57 分 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
 | 上一条高分结果 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；libcbench glibc-rv=30.237213649762825、musl-rv=27.18801787119176 |
@@ -20,6 +20,7 @@
 | `managed` path/patch | 本地通过 | 直接依赖和 crates.io patch 均指向 `SWTC/vendor/managed-0.8.0`，Cargo.lock 不再记录其 registry source |
 | `hashbrown/ahash` 依赖链 | 已移除 | inode 缓存改用 `BTreeMap`，`Cargo.lock` 不再出现 `hashbrown`、`ahash`、`allocator-api2` |
 | `/proc/self/exe` readlinkat 尝试 | 已回退 | `b433976` 线上导致 libcbench 回退到 6.0，已 revert，恢复 `e8d1b48` 行为 |
+| `exit.rs:74` 父进程 weak panic | 已修复待官方验证 | 14:24 日志显示 libcbench-glibc 阶段 `parent_process.upgrade().unwrap()` panic；已改为父进程已释放时跳过 SIGCHLD |
 | 隐藏文件过滤后构建 | 通过 | 干净导出删除全部隐藏文件后可自动恢复并全量构建 |
 | `kernel-rv` 格式 | 通过 | RISC-V executable ELF，入口 `0x80200000` |
 | 官方完整 1G 单核启动参数 | 通过 | 含网络设备与 RTC；SWTC 启动并主动关机 |
@@ -52,7 +53,7 @@
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
 | libcbench staging | 需恢复基线 | 稳定基线 glibc-rv=30.237213649762825、musl-rv=27.18801787119176；`b433976` 回退到 glibc-rv=6.0、musl-rv=0.0 |
-| musl libctest staging | 待官方验证 | 只探测 `musl/libctest_testcode.sh`，从 `run-static.sh` 筛出 8 个基础 allowlist case，优先执行 `runtest.exe -w entry-static.exe <case>` |
+| musl libctest staging | 回退到稳定 8 case | `4602678` 扩到 64 case 后引发 326 回退，已撤回；保留已验证的 `argv/basename/dirname/env/qsort/random/snprintf/string` |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | lmbench-lite staging | 线上仍 0，继续修正 | 识别 glibc/musl `lmbench_testcode.sh`，只执行 `lat_syscall null/read/write/stat/fstat/open`；13:19 日志显示 `no match func -P`，本轮取消 `lat_syscall` argv0 特判 |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
