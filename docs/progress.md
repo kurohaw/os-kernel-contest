@@ -22,12 +22,15 @@
 
 - 本轮只追 `libctest` 一个指标，不同时改 `lmbench`、`readlinkat`、argv 或资源路径。
 - `oscomp` 只探测 musl 入口 `musl/libctest_testcode.sh`，不新增 glibc libctest。
-- 读取官方 `run-static.sh` 或 `run-static`，只从中筛出 `string`、`stdlib`、
-  `stdio` 三个 allowlist case。
-- 只暂存 `entry-static.exe` 和脚本元数据到 `oscomp-libctest-musl`，每个 case 用
-  新增 `C` 队列记录执行 `entry-static.exe <case>`。
+- 读取官方 `run-static.sh` 或 `run-static`，只从中筛出
+  `argv`、`basename`、`dirname`、`env`、`qsort`、`random`、`snprintf`、
+  `string` 这 8 个 allowlist case。
+- 只暂存 `entry-static.exe`、可选 `runtest.exe` 和脚本元数据到
+  `oscomp-libctest-musl`；若存在官方 runner，就执行
+  `runtest.exe -w entry-static.exe <case>`，否则 fallback 到 `C` 队列记录。
 - `runtestcase` 对 `C` 记录按真实退出码输出 `Pass!` 或
-  `FAIL LIBCTEST CASE ...`，每条最多运行 3 秒，超时后继续后续队列。
+  `FAIL LIBCTEST CASE ...`，并补齐 per-case `========== START/END ... ==========`
+  标记；每条最多运行 3 秒，超时后继续后续队列。
 
 ### 验收重点
 

@@ -192,12 +192,21 @@ fn run_libctest_record(record: &[u8]) {
     };
 
     let case_name = core::str::from_utf8(case).unwrap_or("unknown");
+    let executable_name = core::str::from_utf8(name).unwrap_or("entry-static.exe");
+    println!(
+        "========== START {} {} ==========",
+        executable_name, case_name
+    );
     println!("RUN LIBCTEST CASE {}", case_name);
     match run_test_with_argv(name, None, &[case], Some(timeout)) {
         Some(0) => println!("Pass!"),
         Some(status) => println!("FAIL LIBCTEST CASE {} : {}", case_name, status),
         None => println!("FAIL LIBCTEST CASE {} : timeout", case_name),
     }
+    println!(
+        "========== END {} {} ==========",
+        executable_name, case_name
+    );
 }
 
 fn enter_group(record: &[u8]) {

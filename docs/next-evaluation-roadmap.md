@@ -11,14 +11,15 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464` |
 | 最新线上得分 | basic glibc-rv `102/102`、musl-rv `102/102`；BusyBox glibc-rv `49/49`、musl-rv `49/49`；Lua glibc-rv `9/9`、musl-rv `9/9`；libcbench glibc-rv `6.0`、musl-rv `0.0` |
-| 当前修复方向 | 在回退 `b433976` 后，只新增 musl `libctest` 小批量探针，目标是让 libctest 从 0 开始进分 |
+| 当前修复方向 | 让 musl `libctest` 小批量探针改用官方 `runtest.exe`/per-case START-END 输出，目标是从 0 开始进分 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-这轮执行新的单指标策略：不再同时追 lmbench、readlinkat、argv 和资源路径，只把
-musl `libctest` 做成最小 allowlist 探针。若仍为 0，依据日志判断是脚本布局、
-execve、超时还是 case 返回非 0；若导致回退，立即撤回 libctest staging。
+这轮继续执行单指标策略：不再同时追 lmbench、readlinkat、argv 和资源路径，只把
+musl `libctest` 的执行输出改得更贴近官方脚本。若仍为 0，依据日志判断是
+`runtest.exe` 缺失、execve、超时还是 case 返回非 0；若导致回退，立即撤回
+libctest staging。
 
 ## 本轮提交门禁
 
@@ -41,8 +42,9 @@ execve、超时还是 case 返回非 0；若导致回退，立即撤回 libctest
 - RISC-V Lua 保持 `18/18`。
 - libcbench glibc-rv 恢复到 `30.237213649762825` 附近。
 - libcbench musl-rv 恢复到 `27.18801787119176` 附近。
-- 若官方镜像包含 `musl/libctest_testcode.sh` 和 `run-static.sh`，串口日志应出现
-  `RUN LIBCTEST CASE string`、`stdlib`、`stdio` 以及对应 `Pass!` 或 `FAIL`。
+- 若官方镜像包含 `musl/libctest_testcode.sh`、`run-static.sh` 和 `runtest.exe`，
+  串口日志应出现 `========== START entry-static.exe ... ==========` 这类
+  per-case 标记，以及对应 `Pass!` 或 `FAIL`。
 - libctest 不能把现有 8 组或 libcbench 拉回 0。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。

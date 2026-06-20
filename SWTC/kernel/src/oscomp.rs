@@ -32,7 +32,7 @@ const MAX_SCRIPT_DEPTH: usize = 4;
 const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
-const MAX_LIBCTEST_CASES: usize = 3;
+const MAX_LIBCTEST_CASES: usize = 8;
 const LMBENCH_TIMEOUT_MS: usize = 5_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
@@ -54,7 +54,9 @@ const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
     &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
     &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
 ];
-const LIBCTEST_ALLOWLIST: &[&str] = &["string", "stdlib", "stdio"];
+const LIBCTEST_ALLOWLIST: &[&str] = &[
+    "argv", "basename", "dirname", "env", "qsort", "random", "snprintf", "string",
+];
 
 #[derive(Clone, Copy)]
 struct Ext4 {
@@ -551,6 +553,14 @@ fn install_libctest_group(
             resolve_path(&source_dir, "libc-test/entry-static.exe"),
         ],
     )?;
+    let runtest_path = find_optional_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "runtest.exe"),
+            resolve_path(&source_dir, "libctest/runtest.exe"),
+            resolve_path(&source_dir, "libc-test/runtest.exe"),
+        ],
+    )?;
     let cases = find_libctest_cases(fs, &run_static_path)?;
     if cases.is_empty() {
         return Err("no allowed libctest case found");
@@ -562,6 +572,16 @@ fn install_libctest_group(
     if entry.get(..4) != Some(b"\x7fELF") {
         return Err("entry-static.exe is not an ELF file");
     }
+    let runtest = match &runtest_path {
+        Some(path) => {
+            let data = read_file(fs, path)?;
+            if data.get(..4) != Some(b"\x7fELF") {
+                return Err("runtest.exe is not an ELF file");
+            }
+            Some(data)
+        }
+        None => None,
+    };
 
     let (start_marker, end_marker) = match core::str::from_utf8(&script) {
         Ok(script) => (
@@ -585,6 +605,9 @@ fn install_libctest_group(
     )?;
     install_tmpfs_file_path(&alloc::format!("{}/run-static.sh", group_dir), &run_static)?;
     install_tmpfs_file_path(&alloc::format!("{}/entry-static.exe", group_dir), &entry)?;
+    if let Some(runtest) = &runtest {
+        install_tmpfs_file_path(&alloc::format!("{}/runtest.exe", group_dir), runtest)?;
+    }
 
     push_queue_record(
         queue,
@@ -592,7 +615,11 @@ fn install_libctest_group(
         &alloc::format!("/{}\t{}", group_dir, start_marker),
     );
     for case in &cases {
-        push_libctest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-static.exe", case);
+        if runtest.is_some() {
+            push_libctest_runtest_record(queue, LIBCTEST_TIMEOUT_MS, case);
+        } else {
+            push_libctest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-static.exe", case);
+        }
     }
     push_queue_record(queue, b'E', &end_marker);
     Ok(cases.len())
@@ -646,6 +673,17 @@ fn normalize_libctest_case(value: &str) -> String {
 
 fn is_allowed_libctest_case(name: &str) -> bool {
     LIBCTEST_ALLOWLIST.iter().any(|allowed| *allowed == name)
+}
+
+fn find_optional_regular_path(fs: &Ext4, paths: &[String]) -> Result<Option<String>, &'static str> {
+    for path in paths {
+        if let Ok(Some(info)) = lookup_path_str(fs, path) {
+            if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
+                return Ok(Some(path.clone()));
+            }
+        }
+    }
+    Ok(None)
 }
 
 fn install_lmbench_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
@@ -867,6 +905,15 @@ fn push_argv_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, ar
 fn push_libctest_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, case: &str) {
     let payload = alloc::format!("{}\t{}\t{}", timeout_ms, executable, case);
     push_queue_record(queue, b'C', &payload);
+}
+
+fn push_libctest_runtest_record(queue: &mut Vec<u8>, timeout_ms: usize, case: &str) {
+    let payload = alloc::format!(
+        "{}\truntest.exe\t-w\tentry-static.exe\t{}",
+        timeout_ms,
+        case
+    );
+    push_queue_record(queue, b'A', &payload);
 }
 
 fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {
