@@ -33,7 +33,7 @@ const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
-const LMBENCH_TIMEOUT_MS: usize = 5_000;
+const LMBENCH_TIMEOUT_MS: usize = 20_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -53,6 +53,9 @@ const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
     &["lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench"],
     &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
     &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
+    &["lat_select", "-n", "100", "-P", "1", "file"],
+    &["lat_sig", "-P", "1", "install"],
+    &["lat_sig", "-P", "1", "catch"],
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",

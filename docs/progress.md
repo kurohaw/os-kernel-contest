@@ -8,8 +8,8 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，下一步锁定 484 基线后转向 lmbench-lite 或 libcbench |
-| 当前提交 | 官方 static.txt 全部 107 个 musl libctest case 已线上通过，文档记录新基线 |
+| 当前里程碑 | musl libctest static 已满分，锁定 484 基线后转向 lmbench-lite |
+| 当前提交 | lmbench-lite 从 6 条 `lat_syscall` 扩到 9 条轻量命令，并把单命令超时放宽到 20 秒 |
 | 最新可见线上结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench=57.255157002759375 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
@@ -28,6 +28,21 @@
   出现官方回归。
 - 下一阶段优先选一个新指标做最小探针。推荐先回到 `lmbench-lite`，只跑一条短命令
   或先做脚本/资源 staging 诊断；若出现回退，立刻撤回并保留 484 基线。
+
+## 2026-06-21 lmbench-lite 9-command 探针
+
+- 在 484 基线上只推进 `lmbench` 一个指标，不修改 libctest、libcbench、iozone、
+  ltp、网络或 LoongArch。
+- 线上历史显示 6 条 `lat_syscall` lite 命令仍为 0 分，且 musl 曾出现超时迹象。
+- 本轮保持官方参数语义，不添加 `-N` 或缩短 benchmark 轮次；只把每条 lmbench
+  命令超时从 5 秒放宽到 20 秒，给默认 benchmark 足够时间吐出可解析输出。
+- 在原有 `lat_syscall null/read/write/stat/fstat/open` 后新增官方脚本中紧接着的
+  3 条轻量命令：`lat_select -n 100 -P 1 file`、
+  `lat_sig -P 1 install`、`lat_sig -P 1 catch`。
+- 暂不加入 `lat_sig prot`、`lat_pipe`、`lat_proc`、`lmdd`、`lat_fs` 或带宽测试；
+  这些更容易触发文件、进程、mmap 或管道语义问题，等 9-command 结果确认后再拆。
+- 本地 lmbench 夹具使用假 `lmbench_all` 验证队列和隔离：glibc/musl 两组均被识别，
+  共暂存 18 条命令，START/END 各 2 次，最终主动关机且无 panic。
 
 ## 2026-06-21 11:49 libctest static 全量探针
 
