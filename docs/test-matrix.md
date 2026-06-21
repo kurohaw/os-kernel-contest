@@ -4,7 +4,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | lmbench 仍为 0，484 基线基本稳定 | 2026-06-21 12:23:56，`Accepted / 484.15161299502336`；basic=204、BusyBox=98、Lua=18、libcbench=57.15161299502337、libctest=107、lmbench=0 |
+| 官方页面最后可见结果 | lmbench 仍为 0，484 基线基本稳定 | 2026-06-21 12:36:14，`Accepted / 484.04145452769785`；basic=204、BusyBox=98、Lua=18、libcbench=57.04145452769787、libctest=107、lmbench=0 |
 | 最新稳定官方结果 | 通过并拿满 musl static libctest | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench 约 57.25 分 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
@@ -55,8 +55,8 @@
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
 | musl libctest staging | static 全量已通过 | 官方 `libc-test/static.txt` 归一化后的 107 个 static case 已全部进入 musl-rv 得分 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
-| lmbench-lite staging | 本轮改为短轮次探针 | 12:23 的 9-command 探针仍为 0；保留同一批命令，加入 `-W 1 -N 10` 并把单命令 timeout 收回到 10 秒 |
-| iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
+| lmbench-lite staging | 仍未计分 | 12:36 的 9-command 短轮次探针仍为 0；保留现状，不继续在 lmbench 上扩命令 |
+| iozone-lite staging | 本轮新增最小探针 | 只识别官方脚本和暂存 `iozone`，每组执行 `iozone -i 0 -i 1 -r 1k -s 64k`，禁止恢复完整 8 命令脚本 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
 未直接运行 `zhouzhouyi/os-contest:20260510` Docker 镜像，因为当前机器没有
@@ -104,6 +104,7 @@ oscomp: staged 2 test groups with 64 commands
 | `A` 队列记录 | 超时轮询、kill 或 argv 构造错误会拖死后续组 |
 | musl libctest | `run-static.sh` 或 `entry-static.exe` 布局不匹配可能仍为 0，但不得影响现有 8 组 |
 | lmbench-lite | 若短轮次后仍不出现 `Simple/Select/Signal handler` 输出，可能继续 0 分；不得影响 484 基线 |
+| iozone-lite | 只允许最小 `A` 队列探针，若 libcbench/basic 回退需立即撤回 |
 | 动态 loader | 缺失/无效解释器重新触发 panic，或组间 libc 相互覆盖 |
 | nightly 升级 | 旧 RISC-V crate、汇编或 async API 再次不兼容 |
 | 日志 | basic START/END 被调试输出污染 |

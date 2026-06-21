@@ -8,13 +8,28 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，锁定 484 基线后继续拆 lmbench-lite |
-| 当前提交 | 9-command lmbench 未出分后，给 9 条轻量命令加入 `-W 1 -N 10` 短轮次参数 |
-| 最新可见线上结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench=57.255157002759375 |
+| 当前里程碑 | musl libctest static 已满分，484 基线稳定，下一步改用 iozone-lite 探针 |
+| 当前提交 | lmbench 短轮次仍为 0 后，新增最小 iozone 探针；每组只跑一条小文件 write/read |
+| 最新可见线上结果 | 2026-06-21 12:36:14，`Accepted / 484.04145452769785`；libctest-musl=107，libcbench=57.04145452769787，lmbench=0 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-21 12:36 lmbench 短轮次结果与 iozone-lite 探针
+
+- 最新官方结果为 2026-06-21 12:36:14，`Accepted / 484.04145452769785`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.04145452769787、
+  libctest=107，lmbench 仍为 0。
+- 与 12:05 的 `484.2551570027594` 相比只少约 0.2137 分，来源仍是 libcbench
+  性能波动；basic、BusyBox、Lua 和 libctest 107 均保持稳定。
+- 这说明 `-W 1 -N 10` 的 lmbench 短轮次没有带来线上计分，本轮不继续扩大
+  lmbench 命令集。
+- 新增 `iozone-lite`：识别 glibc/musl 官方 `iozone_testcode.sh` 和 `iozone`
+  ELF，但不执行完整 8 命令脚本；每个 ABI 只通过 `A` 队列执行
+  `iozone -i 0 -i 1 -r 1k -s 64k`，单命令 timeout 为 10 秒。
+- 验收标准：若 iozone 仍为 0，至少不能影响 basic、BusyBox、Lua、libcbench 和
+  libctest；若总分低于 480 或 libcbench 归零，立即撤回 iozone-lite。
 
 ## 2026-06-21 12:23 lmbench 9-command 探针结果
 

@@ -4,26 +4,26 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
+| 最新可见官方结果 | 2026-06-21 12:36:14，`Accepted / 484.04145452769785` |
 | 最新稳定结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl 已进 107 分 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
-| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
-| 当前修复方向 | 冻结 musl libctest full-static，锁定 484 基线后推进 lmbench-lite 短轮次探针 |
-| 本轮代码基线 | 已基于 GitHub/GitLab `main` 的 `415b423 feat: run full musl libctest static set` |
-| 本轮新增门禁修复 | 刷新 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json`，消除 22 个 stale checksum |
+| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.04145452769787`、libctest `107`、lmbench `0` |
+| 当前修复方向 | 冻结 musl libctest full-static；lmbench 短轮次仍为 0，转向 iozone-lite 最小探针 |
+| 本轮代码基线 | 已基于 GitHub/GitLab `main` 的 `83ff79e feat: shorten lmbench lite runs` |
+| 本轮新增探针 | 新增 iozone-lite 最小命令队列，不恢复完整 iozone 脚本 |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
 这轮在 12:05 已确认 musl libctest static 全量进分：不再改 allowlist、timeout
-或 `C` 队列协议。12:23 的 lmbench 9-command 探针仍为 0，且评测耗时明显增加，
-因此下一次不再加命令，而是给同一批 9 条轻量命令加入 `-W 1 -N 10`，让它们
-尽快输出官方 parser 识别的结果行。核心要求是保持 basic、BusyBox、Lua、
-libcbench 与 107 个 libctest case，不因 lmbench 探针回退。
+或 `C` 队列协议。12:23 与 12:36 的 lmbench 9-command 探针仍为 0，因此下一次
+不再继续扩大 lmbench，而是新增 iozone-lite：只暂存官方 `iozone` ELF，每个 ABI
+只执行一条 `iozone -i 0 -i 1 -r 1k -s 64k`。核心要求是保持 basic、BusyBox、
+Lua、libcbench 与 107 个 libctest case，不因新探针回退。
 
 ## 本轮提交门禁
 
@@ -46,7 +46,7 @@ libcbench 与 107 个 libctest case，不因 lmbench 探针回退。
 - RISC-V Lua 保持 `18/18`。
 - libcbench 维持约 `57` 分区间。
 - `libctest-musl` 保持 `107/107`。
-- lmbench 探针若失败，必须只表现为单命令 timeout 或无得分，不能引发 kernel panic。
+- lmbench 或 iozone-lite 探针若失败，必须只表现为单命令 timeout 或无得分，不能引发 kernel panic。
 - 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
 - RISC-V 输出中没有 `Panicked`，最终输出 `!TEST FINISH!` 并主动关机。
@@ -61,17 +61,20 @@ libcbench 与 107 个 libctest case，不因 lmbench 探针回退。
 
 ## 后续提分顺序
 
-1. 下一次先确认 484 基线不回退；若低于 480，优先撤回本轮 lmbench 短轮次探针。
+1. 下一次先确认 484 基线不回退；若低于 480，优先撤回本轮 iozone-lite 探针。
 2. `libctest` 已满分，除非官方回归，不再修改 allowlist、timeout 或 `C` 队列协议。
-3. 若 lmbench 仍为 0，必须看串口日志确认是否出现 `Simple syscall:`、
+3. 若 iozone-lite 仍为 0，必须看串口日志确认是否出现 `iozone test complete` 或
+   write/read 表格；没有这些行就继续修执行/超时路径，有这些行但不计分再查
+   parser 分组。
+4. 若 lmbench 仍为 0，必须看串口日志确认是否出现 `Simple syscall:`、
    `Select on 100 fd` 或 `Signal handler installation:`；没有这些行就继续修
    执行/超时路径，有这些行但不计分再查 parser 分组。
-4. iozone 先补齐安全返回路径，再只执行小文件 direct 命令，禁止恢复完整脚本。
-5. 再推进 ltp、iperf、netperf 等更容易暴露网络或多进程语义的问题。
-6. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
+5. iozone 只能从 lite 探针逐步增加，禁止恢复完整脚本。
+6. 再推进 ltp、iperf、netperf 等更容易暴露网络或多进程语义的问题。
+7. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
 
 ## 本轮暂缓
 
-- 不新增 iozone、iperf、netperf 或 ltp 正式执行组。
+- 不新增完整 iozone、iperf、netperf 或 ltp 正式执行组。
 - 不处理网络、多核和 LoongArch。
 - 不一次性重新合入完整 iozone。
