@@ -917,6 +917,8 @@ fn install_lmbench_group(
         &script,
     )?;
     install_tmpfs_file_path(&alloc::format!("{}/lmbench_all", group_dir), &lmbench)?;
+    // Keep this in sync with sys_readlinkat's /proc/self/exe compatibility path.
+    install_tmpfs_file_path("lmbench_all", &lmbench)?;
 
     let mut interp_paths = Vec::new();
     remember_interp(group_dir, &lmbench, &mut interp_paths)?;

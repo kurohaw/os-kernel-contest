@@ -58,6 +58,7 @@
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
 | musl libctest staging | static 全量已通过 | 官方 `libc-test/static.txt` 归一化后的 107 个 static case 已全部进入 musl-rv 得分 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
+| lmbench `/lmbench_all` 根别名 | 通过 | fake lmbench EXT4 盘验证 glibc/musl 脚本识别、9-command 队列执行和主动关机；只验证入口，不代表真实得分 |
 | lmbench-lite staging | 仍未计分但不回退 | 12:36 的 9-command 短轮次探针仍为 0；作为当前 484 基线保留 |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |

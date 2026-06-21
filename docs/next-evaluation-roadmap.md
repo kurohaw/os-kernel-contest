@@ -13,7 +13,7 @@
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
 | 当前修复方向 | 已恢复 483-484 基线；后续不新增测试组，改查现有稳定组的小 syscall/VFS 缺口 |
-| 本轮代码基线 | 回到 `83ff79e feat: shorten lmbench lite runs` 的稳定代码路径 |
+| 本轮代码基线 | 在 `83ff79e feat: shorten lmbench lite runs` 的稳定路径上，只补 lmbench `/lmbench_all` 根路径别名 |
 | 本轮新增门禁修复 | `64fe8b4` 已撤回 `8690e03 feat: add minimal iozone probe` |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
@@ -32,7 +32,8 @@
 4. `SWTC/kernel/Cargo.lock` 中不再出现 `hashbrown`、`ahash` 或
    `allocator-api2`；`managed` 仍不记录 registry source/checksum。
 5. 官方完整参数下，无盘、basic、libctest 和 lmbench 外部探针均无 panic、无全局超时并主动关机。
-6. `readlinkat` 行为与 `e8d1b48` 保持一致，不保留 `b433976` 的真实路径尝试。
+6. `readlinkat` 行为与 `e8d1b48` 保持一致，不保留 `b433976` 的真实路径尝试；
+   lmbench staging 必须提供 `/lmbench_all` 根路径别名。
 7. `C` 队列记录只服务 musl libctest，且 107 个 static case 已线上通过；后续不再扩容。
 8. Git 状态不包含本地说明、镜像、日志、验证夹具或构建产物。
 
@@ -45,7 +46,9 @@
 - RISC-V Lua 保持 `18/18`。
 - libcbench 维持约 `57` 分区间。
 - `libctest-musl` 保持 `107/107`。
-- lmbench 探针若失败，必须只表现为单命令 timeout 或无得分，不能引发 kernel panic。
+- lmbench 探针若失败，必须只表现为单命令 timeout 或无得分，不能引发 kernel panic；
+  若仍为 0，先看串口日志是否出现 `Simple syscall:`、`Select on 100 fd` 或
+  `Signal handler installation:`。
 - 不再暂存或执行 iozone；完整脚本和 lite 探针都已证明会导致 320 回退。
 - 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
