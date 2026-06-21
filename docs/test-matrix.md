@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | iozone-lite 回退，已撤回 | 2026-06-21 13:04:01，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest 均为 0 |
-| 最新稳定官方结果 | lmbench 仍为 0，484 基线基本稳定 | 2026-06-21 12:36:14，`Accepted / 484.04145452769785`；basic=204、BusyBox=98、Lua=18、libcbench=57.04145452769787、libctest=107、lmbench=0 |
+| 官方页面最后可见结果 | iozone-lite 撤回后恢复 484 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；basic=204、BusyBox=98、Lua=18、libcbench=57.26735406790887、libctest=107、lmbench=0 |
+| 上一条回归结果 | iozone-lite 回退，已撤回 | 2026-06-21 13:04:01，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest 均为 0 |
 | 上一条高分官方结果 | 通过并拿满 musl static libctest | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench 约 57.25 分 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
