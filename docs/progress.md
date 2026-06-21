@@ -8,13 +8,26 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 稳住 412 基线后，直接推进 musl libctest static 全量 |
-| 当前提交 | 在已验证 36 个 musl libctest case 的基础上，扩到官方 static.txt 全部 107 个 case |
-| 最新可见线上结果 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；libctest-musl=36，libcbench=56.92336789756515 |
-| 上一条通过基线 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；basic=204、BusyBox=98、Lua=18、libcbench=56.92336789756515、libctest=36 |
+| 当前里程碑 | musl libctest static 已满分，下一步锁定 484 基线后转向 lmbench-lite 或 libcbench |
+| 当前提交 | 官方 static.txt 全部 107 个 musl libctest case 已线上通过，文档记录新基线 |
+| 最新可见线上结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench=57.255157002759375 |
+| 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
-| 上一条高分结果 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；libcbench glibc/musl 合计 56.92336789756515、libctest-musl=36 |
+| 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-21 12:05 musl libctest static 满分
+
+- 最新官方结果为 2026-06-21 12:05:08，`Accepted / 484.2551570027594`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、
+  libctest=107；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
+- 这说明 `415b423 feat: run full musl libctest static set` 的 107-case
+  full-static 探针全部进入 musl-rv 得分，且没有引发 basic、BusyBox、Lua 或
+  libcbench 回退。
+- libctest 方向先冻结：后续不要继续改 allowlist、timeout 或 `C` 队列协议，除非
+  出现官方回归。
+- 下一阶段优先选一个新指标做最小探针。推荐先回到 `lmbench-lite`，只跑一条短命令
+  或先做脚本/资源 staging 诊断；若出现回退，立刻撤回并保留 484 基线。
 
 ## 2026-06-21 11:49 libctest static 全量探针
 
