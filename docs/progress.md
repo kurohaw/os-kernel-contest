@@ -8,13 +8,27 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，锁定 484 基线后转向 lmbench-lite |
-| 当前提交 | lmbench-lite 从 6 条 `lat_syscall` 扩到 9 条轻量命令，并把单命令超时放宽到 20 秒 |
+| 当前里程碑 | musl libctest static 已满分，锁定 484 基线后继续拆 lmbench-lite |
+| 当前提交 | 9-command lmbench 未出分后，给 9 条轻量命令加入 `-W 1 -N 10` 短轮次参数 |
 | 最新可见线上结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libctest-musl=107，libcbench=57.255157002759375 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-21 12:23 lmbench 9-command 探针结果
+
+- 最新官方结果为 2026-06-21 12:23:56，`Accepted / 484.15161299502336`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.15161299502337、
+  libctest=107，lmbench 仍为 0。
+- 与 12:05 的 `484.2551570027594` 相比只少约 0.1035 分，来源是 libcbench
+  性能波动；basic、BusyBox、Lua 和 libctest 107 均保持稳定。
+- 这说明 9-command lmbench 探针没有造成明显回退，但也没有让输出被官方计分。
+- 评测耗时从约 3 分钟增加到约 5 分钟，结合 lmbench 仍为 0，优先判断为默认
+  lmbench 轮次过长，命令被 per-command timeout 终止，未吐出 `Simple syscall:`、
+  `Select on 100 fd`、`Signal handler installation:` 等可解析行。
+- 本轮不继续加命令，而是保留 9-command 范围，加入 `-W 1 -N 10` 短轮次参数，并
+  把单命令 timeout 收回到 10 秒，目标是让命令快速完成并保留超时隔离。
 
 ## 2026-06-21 12:05 musl libctest static 满分
 
@@ -34,8 +48,10 @@
 - 在 484 基线上只推进 `lmbench` 一个指标，不修改 libctest、libcbench、iozone、
   ltp、网络或 LoongArch。
 - 线上历史显示 6 条 `lat_syscall` lite 命令仍为 0 分，且 musl 曾出现超时迹象。
-- 本轮保持官方参数语义，不添加 `-N` 或缩短 benchmark 轮次；只把每条 lmbench
-  命令超时从 5 秒放宽到 20 秒，给默认 benchmark 足够时间吐出可解析输出。
+- 第一版保持官方参数语义，不添加 `-N` 或缩短 benchmark 轮次，只把每条 lmbench
+  命令超时从 5 秒放宽到 20 秒；线上确认仍为 0 分。
+- 第二版保留同样 9 条命令，但加入 `-W 1 -N 10`，避免默认轮次在当前内核上跑到
+  timeout 之前没有任何可解析输出。
 - 在原有 `lat_syscall null/read/write/stat/fstat/open` 后新增官方脚本中紧接着的
   3 条轻量命令：`lat_select -n 100 -P 1 file`、
   `lat_sig -P 1 install`、`lat_sig -P 1 catch`。

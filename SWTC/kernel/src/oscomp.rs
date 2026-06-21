@@ -33,7 +33,7 @@ const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
-const LMBENCH_TIMEOUT_MS: usize = 20_000;
+const LMBENCH_TIMEOUT_MS: usize = 10_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -47,15 +47,56 @@ const LUA_RESOURCES: &[&str] = &[
     "strings.lua",
 ];
 const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
-    &["lat_syscall", "-P", "1", "null"],
-    &["lat_syscall", "-P", "1", "read"],
-    &["lat_syscall", "-P", "1", "write"],
-    &["lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench"],
-    &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
-    &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
-    &["lat_select", "-n", "100", "-P", "1", "file"],
-    &["lat_sig", "-P", "1", "install"],
-    &["lat_sig", "-P", "1", "catch"],
+    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "null"],
+    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "read"],
+    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "write"],
+    &[
+        "lat_syscall",
+        "-P",
+        "1",
+        "-W",
+        "1",
+        "-N",
+        "10",
+        "stat",
+        "/var/tmp/lmbench",
+    ],
+    &[
+        "lat_syscall",
+        "-P",
+        "1",
+        "-W",
+        "1",
+        "-N",
+        "10",
+        "fstat",
+        "/var/tmp/lmbench",
+    ],
+    &[
+        "lat_syscall",
+        "-P",
+        "1",
+        "-W",
+        "1",
+        "-N",
+        "10",
+        "open",
+        "/var/tmp/lmbench",
+    ],
+    &[
+        "lat_select",
+        "-n",
+        "100",
+        "-P",
+        "1",
+        "-W",
+        "1",
+        "-N",
+        "10",
+        "file",
+    ],
+    &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
+    &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
