@@ -34,7 +34,6 @@ const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
-const IOZONE_TIMEOUT_MS: usize = 10_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -99,7 +98,6 @@ const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
 ];
-const IOZONE_LITE_COMMANDS: &[&[&str]] = &[&["-i", "0", "-i", "1", "-r", "1k", "-s", "64k"]];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
     "basename",
@@ -339,10 +337,6 @@ pub fn init() {
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
     installed_commands += lmbench_commands;
-
-    let (iozone_groups, iozone_commands) = install_iozone_groups(&fs, &mut queue);
-    installed_groups += iozone_groups;
-    installed_commands += iozone_commands;
 
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
@@ -945,104 +939,6 @@ fn install_lmbench_group(
     }
     push_queue_record(queue, b'E', &end_marker);
     Ok(LMBENCH_LITE_COMMANDS.len())
-}
-
-fn install_iozone_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
-    let candidates = [
-        (
-            "glibc/iozone_testcode.sh",
-            "oscomp-iozone-glibc",
-            "iozone",
-            BasicFlavor::Glibc,
-        ),
-        (
-            "musl/iozone_testcode.sh",
-            "oscomp-iozone-musl",
-            "iozone",
-            BasicFlavor::Musl,
-        ),
-    ];
-
-    let mut installed_groups = 0usize;
-    let mut installed_commands = 0usize;
-    for (script_path, group_dir, marker_name, flavor) in candidates {
-        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
-            continue;
-        };
-        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
-            continue;
-        }
-        match install_iozone_group(fs, script_path, group_dir, marker_name, flavor, queue) {
-            Ok(command_count) => {
-                println!("oscomp: found official iozone script {}", script_path);
-                installed_groups += 1;
-                installed_commands += command_count;
-            }
-            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
-        }
-    }
-
-    (installed_groups, installed_commands)
-}
-
-fn install_iozone_group(
-    fs: &Ext4,
-    script_path: &str,
-    group_dir: &str,
-    marker_name: &str,
-    flavor: BasicFlavor,
-    queue: &mut Vec<u8>,
-) -> Result<usize, &'static str> {
-    let source_dir = parent_path(script_path);
-    let iozone_path = find_first_regular_path(
-        fs,
-        &[
-            resolve_path(&source_dir, "iozone"),
-            resolve_path(&source_dir, "bin/iozone"),
-            resolve_path(&source_dir, "iozone/iozone"),
-        ],
-    )?;
-    let iozone = read_file(fs, &iozone_path)?;
-    if iozone.get(..4) != Some(b"\x7fELF") {
-        return Err("iozone is not an ELF file");
-    }
-
-    let script = read_file(fs, script_path)?;
-    let (start_marker, end_marker) = match core::str::from_utf8(&script) {
-        Ok(script) => (
-            find_group_marker(script, "START").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name)
-            }),
-            find_group_marker(script, "END").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name)
-            }),
-        ),
-        Err(_) => (
-            alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name),
-            alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
-        ),
-    };
-
-    install_tmpfs_dir_path(group_dir)?;
-    install_tmpfs_file_path(&alloc::format!("{}/iozone_testcode.sh", group_dir), &script)?;
-    install_tmpfs_file_path(&alloc::format!("{}/iozone", group_dir), &iozone)?;
-
-    let mut interp_paths = Vec::new();
-    remember_interp(group_dir, &iozone, &mut interp_paths)?;
-    if !interp_paths.is_empty() {
-        install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
-    }
-
-    push_queue_record(
-        queue,
-        b'G',
-        &alloc::format!("/{}\t{}", group_dir, start_marker),
-    );
-    for args in IOZONE_LITE_COMMANDS {
-        push_argv_record(queue, IOZONE_TIMEOUT_MS, "iozone", args);
-    }
-    push_queue_record(queue, b'E', &end_marker);
-    Ok(IOZONE_LITE_COMMANDS.len())
 }
 
 fn find_first_regular_path(fs: &Ext4, paths: &[String]) -> Result<String, &'static str> {
