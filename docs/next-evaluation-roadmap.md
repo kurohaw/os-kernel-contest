@@ -4,7 +4,7 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；libctest-musl 仍为 107 分 |
+| 最新可见官方结果 | 2026-06-21 13:50:12，`Accepted / 483.52722370911204`；libctest-musl 仍为 107 分 |
 | 最新高分结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
@@ -20,7 +20,7 @@
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
 这轮在 12:05 已确认 musl libctest static 全量进分：不再改 allowlist、timeout
-或 `C` 队列协议。13:15 和 13:36 已确认撤回 iozone-lite 后保持 483-484 基线。
+或 `C` 队列协议。13:15、13:36 和 13:50 已确认撤回 iozone-lite 后保持 483-484 基线。
 下一轮不再新增测试组，优先从现有稳定组的串口日志和 syscall/VFS 语义中找
 可解释的小修复。
 
