@@ -8,14 +8,24 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，iozone-lite 撤回后已恢复 484 基线 |
-| 当前提交 | 记录 13:15 恢复结果；禁止继续暂存 iozone，下一步不新增测试组 |
-| 最新可见线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；basic=204、BusyBox=98、Lua=18、libcbench=57.26735406790887、libctest=107 |
-| 最新稳定线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
+| 当前里程碑 | musl libctest static 已满分，iozone-lite 撤回后维持 483-484 基线 |
+| 当前提交 | 记录 13:36 结果；禁止继续暂存 iozone，下一步不新增测试组 |
+| 最新可见线上结果 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、libctest=107 |
+| 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-21 13:36 稳定基线复测
+
+- 最新官方结果为 2026-06-21 13:36:45，`Accepted / 483.16564668235225`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、
+  libctest=107；iozone、lmbench 等仍为 0。
+- 与 13:15 的 `484.26735406790885` 相比少约 1.10 分，来源是 libcbench 性能波动；
+  basic、BusyBox、Lua 和 libctest 都没有回退。
+- 当前继续保持“不新增测试组”：没有完整串口日志或真实 `lmbench_all` 本地复现前，
+  不再改 lmbench/iozone staging。
 
 ## 2026-06-21 13:15 iozone-lite 撤回后恢复
 

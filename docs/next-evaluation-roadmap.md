@@ -4,15 +4,15 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
-| 最新稳定结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；libctest-musl 仍为 107 分 |
+| 最新可见官方结果 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；libctest-musl 仍为 107 分 |
+| 最新高分结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
-| 当前修复方向 | 已恢复 484 基线；后续不新增测试组，改查现有稳定组的小 syscall/VFS 缺口 |
+| 当前修复方向 | 已恢复 483-484 基线；后续不新增测试组，改查现有稳定组的小 syscall/VFS 缺口 |
 | 本轮代码基线 | 回到 `83ff79e feat: shorten lmbench lite runs` 的稳定代码路径 |
 | 本轮新增门禁修复 | `64fe8b4` 已撤回 `8690e03 feat: add minimal iozone probe` |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
@@ -20,8 +20,9 @@
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
 这轮在 12:05 已确认 musl libctest static 全量进分：不再改 allowlist、timeout
-或 `C` 队列协议。13:15 已确认撤回 iozone-lite 后恢复 484 基线。下一轮不再新增
-测试组，优先从现有稳定组的串口日志和 syscall/VFS 语义中找可解释的小修复。
+或 `C` 队列协议。13:15 和 13:36 已确认撤回 iozone-lite 后保持 483-484 基线。
+下一轮不再新增测试组，优先从现有稳定组的串口日志和 syscall/VFS 语义中找
+可解释的小修复。
 
 ## 本轮提交门禁
 
@@ -60,7 +61,7 @@
 
 ## 后续提分顺序
 
-1. 484 基线已恢复；下一轮如果低于 480，先确认是否有人重新引入 iozone 或新组 staging。
+1. 483-484 基线已恢复；下一轮如果低于 480，先确认是否有人重新引入 iozone 或新组 staging。
 2. `libctest` 已满分，除非官方回归，不再修改 allowlist、timeout 或 `C` 队列协议。
 3. 若 lmbench 仍为 0，必须看串口日志确认是否出现 `Simple syscall:`、
    `Select on 100 fd` 或 `Signal handler installation:`；没有这些行就继续修
