@@ -4,11 +4,11 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 基线已恢复 | 2026-06-20 21:34:30，`Accepted / 400.50066694574866`；basic=204、BusyBox=98、Lua=18、libcbench=56.50066694574863、libctest=24 |
-| 最新稳定官方结果 | 通过并新增 libctest 得分 | 2026-06-20 21:34:30，`Accepted / 400.50066694574866`；libctest-musl=24，libcbench 约 56.50 分 |
+| 官方页面最后可见结果 | 基线已恢复 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；basic=204、BusyBox=98、Lua=18、libcbench=56.92336789756515、libctest=36 |
+| 最新稳定官方结果 | 通过并新增 libctest 得分 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；libctest-musl=36，libcbench 约 56.92 分 |
 | 上一条通过基线 | 通过并得分 | 2026-06-20 10:52:03，`Accepted / 377.42523152095464`；basic=204、BusyBox=98、Lua=18、libcbench=57.42523152095458 |
 | 上一条编译错误 | 已修复 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮移除内核 `hashbrown` 依赖链 |
-| 上一条高分结果 | 通过并得分 | 2026-06-20 21:34:30，`Accepted / 400.50066694574866`；basic=204、BusyBox=98、Lua=18、libcbench=56.50066694574863、libctest=24 |
+| 上一条高分结果 | 通过并得分 | 2026-06-21 11:49:38，`Accepted / 412.92336789756513`；basic=204、BusyBox=98、Lua=18、libcbench=56.92336789756515、libctest=36 |
 | iozone 回归结果 | 已止血 | 2026-06-18 16:00:21，`Accepted / 320.0`；libcbench=0、iozone=0；已撤回 `b10e9f0` |
 | musl-rv basic | 通过 | 线上 `102/102` |
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
@@ -34,7 +34,7 @@
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
-| `C` libctest 队列协议 | 已线上验证 24 case | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
+| `C` libctest 队列协议 | 已线上验证 36 case | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
@@ -52,8 +52,8 @@
 | 无测试盘回归 | 通过 | runner 回退并主动关机 |
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
-| libcbench staging | 已恢复基线 | 21:34 线上 libcbench 合计 56.50066694574863；`b433976` 的 readlinkat 回退问题已止血 |
-| musl libctest staging | 本轮批量扩到 36 case | 已验证 24 case；本轮新增 `clocale_mbfuncs/clock_gettime/fnmatch/inet_pton/mbc/setjmp/sscanf/sscanf_long/strftime/strtod/strtold/swprintf` |
+| libcbench staging | 已恢复基线 | 11:49 线上 libcbench 合计 56.92336789756515；`b433976` 的 readlinkat 回退问题已止血 |
+| musl libctest staging | 本轮扩到 static 全量 107 case | 已验证 36 case；本轮使用官方 `libc-test/static.txt` 归一化后的全部 static case，目标拿满 musl static libctest |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | lmbench-lite staging | 线上仍 0，暂不扩大 | 14:43 glibc 已输出多条 `lat_syscall` 结果但未得分，musl 6 条 lite 命令超时；本轮不改 lmbench |
 | iozone staging | 已撤回 | `b10e9f0` 后线上回退到 `320.0`，当前先恢复 libcbench 基线 |
