@@ -35,7 +35,6 @@ ifneq ($(STRACE), )
 endif
 ifneq ($(SUBMIT), )
 	KERNEL_FEATURES += submit
-	KERNEL_FEATURES += stack_trace
 	ifneq ($(STACK_TRACE), )
 		KERNEL_FEATURES += stack_trace
 	endif

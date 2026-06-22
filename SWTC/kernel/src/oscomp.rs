@@ -33,7 +33,7 @@ const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
-const LMBENCH_TIMEOUT_MS: usize = 10_000;
+const LMBENCH_TIMEOUT_MS: usize = 25_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -46,57 +46,40 @@ const LUA_RESOURCES: &[&str] = &[
     "sort.lua",
     "strings.lua",
 ];
-const LMBENCH_LITE_COMMANDS: &[&[&str]] = &[
-    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "null"],
-    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "read"],
-    &["lat_syscall", "-P", "1", "-W", "1", "-N", "10", "write"],
+const LMBENCH_COMMANDS: &[&[&str]] = &[
+    &["lat_syscall", "-P", "1", "null"],
+    &["lat_syscall", "-P", "1", "read"],
+    &["lat_syscall", "-P", "1", "write"],
+    &["lat_syscall", "-P", "1", "stat", "/var/tmp/lmbench"],
+    &["lat_syscall", "-P", "1", "fstat", "/var/tmp/lmbench"],
+    &["lat_syscall", "-P", "1", "open", "/var/tmp/lmbench"],
+    &["lat_select", "-n", "100", "-P", "1", "file"],
+    &["lat_sig", "-P", "1", "install"],
+    &["lat_sig", "-P", "1", "catch"],
+    &["lat_sig", "-P", "1", "prot", "lat_sig"],
+    &["lat_pipe", "-P", "1"],
+    &["lat_proc", "-P", "1", "fork"],
+    &["lat_proc", "-P", "1", "exec"],
+    &["lat_proc", "-P", "1", "shell"],
     &[
-        "lat_syscall",
-        "-P",
-        "1",
-        "-W",
-        "1",
-        "-N",
-        "10",
-        "stat",
-        "/var/tmp/lmbench",
+        "lmdd",
+        "label=File /var/tmp/XXX write bandwidth:",
+        "of=/var/tmp/XXX",
+        "move=1m",
+        "fsync=1",
+        "print=3",
     ],
+    &["lat_pagefault", "-P", "1", "/var/tmp/XXX"],
+    &["lat_mmap", "-P", "1", "512k", "/var/tmp/XXX"],
+    &["lat_fs", "/var/tmp"],
+    &["bw_pipe", "-P", "1"],
+    &["bw_file_rd", "-P", "1", "512k", "io_only", "/var/tmp/XXX"],
+    &["bw_file_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX"],
+    &["bw_mmap_rd", "-P", "1", "512k", "mmap_only", "/var/tmp/XXX"],
+    &["bw_mmap_rd", "-P", "1", "512k", "open2close", "/var/tmp/XXX"],
     &[
-        "lat_syscall",
-        "-P",
-        "1",
-        "-W",
-        "1",
-        "-N",
-        "10",
-        "fstat",
-        "/var/tmp/lmbench",
+        "lat_ctx", "-P", "1", "-s", "32", "2", "4", "8", "16", "24", "32", "64", "96",
     ],
-    &[
-        "lat_syscall",
-        "-P",
-        "1",
-        "-W",
-        "1",
-        "-N",
-        "10",
-        "open",
-        "/var/tmp/lmbench",
-    ],
-    &[
-        "lat_select",
-        "-n",
-        "100",
-        "-P",
-        "1",
-        "-W",
-        "1",
-        "-N",
-        "10",
-        "file",
-    ],
-    &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
-    &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -923,24 +906,44 @@ fn install_lmbench_group(
     let mut interp_paths = Vec::new();
     remember_interp(group_dir, &lmbench, &mut interp_paths)?;
     install_optional_lmbench_resource(fs, &source_dir, group_dir, "hello", &mut interp_paths)?;
+    let lat_sig_path = resolve_path(&source_dir, "lat_sig");
+    match lookup_path_str(fs, &lat_sig_path) {
+        Ok(Some(info)) if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG => {
+            let lat_sig = read_file(fs, &lat_sig_path)?;
+            install_tmpfs_file_path(&alloc::format!("{}/lat_sig", group_dir), &lat_sig)?;
+            install_tmpfs_file_path("lat_sig", &lat_sig)?;
+            if lat_sig.get(..4) == Some(b"\x7fELF") {
+                remember_interp(group_dir, &lat_sig, &mut interp_paths)?;
+            }
+        }
+        _ => {
+            install_tmpfs_file_path(&alloc::format!("{}/lat_sig", group_dir), &lmbench)?;
+            install_tmpfs_file_path("lat_sig", &lmbench)?;
+        }
+    }
 
     if !interp_paths.is_empty() {
         install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
     }
 
     install_tmpfs_dir_path("var/tmp")?;
+    install_tmpfs_dir_path("tmp")?;
     install_tmpfs_file_path("var/tmp/lmbench", b"")?;
+    install_tmpfs_file_path("var/tmp/XXX", b"")?;
+    if let Ok(hello) = read_file(fs, &resolve_path(&source_dir, "hello")) {
+        install_tmpfs_file_path("tmp/hello", &hello)?;
+    }
 
     push_queue_record(
         queue,
         b'G',
         &alloc::format!("/{}\t{}", group_dir, start_marker),
     );
-    for args in LMBENCH_LITE_COMMANDS {
+    for args in LMBENCH_COMMANDS {
         push_argv_record(queue, LMBENCH_TIMEOUT_MS, "lmbench_all", args);
     }
     push_queue_record(queue, b'E', &end_marker);
-    Ok(LMBENCH_LITE_COMMANDS.len())
+    Ok(LMBENCH_COMMANDS.len())
 }
 
 fn find_first_regular_path(fs: &Ext4, paths: &[String]) -> Result<String, &'static str> {

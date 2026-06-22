@@ -4,18 +4,41 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-21 |
+| 当前日期 | 2026-06-22 |
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，iozone-lite 撤回后维持 483-484 基线 |
-| 当前提交 | lmbench 不新增命令，只补 `/proc/self/exe` 兼容返回所需的 `/lmbench_all` tmpfs 根路径别名 |
-| 最新可见线上结果 | 2026-06-21 13:50:12，`Accepted / 483.52722370911204`；basic=204、BusyBox=98、Lua=18、libcbench=56.527223709112、libctest=107 |
+| 当前里程碑 | musl libctest static 已满分，2026-06-22 复测维持 483-484 基线 |
+| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 扩为 24-command 官方主项队列 |
+| 最新可见线上结果 | 2026-06-22 15:40:33，`Accepted / 483.89530518161376`；basic=204、BusyBox=98、Lua=18、libcbench=56.89530518161379、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-22 lmbench 主项冲刺
+
+- 最新官方结果为 2026-06-22 15:40:33，`Accepted / 483.89530518161376`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.89530518161379、
+  libctest=107；lmbench 仍为 0。
+- 评测页面已经显示 lmbench-glibc 和 lmbench-musl 的完整评分表，说明源码包编译、
+  lmbench 分组和页面识别都已恢复，但当前 9-command lite 没有产生计分。
+- 本轮改为冲刺真实 lmbench 主项，不伪造输出：
+  - `SWTC/kernel/Makefile` 中 submit 构建不再默认启用 `stack_trace`，去掉每次
+    syscall/文件/内存函数入口的 `StackInfoGuard` push/pop 开销。
+  - lmbench 队列从 9 条扩到 24 条，覆盖官方脚本主要项目：`lat_syscall`、
+    `lat_select`、`lat_sig`、`lat_pipe`、`lat_proc`、`lmdd`、`lat_pagefault`、
+    `lat_mmap`、`lat_fs`、`bw_pipe`、`bw_file_rd`、`bw_mmap_rd` 和 `lat_ctx`。
+  - 补齐 `/var/tmp/XXX`、`/tmp/hello` 和 `lat_sig` helper/兼容别名。
+- 本地验证：
+  - `make all RUST_TOOLCHAIN=nightly-2025-02-18`：通过，构建日志显示内核 feature
+    为 `submit tmpfs`，不再包含 `stack_trace`。
+  - 无测试盘 QEMU：主动关机。
+  - 官方布局 basic 双组盘：官方 `test_runner.py` 解析 `102/102`。
+  - fake lmbench EXT4 盘：glibc/musl 两组均识别，暂存 48 条命令并主动关机。
+- 风险：完整 lmbench 主项可能拉长评测时间；若线上回退低于 480，优先撤回本轮
+  lmbench 扩容，只保留关闭 `stack_trace` 的性能构建再复测。
 
 ## 2026-06-21 14:23 lmbench 路径别名修复
 
