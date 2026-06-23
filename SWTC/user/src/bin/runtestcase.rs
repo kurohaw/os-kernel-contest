@@ -204,6 +204,30 @@ fn run_libctest_record(record: &[u8]) {
     );
 }
 
+fn run_ltp_record(record: &[u8]) {
+    let mut fields = record.split(|byte| *byte == b'\t');
+    let Some(timeout) = fields.next().and_then(parse_usize) else {
+        println!("oscomp: malformed ltp timeout record");
+        return;
+    };
+    let Some(name) = fields.next().filter(|field| !field.is_empty()) else {
+        println!("oscomp: malformed ltp executable record");
+        return;
+    };
+    let Some(case) = fields.next().filter(|field| !field.is_empty()) else {
+        println!("oscomp: malformed ltp case record");
+        return;
+    };
+
+    let case_name = core::str::from_utf8(case).unwrap_or("unknown");
+    println!("RUN LTP CASE {}", case_name);
+    match run_test_with_argv(name, None, &[], Some(timeout)) {
+        Some(0) => {}
+        Some(status) => println!("FAIL LTP CASE {} : {}", case_name, status),
+        None => println!("FAIL LTP CASE {} : timeout", case_name),
+    }
+}
+
 fn enter_group(record: &[u8]) {
     let Some(separator) = record.iter().position(|byte| *byte == b'\t') else {
         println!("oscomp: malformed group record");
@@ -254,6 +278,10 @@ fn run_basic_queue() -> bool {
             b'C' => {
                 ran = true;
                 run_libctest_record(&record[1..]);
+            }
+            b'L' => {
+                ran = true;
+                run_ltp_record(&record[1..]);
             }
             b'E' => {
                 if let Ok(marker) = core::str::from_utf8(&record[1..]) {

@@ -4,8 +4,9 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 运行环境骨架回归，已撤回 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/lmbench 均为 0 |
+| 官方页面最后可见结果 | 483-484 基线恢复 | 2026-06-23 用户截图，`Accepted / 483.94872319405437`；basic=204、BusyBox=98、Lua=18、libcbench=56.94872319405434、libctest=107、lmbench=0 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
+| 运行环境骨架回归结果 | 已撤回并恢复 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/lmbench 均为 0 |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
 | 上一条稳定复测结果 | 483-484 基线稳定 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、libctest=107、lmbench=0 |
 | 最新高分恢复结果 | iozone-lite 撤回后恢复 484 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；basic=204、BusyBox=98、Lua=18、libcbench=57.26735406790887、libctest=107、lmbench=0 |
@@ -63,6 +64,7 @@
 | lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
+| LTP 12-case 隔离探针 | 待线上确认 | glibc/musl 各暂存 12 个基础 syscall case，使用 `L` 队列逐项 timeout，不新增全局 runtime |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
