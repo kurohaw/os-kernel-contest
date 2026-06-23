@@ -4,18 +4,34 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-22 |
+| 当前日期 | 2026-06-23 |
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | musl libctest static 已满分，2026-06-22 复测维持 483-484 基线 |
-| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 扩为 24-command 官方主项队列 |
-| 最新可见线上结果 | 2026-06-22 15:40:33，`Accepted / 483.89530518161376`；basic=204、BusyBox=98、Lua=18、libcbench=56.89530518161379、libctest=107、lmbench=0 |
+| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 回到 9-command lite，并补官方运行环境骨架 |
+| 最新可见线上结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-23 lmbench 环境骨架与 lite 回滚
+
+- 最新官方结果为 2026-06-22 18:46:51，`Accepted / 484.1693353980349`。
+- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、
+  libctest=107；lmbench 仍为 0。
+- 上一轮 24-command lmbench 主项队列没有带来得分，且评测时间明显拉长；本轮撤回
+  24-command 扩张，恢复 9-command lite 探针和 10 秒单项超时。
+- 保留 submit 默认关闭 `stack_trace` 的构建优化，因为线上没有出现 basic、BusyBox、
+  Lua、libctest 或 libcbench 回退。
+- 根据公开 `testcase_list` 的官方环境准备流程，新增 tmpfs 运行环境骨架：
+  `/bin/sh`、`/lib`、`/lib64/lp64d`、`/usr/lib64`、`/etc/passwd`、`/tmp/memfd`
+  和 `/var/tmp`，并从测试盘尽量拷贝 BusyBox、glibc loader/libc/libm、musl
+  libc/loader 到这些全局路径。
+- 本轮只修正 lmbench/动态程序运行前置条件，不新增 iozone、ltp、iperf、netperf 或
+  其他测试组。
 
 ## 2026-06-22 lmbench 主项冲刺
 

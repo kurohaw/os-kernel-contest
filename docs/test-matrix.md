@@ -4,7 +4,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 483-484 基线稳定 | 2026-06-22 15:40:33，`Accepted / 483.89530518161376`；basic=204、BusyBox=98、Lua=18、libcbench=56.89530518161379、libctest=107、lmbench=0 |
+| 官方页面最后可见结果 | 483-484 基线稳定 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
 | 上一条稳定复测结果 | 483-484 基线稳定 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、libctest=107、lmbench=0 |
 | 最新高分恢复结果 | iozone-lite 撤回后恢复 484 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；basic=204、BusyBox=98、Lua=18、libcbench=57.26735406790887、libctest=107、lmbench=0 |
@@ -59,8 +59,8 @@
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
 | musl libctest staging | static 全量已通过 | 官方 `libc-test/static.txt` 归一化后的 107 个 static case 已全部进入 musl-rv 得分 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
-| lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483.895 基线，lmbench 仍为 0 |
-| lmbench 主项队列 | 本地通过，待线上确认 | fake lmbench EXT4 盘验证 glibc/musl 两组共 48 条命令、START/END 和主动关机；真实得分待下一轮官方评测 |
+| lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
+| lmbench lite + 官方环境骨架 | 待线上确认 | 24-command 主项线上未进分且拉长评测；当前恢复 9-command lite，并补 `/bin/sh`、`/lib`、`/lib64/lp64d`、`/usr/lib64`、`/etc/passwd`、`/tmp/memfd` |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
