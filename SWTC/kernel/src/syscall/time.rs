@@ -226,15 +226,30 @@ pub async fn sys_clock_nanosleep(
 
 pub fn sys_times(buf: *mut Tms) -> SyscallRet {
     stack_trace!();
+    const CLK_TCK: usize = 100;
+    let ticks = (current_time_duration().as_micros() as usize * CLK_TCK) / 1_000_000;
+    if buf.is_null() {
+        return Ok(ticks);
+    }
     UserCheck::new().check_writable_slice(buf as *mut u8, core::mem::size_of::<Tms>())?;
     let _sum_guard = SumGuard::new();
     let tms = unsafe { &mut *buf };
-    // TODO: need to modify
-    tms.stime = 1;
-    tms.utime = 1;
-    tms.cstime = 1;
-    tms.cutime = 1;
-    Ok(0)
+    let cpu_time = current_process().inner_handler(|proc| {
+        let mut user_time = Duration::ZERO;
+        let mut sys_time = Duration::ZERO;
+        for (_, thread) in proc.threads.iter() {
+            if let Some(thread) = thread.upgrade() {
+                user_time += unsafe { (*thread.inner.get()).time_info.user_time };
+                sys_time += unsafe { (*thread.inner.get()).time_info.sys_time };
+            }
+        }
+        (user_time, sys_time)
+    });
+    tms.utime = (cpu_time.0.as_micros() as usize * CLK_TCK) / 1_000_000;
+    tms.stime = (cpu_time.1.as_micros() as usize * CLK_TCK) / 1_000_000;
+    tms.cutime = 0;
+    tms.cstime = 0;
+    Ok(ticks)
 }
 
 pub async fn sys_nanosleep(time_val_ptr: usize) -> SyscallRet {

@@ -9,7 +9,7 @@
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 停止新增测试组盲试，转向稳定组内部 syscall/性能修复 |
-| 当前提交 | 修复 futex waiter 清理、futex timeout/requeue、robust list 和 clock 快路径 |
+| 当前提交 | 修复 futex/time 后，继续补 getrusage/times/affinity/fcntl/lseek 兼容 |
 | 最新可见线上结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、lmbench=0 |
 | 最新稳定线上结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -23,6 +23,17 @@
 - 用户确认不再每轮排队评测，改为连续累积改动。
 - 新增测试组探针已经多次证明会把 libcbench/libctest 回退到 0；本轮不再新增
   LTP、iozone、lmbench、cyclictest、iperf 或 netperf staging。
+- 本轮第二批兼容修复：
+  - `getrusage` 支持 `RUSAGE_THREAD` 和 `RUSAGE_CHILDREN`，未知 who 返回
+    `EINVAL`，不再直接 `panic!()`。
+  - `times` 允许空指针并返回真实 clock tick，`tms` 使用当前进程累计 user/system
+    时间而不是固定写 1。
+  - `sched_getaffinity/setaffinity` 支持 Linux 常见的 `pid=0` 当前线程语义，并避免
+    小 cpuset 缓冲区越界写。
+  - `fcntl` 修正 `F_GETFD` 返回值，给 `F_GETLK/F_SETLK/F_SETLKW` 提供无锁冲突占位，
+    其他未知命令返回 `EINVAL` 而不是 `todo!()`。
+  - `lseek` 不再要求 fd 可读，修复只写 fd seek；底层 seek 对负偏移下溢返回
+    `EINVAL`。
 - futex 修复：
   - `FutexFuture` 在值已变化或 future 被 timeout/drop 时清理 waiter，避免 stale waiter
     留在进程队列。
@@ -33,8 +44,10 @@
   返回真实值。
 - time 修复：`CLOCK_REALTIME`、`CLOCK_MONOTONIC` 和 `CLOCK_PROCESS_CPUTIME_ID` 的
   `clock_gettime/getres` 常见路径避免全局 clock BTreeMap 锁。
-- 预期影响：优先改善 libcbench pthread/futex、时间 syscall 和多线程退出路径稳定性；
-  不改变官方测试组顺序。
+- 预期影响：优先改善 libcbench pthread/futex、时间 syscall、文件锁探针和文件 seek
+  语义；不改变官方测试组顺序。
+- 本地验证：`cargo +nightly-2025-02-18 fmt`，`make all
+  RUST_TOOLCHAIN=nightly-2025-02-18`，无测试盘 QEMU 启动并主动关机均通过。
 
 ## 2026-06-23 运行环境骨架回滚
 

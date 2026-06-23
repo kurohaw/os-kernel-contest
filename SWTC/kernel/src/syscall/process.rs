@@ -526,6 +526,7 @@ pub fn sys_setsid() -> SyscallRet {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
 struct RUsage {
     /// user CPU time used
     ru_utime: TimeVal,
@@ -562,12 +563,15 @@ struct RUsage {
 }
 
 const RUSAGE_SELF: i32 = 0;
+const RUSAGE_CHILDREN: i32 = -1;
+const RUSAGE_THREAD: i32 = 1;
 
 pub fn sys_getrusage(who: i32, usage: usize) -> SyscallRet {
     stack_trace!();
     let _sum_guard = SumGuard::new();
     UserCheck::new().check_writable_slice(usage as *mut u8, core::mem::size_of::<RUsage>())?;
     let usage = unsafe { &mut *(usage as *mut RUsage) };
+    *usage = RUsage::default();
 
     match who {
         RUSAGE_SELF => current_process().inner_handler(|proc| {
@@ -591,9 +595,15 @@ pub fn sys_getrusage(who: i32, usage: usize) -> SyscallRet {
                 current_time_duration() - start_ts
             );
         }),
-        _ => {
-            panic!()
+        RUSAGE_THREAD => {
+            let time_info = unsafe { &(*current_task().inner.get()).time_info };
+            usage.ru_utime = time_info.user_time.into();
+            usage.ru_stime = time_info.sys_time.into();
         }
+        // We do not persist child CPU accounting yet. Returning a zero-filled
+        // structure is preferable to failing libc feature probes or panicking.
+        RUSAGE_CHILDREN => {}
+        _ => return Err(SyscallErr::EINVAL),
     }
     trace!(
         "[sys_getrusage]: ru_utime {:?}, ru_stime {:?}, current ts {:?}",

@@ -1,3 +1,5 @@
+use core::ptr::copy_nonoverlapping;
+
 use log::debug;
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
         resource::{CpuSet, RLimit},
         PROCESS_MANAGER,
     },
-    processor::SumGuard,
+    processor::{current_task, SumGuard},
     stack_trace,
     utils::error::{SyscallErr, SyscallRet},
 };
@@ -48,10 +50,14 @@ pub fn sys_sched_getaffinity(pid: usize, cpusetsize: usize, mask: usize) -> Sysc
     stack_trace!();
     debug_assert_eq!(cpusetsize, core::mem::size_of::<CpuSet>());
     let _sum_guard = SumGuard::new();
+    if cpusetsize == 0 {
+        return Err(SyscallErr::EINVAL);
+    }
     UserCheck::new().check_writable_slice(mask as *mut u8, cpusetsize)?;
-    if let Some(proc) = PROCESS_MANAGER.get(pid) {
+    let tid = if pid == 0 { current_task().tid() } else { pid };
+    if let Some(proc) = PROCESS_MANAGER.get(tid) {
         if let Some(thread) = proc.inner_handler(|proc| {
-            if let Some(thread) = proc.threads.get(&pid) {
+            if let Some(thread) = proc.threads.get(&tid) {
                 thread.upgrade()
             } else {
                 None
@@ -59,19 +65,23 @@ pub fn sys_sched_getaffinity(pid: usize, cpusetsize: usize, mask: usize) -> Sysc
         }) {
             unsafe {
                 let set = (*(thread.inner.get())).cpu_set;
-                *(mask as *mut CpuSet) = set;
+                copy_nonoverlapping(
+                    &set as *const CpuSet as *const u8,
+                    mask as *mut u8,
+                    core::cmp::min(cpusetsize, core::mem::size_of::<CpuSet>()),
+                );
             }
             Ok(0)
         } else {
             log::info!(
                 "[sys_sched_getaffinity] No such tid {} in pid {}",
-                pid,
+                tid,
                 proc.pid()
             );
             Err(SyscallErr::ESRCH)
         }
     } else {
-        log::info!("[sys_sched_getaffinity] No such process, tid {}", pid);
+        log::info!("[sys_sched_getaffinity] No such process, tid {}", tid);
         Err(SyscallErr::ESRCH)
     }
 }
@@ -80,23 +90,30 @@ pub fn sys_sched_setaffinity(pid: usize, cpusetsize: usize, mask: usize) -> Sysc
     stack_trace!();
     debug_assert_eq!(cpusetsize, core::mem::size_of::<CpuSet>());
     let _sum_guard = SumGuard::new();
+    if cpusetsize < core::mem::size_of::<usize>() {
+        return Err(SyscallErr::EINVAL);
+    }
     UserCheck::new().check_readable_slice(mask as *const u8, cpusetsize)?;
-    if let Some(proc) = PROCESS_MANAGER.get(pid) {
+    let tid = if pid == 0 { current_task().tid() } else { pid };
+    if let Some(proc) = PROCESS_MANAGER.get(tid) {
         if let Some(thread) = proc.inner_handler(|proc| {
-            if let Some(thread) = proc.threads.get(&pid) {
+            if let Some(thread) = proc.threads.get(&tid) {
                 thread.upgrade()
             } else {
                 None
             }
         }) {
             unsafe {
-                (*(thread.inner.get())).cpu_set = *(mask as *const CpuSet);
+                (*(thread.inner.get())).cpu_set = CpuSet {
+                    set: *(mask as *const usize),
+                    dummy: [0; 15],
+                };
             }
             Ok(0)
         } else {
             debug!(
                 "[sys_sched_setaffinity] No such tid {} in pid {}",
-                pid,
+                tid,
                 proc.pid()
             );
             Err(SyscallErr::ESRCH)

@@ -135,9 +135,15 @@ pub trait File: Send + Sync {
         match pos {
             SeekFrom::Current(off) => {
                 if off < 0 {
-                    meta.pos -= off.abs() as usize;
+                    meta.pos = meta
+                        .pos
+                        .checked_sub(off.abs() as usize)
+                        .ok_or(SyscallErr::EINVAL)?;
                 } else {
-                    meta.pos += off as usize;
+                    meta.pos = meta
+                        .pos
+                        .checked_add(off as usize)
+                        .ok_or(SyscallErr::EINVAL)?;
                 }
             }
             SeekFrom::Start(off) => {
@@ -153,9 +159,13 @@ pub trait File: Send + Sync {
                     .lock()
                     .data_len;
                 if off < 0 {
-                    meta.pos = data_len - off.abs() as usize;
+                    meta.pos = data_len
+                        .checked_sub(off.abs() as usize)
+                        .ok_or(SyscallErr::EINVAL)?;
                 } else {
-                    meta.pos = data_len + off as usize;
+                    meta.pos = data_len
+                        .checked_add(off as usize)
+                        .ok_or(SyscallErr::EINVAL)?;
                 }
             }
         }

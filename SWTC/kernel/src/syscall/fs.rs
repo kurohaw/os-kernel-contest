@@ -550,12 +550,11 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: u8) -> SyscallRet {
         .inner_handler(move |proc| proc.fd_table.get_ref(fd).cloned())
         .ok_or(SyscallErr::EBADF)?;
     let file = fd_info.file;
-    let flags = fd_info.flags;
-    if !flags.readable() {
-        return Err(SyscallErr::EACCES);
-    }
     match whence {
         SEEK_SET => {
+            if offset < 0 {
+                return Err(SyscallErr::EINVAL);
+            }
             let off = file.seek(SeekFrom::Start(offset as usize))?;
             trace!("[sys_lseek] return off: {}", off);
             Ok(off)
@@ -791,6 +790,10 @@ const F_GETFD: i32 = 1;
 const F_SETFD: i32 = 2;
 const F_GETFL: i32 = 3;
 const F_SETFL: i32 = 4;
+const F_GETLK: i32 = 5;
+const F_SETLK: i32 = 6;
+const F_SETLKW: i32 = 7;
+const F_UNLCK: i16 = 2;
 
 pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> SyscallRet {
     stack_trace!();
@@ -839,18 +842,41 @@ pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> SyscallRet {
                 Ok(0)
             })
         }
-        F_GETFD | F_GETFL => current_process().inner_handler(|proc| {
+        F_GETFD => current_process().inner_handler(|proc| {
             let fd_info = proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
             let flags = fd_info.flags;
             info!("[sys_fcntl]: get file flags {:?}", flags);
-            if flags.contains(OpenFlags::CLOEXEC) && cmd == F_GETFD {
+            if flags.contains(OpenFlags::CLOEXEC) {
                 Ok(FcntlFlags::bits(&FcntlFlags::FD_CLOEXEC) as usize)
             } else {
-                Ok(OpenFlags::bits(&flags) as usize)
+                Ok(0)
             }
         }),
+        F_GETFL => current_process().inner_handler(|proc| {
+            let fd_info = proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
+            let flags = fd_info.flags;
+            info!("[sys_fcntl]: get file flags {:?}", flags);
+            Ok(OpenFlags::bits(&flags) as usize)
+        }),
+        F_GETLK => current_process().inner_handler(|proc| {
+            proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
+            UserCheck::new().check_writable_slice(arg as *mut u8, core::mem::size_of::<i16>())?;
+            let _sum_guard = SumGuard::new();
+            unsafe {
+                (arg as *mut i16).write_volatile(F_UNLCK);
+            }
+            Ok(0)
+        }),
+        F_SETLK | F_SETLKW => current_process().inner_handler(|proc| {
+            proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
+            if arg == 0 {
+                return Err(SyscallErr::EFAULT);
+            }
+            Ok(0)
+        }),
         _ => {
-            todo!()
+            debug!("[sys_fcntl] unsupported command {}", cmd);
+            Err(SyscallErr::EINVAL)
         }
     }
 }

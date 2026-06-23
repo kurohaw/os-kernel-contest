@@ -7,6 +7,8 @@
 | 官方页面最后可见结果 | 运行环境骨架回归，已撤回 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/lmbench 均为 0 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
+| libc syscall 兼容修复 | 本地通过 | `getrusage/times/sched_getaffinity/fcntl/lseek` 完成低风险语义修正；不新增测试组 |
+| 无盘 QEMU 回归 | 本地通过 | `kernel-rv` 启动后输出 `oscomp: block device unavailable`、`!TEST FINISH!` 并主动关机 |
 | 上一条稳定复测结果 | 483-484 基线稳定 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、libctest=107、lmbench=0 |
 | 最新高分恢复结果 | iozone-lite 撤回后恢复 484 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；basic=204、BusyBox=98、Lua=18、libcbench=57.26735406790887、libctest=107、lmbench=0 |
 | 上一条回归结果 | iozone-lite 回退，已撤回 | 2026-06-21 13:04:01，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest 均为 0 |
