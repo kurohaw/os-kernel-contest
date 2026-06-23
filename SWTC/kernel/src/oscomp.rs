@@ -269,12 +269,6 @@ pub fn init() {
     ];
 
     let mut queue = Vec::new();
-    if let Err(message) = install_official_runtime_skeleton(&fs) {
-        println!(
-            "oscomp: cannot stage official runtime skeleton: {}",
-            message
-        );
-    }
     let mut found_named_group = false;
     let mut installed_groups = 0usize;
     let mut installed_commands = 0usize;
@@ -1232,95 +1226,6 @@ fn install_interp_alias(group_dir: &str, interp: &str, data: &[u8]) -> Result<()
 
 fn read_first_disk_file(fs: &Ext4, paths: &[&str]) -> Option<Vec<u8>> {
     paths.iter().find_map(|path| read_file(fs, path).ok())
-}
-
-fn install_official_runtime_skeleton(fs: &Ext4) -> Result<(), &'static str> {
-    install_tmpfs_dir_path("bin")?;
-    install_tmpfs_dir_path("etc")?;
-    install_tmpfs_dir_path("lib")?;
-    install_tmpfs_dir_path("lib64/lp64d")?;
-    install_tmpfs_dir_path("usr/lib64")?;
-    install_tmpfs_dir_path("tmp/memfd")?;
-    install_tmpfs_dir_path("var/tmp")?;
-    install_tmpfs_file_path(
-        "etc/passwd",
-        b"root:x:0:0:root:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\n",
-    )?;
-
-    install_optional_runtime_aliases(
-        fs,
-        &["musl/busybox", "glibc/busybox", "busybox"],
-        &["bin/busybox", "bin/sh", "busybox"],
-    )?;
-    install_optional_runtime_aliases(
-        fs,
-        &["glibc/lib/ld-linux-riscv64-lp64d.so.1"],
-        &[
-            "lib/ld-linux-riscv64-lp64d.so.1",
-            "lib64/lp64d/ld-linux-riscv64-lp64d.so.1",
-            "usr/lib64/ld-linux-riscv64-lp64d.so.1",
-        ],
-    )?;
-    install_optional_runtime_aliases(
-        fs,
-        &["glibc/lib/libc.so.6"],
-        &[
-            "lib/libc.so.6",
-            "lib64/lp64d/libc.so.6",
-            "usr/lib64/libc.so.6",
-        ],
-    )?;
-    install_optional_runtime_aliases(
-        fs,
-        &["glibc/lib/libm.so.6"],
-        &[
-            "lib/libm.so.6",
-            "lib64/lp64d/libm.so.6",
-            "usr/lib64/libm.so.6",
-        ],
-    )?;
-    install_optional_runtime_aliases(
-        fs,
-        &[
-            "musl/lib/libc.so",
-            "musl/lib/ld-musl-riscv64-lp64d.so.1",
-            "musl/lib/ld-musl-riscv64-lp64.so.1",
-            "musl/lib/ld-musl-riscv64.so.1",
-            "musl/lib/ld-musl-riscv64-sf.so.1",
-        ],
-        &[
-            "lib/libc.so",
-            "lib/ld-musl-riscv64-lp64d.so.1",
-            "lib/ld-musl-riscv64-lp64.so.1",
-            "lib/ld-musl-riscv64.so.1",
-            "lib/ld-musl-riscv64-sf.so.1",
-            "lib64/lp64d/libc.so",
-            "lib64/lp64d/ld-musl-riscv64-lp64d.so.1",
-            "usr/lib64/libc.so",
-            "usr/lib64/ld-musl-riscv64-lp64d.so.1",
-        ],
-    )?;
-    install_tmpfs_file_path(
-        "etc/ld-musl-riscv64.path",
-        b"/\n/lib\n/lib64/lp64d\n/usr/lib64\n",
-    )?;
-    install_tmpfs_file_path(
-        "etc/ld-musl-riscv64-sf.path",
-        b"/\n/lib\n/lib64/lp64d\n/usr/lib64\n",
-    )
-}
-
-fn install_optional_runtime_aliases(
-    fs: &Ext4,
-    sources: &[&str],
-    destinations: &[&str],
-) -> Result<(), &'static str> {
-    if let Some(data) = read_first_disk_file(fs, sources) {
-        for destination in destinations {
-            install_tmpfs_file_path(destination, &data)?;
-        }
-    }
-    Ok(())
 }
 
 fn install_required_disk_file(

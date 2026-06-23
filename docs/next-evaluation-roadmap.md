@@ -4,25 +4,25 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；libctest-musl 仍为 107 分，lmbench 仍为 0 |
+| 最新可见官方结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic、BusyBox、Lua 保持，libcbench/libctest/lmbench 为 0 |
+| 最新稳定官方结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；libctest-musl 仍为 107 分，lmbench 仍为 0 |
 | 最新高分结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
-| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `57.16933539803484`、libctest `107`、lmbench `0` |
-| 当前修复方向 | 保留 submit 默认关闭 `stack_trace`，撤回 24-command lmbench 扩张，补官方运行环境骨架后复测 9-command lite |
-| 本轮代码基线 | 在 `c941356 feat: expand lmbench main queue` 基础上，回到短 lmbench 队列并补 `/bin/sh`、全局 loader/lib、`/etc/passwd`、`/tmp/memfd` |
+| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `0`、libctest `0`、lmbench `0` |
+| 当前修复方向 | 撤回全局运行环境骨架，先恢复 480 基线；保留 submit 默认关闭 `stack_trace` 和 9-command lmbench lite |
+| 本轮代码基线 | 在 `d6746eb fix: add lmbench runtime skeleton` 基础上，删除全局 `/bin/sh`、loader/lib、`/etc/passwd`、`/tmp/memfd` staging |
 | 本轮新增门禁修复 | `64fe8b4` 已撤回 `8690e03 feat: add minimal iozone probe` |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-18:46 已确认 `c941356` 编译通过且保持 483-484 基线，但 24-command lmbench
-仍为 0，并把评测时间拉长到约 17 分钟。下一轮不伪造 lmbench 输出，先补官方脚本会
-准备的运行环境骨架，并把 lmbench 恢复到短探针；若仍为 0，再看串口日志判断是否
-进入真实 benchmark 输出路径。
+11:39 已确认 `d6746eb` 编译通过但回退到 320：基础组仍在，libcbench/libctest 全部
+丢分。下一轮的第一目标不是提 lmbench，而是撤回全局 runtime skeleton，确认 480
+基线恢复；恢复前不再扩大测试组或改全局 VFS 环境。
 
 ## 本轮提交门禁
 
@@ -31,7 +31,7 @@
 3. `kernel-rv` 为 RISC-V executable ELF，入口 `0x80200000`。
 4. `SWTC/kernel/Cargo.lock` 中不再出现 `hashbrown`、`ahash` 或
    `allocator-api2`；`managed` 仍不记录 registry source/checksum。
-5. 官方完整参数下，无盘、basic、libctest 和 lmbench 外部探针均无 panic、无全局超时并主动关机。
+5. 官方完整参数下，无盘、basic 和 lmbench 外部探针均无 panic、无全局超时并主动关机。
 6. `readlinkat` 行为与 `e8d1b48` 保持一致，不保留 `b433976` 的真实路径尝试；
    lmbench staging 必须提供 `/lmbench_all` 根路径别名。
 7. submit 默认构建 feature 应为 `submit tmpfs`，不再带 `stack_trace`；需要诊断时手动传 `STACK_TRACE=1`。
@@ -46,10 +46,10 @@
 - RISC-V basic 保持 `204/204`。
 - RISC-V BusyBox 保持 `98/98`。
 - RISC-V Lua 保持 `18/18`。
-- libcbench 维持约 `57` 分区间。
-- `libctest-musl` 保持 `107/107`。
-- lmbench 若仍为 0，但总分保持 480 以上，下一轮转向 pipe/select/fork 热路径优化。
-- 若总分低于 480，优先撤回运行环境骨架，只保留关闭 `stack_trace` 的性能构建单独复测。
+- libcbench 恢复约 `57` 分区间。
+- `libctest-musl` 恢复 `107/107`。
+- lmbench 若仍为 0，但总分保持 480 以上，才继续看串口日志研究真实 benchmark 输出。
+- 若总分仍低于 480，继续回滚 lmbench 队列变化，直到恢复 484 基线。
 - 不再暂存或执行 iozone；完整脚本和 lite 探针都已证明会导致 320 回退。
 - 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
