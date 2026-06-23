@@ -84,18 +84,21 @@ impl FutexQueue {
         if old_addr.0 == new_addr.0 {
             return 0;
         }
-        let ret = self.wake(old_addr, nval_wake);
-        for i in 0..nval_rq {
-            if let Some(old_queue) = self.0.get_mut(&old_addr) {
-                if let Some((_, waiter)) = old_queue.pop_first() {
-                    *waiter.addr.get_unchecked_mut() = new_addr;
-                    self.add_waiter(waiter);
-                }
-            } else {
-                return ret + i;
-            }
+        let woken = self.wake(old_addr, nval_wake);
+        let mut moved = 0usize;
+        while moved < nval_rq {
+            let waiter = self
+                .0
+                .get_mut(&old_addr)
+                .and_then(|old_queue| old_queue.pop_first().map(|(_, waiter)| waiter));
+            let Some(waiter) = waiter else {
+                break;
+            };
+            *waiter.addr.get_unchecked_mut() = new_addr;
+            self.add_waiter(waiter);
+            moved += 1;
         }
-        ret + nval_rq
+        woken + moved
     }
 
     // /// Wake up one waiter.
@@ -186,6 +189,10 @@ impl Future for FutexFuture {
                     self.expected_val
                 );
                 if val != self.expected_val {
+                    proc.futex_queue.remove_waiter(addr, current_task().tid());
+                    unsafe {
+                        *self.has_added_waiter.get() = false;
+                    }
                     return Poll::Ready(());
                 } else {
                     return Poll::Pending;
@@ -197,6 +204,9 @@ impl Future for FutexFuture {
                 unsafe { atomic_load_acquire(addr.0 as *const u32) }
             );
             proc.futex_queue.remove_waiter(addr, current_task().tid());
+            unsafe {
+                *self.has_added_waiter.get() = false;
+            }
             // TODO: change thread's owned futexes when requeue
             // unsafe {
             //     (*current_task().inner.get()).owned_futexes.0.insert(addr);
@@ -215,6 +225,17 @@ impl Future for FutexFuture {
             //     Poll::Pending
             // }
         })
+    }
+}
+
+impl Drop for FutexFuture {
+    fn drop(&mut self) {
+        if unsafe { *self.has_added_waiter.get() } {
+            let addr = unsafe { *self.addr.get() };
+            current_process().inner_handler(|proc| {
+                proc.futex_queue.remove_waiter(addr, current_task().tid());
+            });
+        }
     }
 }
 

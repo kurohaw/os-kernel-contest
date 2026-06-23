@@ -2,6 +2,7 @@ use core::{intrinsics::atomic_load_acquire, time::Duration};
 
 use log::{debug, info};
 
+use crate::timer::timeout_task::TimeoutTaskOutput;
 use crate::{
     mm::user_check::UserCheck,
     process::thread,
@@ -59,7 +60,11 @@ pub async fn sys_futex(
                 let future = FutexFuture::new(uaddr.into(), val);
                 if let Some(timeout) = timeout {
                     info!("[sys_futex]: timeout {:?}", timeout);
-                    TimeoutTaskFuture::new(timeout, future).await;
+                    if let TimeoutTaskOutput::Timeout =
+                        TimeoutTaskFuture::new(timeout, future).await
+                    {
+                        return Err(SyscallErr::ETIMEDOUT);
+                    }
                 } else {
                     future.await;
                 }
@@ -69,11 +74,13 @@ pub async fn sys_futex(
             }
         }
         FUTEX_WAKE | FUTEX_WAKE_BITSET => {
-            let ret = futex_wake(uaddr, val);
+            let ret = futex_wake(uaddr, val)?;
             log::info!("[sys_futex] futex wake number {:?}", ret);
             // Yield and let the waiter to fetch the lock
-            thread::yield_now().await;
-            return ret;
+            if ret > 0 {
+                thread::yield_now().await;
+            }
+            return Ok(ret);
         }
         FUTEX_REQUEUE | FUTEX_CMP_REQUEUE => {
             let _sum_guard = SumGuard::new();
@@ -127,15 +134,29 @@ pub fn sys_set_tid_address(tid_ptr: usize) -> SyscallRet {
     Ok(current_task().tid())
 }
 
-pub fn sys_set_robust_list(_head: usize, _len: usize) -> SyscallRet {
+pub fn sys_set_robust_list(head: usize, len: usize) -> SyscallRet {
     stack_trace!();
-    log::warn!("[sys_set_robust_list]");
+    if head != 0 {
+        UserCheck::new().check_readable_slice(head as *const u8, len)?;
+    }
+    let inner = unsafe { &mut (*current_task().inner.get()) };
+    inner.robust_list = Some((head, len));
     Ok(0)
 }
 
-pub fn sys_get_robust_list(_pid: usize, _head_ptr: usize, _len_ptr: usize) -> SyscallRet {
+pub fn sys_get_robust_list(pid: usize, head_ptr: usize, len_ptr: usize) -> SyscallRet {
     stack_trace!();
-    log::warn!("[sys_get_robust_list]");
+    if pid != 0 && pid != current_task().tid() {
+        return Err(SyscallErr::ESRCH);
+    }
+    UserCheck::new().check_writable_slice(head_ptr as *mut u8, core::mem::size_of::<usize>())?;
+    UserCheck::new().check_writable_slice(len_ptr as *mut u8, core::mem::size_of::<usize>())?;
+    let (head, len) = unsafe { (*current_task().inner.get()).robust_list.unwrap_or((0, 0)) };
+    let _sum_guard = SumGuard::new();
+    unsafe {
+        *(head_ptr as *mut usize) = head;
+        *(len_ptr as *mut usize) = len;
+    }
     Ok(0)
 }
 

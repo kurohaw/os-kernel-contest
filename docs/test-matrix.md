@@ -60,6 +60,7 @@
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
 | musl libctest staging | static 全量已通过 | 官方 `libc-test/static.txt` 归一化后的 107 个 static case 已全部进入 musl-rv 得分 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
+| futex/time/robust 内部修复 | 本地构建通过，待累计评测 | 清理 futex stale waiter、修正 timeout/requeue、补 robust list，`clock_gettime/getres` 常见路径免锁 |
 | lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |

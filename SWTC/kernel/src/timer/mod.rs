@@ -7,7 +7,12 @@ pub mod timed_task;
 pub mod timeout_task;
 pub use poll_queue::POLL_QUEUE;
 
-use core::{cmp::Reverse, task::Waker, time::Duration};
+use core::{
+    cmp::Reverse,
+    sync::atomic::{AtomicU64, Ordering},
+    task::Waker,
+    time::Duration,
+};
 
 use crate::config::board::CLOCK_FREQ;
 use crate::driver::set_timer;
@@ -62,6 +67,15 @@ pub struct ClockManager(pub BTreeMap<usize, Duration>);
 /// Clock manager that used for looking for a given process
 pub static CLOCK_MANAGER: SpinNoIrqLock<ClockManager> =
     SpinNoIrqLock::new(ClockManager(BTreeMap::new()));
+static REALTIME_OFFSET_US: AtomicU64 = AtomicU64::new(0);
+
+pub fn set_realtime_offset(offset: Duration) {
+    REALTIME_OFFSET_US.store(offset.as_micros() as u64, Ordering::Relaxed);
+}
+
+pub fn realtime_offset() -> Duration {
+    Duration::from_micros(REALTIME_OFFSET_US.load(Ordering::Relaxed))
+}
 
 pub fn init() {
     TIMER_QUEUE.init();

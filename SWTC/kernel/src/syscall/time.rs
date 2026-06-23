@@ -15,9 +15,10 @@ use crate::{
         ffi::TimeVal,
         ffi::Tms,
         ffi::{ITimerval, TimeSpec},
+        realtime_offset, set_realtime_offset,
         timed_task::TimedTaskFuture,
         timeout_task::ksleep,
-        CLOCK_MANAGER, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, TIMER_ABSTIME,
+        CLOCK_MANAGER, CLOCK_MONOTONIC, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, TIMER_ABSTIME,
     },
     utils::{
         async_utils::{Select2Futures, SelectOutput},
@@ -78,6 +79,9 @@ pub fn sys_clock_settime(clock_id: usize, time_spec_ptr: *const TimeSpec) -> Sys
 
     let mut manager_unlock = CLOCK_MANAGER.lock();
     manager_unlock.0.insert(clock_id, diff_time);
+    if clock_id == CLOCK_REALTIME {
+        set_realtime_offset(diff_time);
+    }
 
     Ok(0)
 }
@@ -106,6 +110,18 @@ pub fn sys_clock_gettime(clock_id: usize, time_spec_ptr: *mut TimeSpec) -> Sysca
         }
         return Ok(0);
     }
+    if clock_id == CLOCK_MONOTONIC {
+        unsafe {
+            time_spec_ptr.write_volatile(current_time_duration().into());
+        }
+        return Ok(0);
+    }
+    if clock_id == CLOCK_REALTIME {
+        unsafe {
+            time_spec_ptr.write_volatile((current_time_duration() + realtime_offset()).into());
+        }
+        return Ok(0);
+    }
     let manager_locked = CLOCK_MANAGER.lock();
     let clock = manager_locked.0.get(&clock_id);
     match clock {
@@ -130,6 +146,15 @@ pub fn sys_clock_getres(clock_id: usize, res: *mut TimeSpec) -> SyscallRet {
     stack_trace!();
     let _sum_guard = SumGuard::new();
     UserCheck::new().check_writable_slice(res as *mut u8, core::mem::size_of::<TimeSpec>())?;
+    if matches!(
+        clock_id,
+        CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_PROCESS_CPUTIME_ID
+    ) {
+        unsafe {
+            res.write_volatile(Duration::from_nanos(1).into());
+        }
+        return Ok(0);
+    }
     let manager_locked = CLOCK_MANAGER.lock();
     let clock = manager_locked.0.get(&clock_id);
     match clock {

@@ -67,6 +67,8 @@ pub struct ThreadInner {
     pub signal_context: Option<SignalContext>,
     /// Tid address, which may be modified by `set_tid_address` syscall
     pub tid_addr: TidAddress,
+    /// Robust futex list head and length set by userspace pthread runtime.
+    pub robust_list: Option<(usize, usize)>,
     /// Time info
     pub time_info: ThreadTimeInfo,
     /// Waker
@@ -111,6 +113,7 @@ impl Thread {
                 signal_context: None,
                 ustack_top,
                 tid_addr: TidAddress::new(),
+                robust_list: None,
                 time_info: ThreadTimeInfo::new(),
                 waker: None,
                 // TODO: need to change if multi_hart
@@ -159,6 +162,7 @@ impl Thread {
                 signal_context: None,
                 ustack_top: unsafe { (*another.inner.get()).ustack_top },
                 tid_addr: TidAddress::new(),
+                robust_list: None,
                 time_info: ThreadTimeInfo::new(),
                 waker: None,
                 // TODO: need to change if multi_hart

@@ -8,8 +8,8 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest static 已满分，撤回 2026-06-23 运行环境骨架回归 |
-| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 回到 9-command lite，全局运行环境骨架已撤回 |
+| 当前里程碑 | 停止新增测试组盲试，转向稳定组内部 syscall/性能修复 |
+| 当前提交 | 修复 futex waiter 清理、futex timeout/requeue、robust list 和 clock 快路径 |
 | 最新可见线上结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、lmbench=0 |
 | 最新稳定线上结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -17,6 +17,24 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-23 稳定组内部 syscall 修复
+
+- 用户确认不再每轮排队评测，改为连续累积改动。
+- 新增测试组探针已经多次证明会把 libcbench/libctest 回退到 0；本轮不再新增
+  LTP、iozone、lmbench、cyclictest、iperf 或 netperf staging。
+- futex 修复：
+  - `FutexFuture` 在值已变化或 future 被 timeout/drop 时清理 waiter，避免 stale waiter
+    留在进程队列。
+  - `FUTEX_WAIT` timeout 返回 `ETIMEDOUT`，更贴近 Linux 语义。
+  - `FUTEX_WAKE` 只有实际唤醒 waiter 时才 yield，减少无等待者路径开销。
+  - `FUTEX_REQUEUE/CMP_REQUEUE` 返回真实 wake+move 数量，不再按请求数量虚报。
+- robust list 修复：每线程保存 `set_robust_list` 的 head/len，`get_robust_list(0, ...)`
+  返回真实值。
+- time 修复：`CLOCK_REALTIME`、`CLOCK_MONOTONIC` 和 `CLOCK_PROCESS_CPUTIME_ID` 的
+  `clock_gettime/getres` 常见路径避免全局 clock BTreeMap 锁。
+- 预期影响：优先改善 libcbench pthread/futex、时间 syscall 和多线程退出路径稳定性；
+  不改变官方测试组顺序。
 
 ## 2026-06-23 运行环境骨架回滚
 
