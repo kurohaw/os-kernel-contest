@@ -8,30 +8,15 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 483-484 基线已恢复，lmbench 暂停，转向 LTP 小批量提分 |
-| 当前提交 | 全局运行环境骨架已撤回；新增 glibc/musl LTP 12-case 隔离探针 |
-| 最新可见线上结果 | 2026-06-23 用户截图，`Accepted / 483.94872319405437`；basic=204、BusyBox=98、Lua=18、libcbench=56.94872319405434、libctest=107、lmbench=0 |
+| 当前里程碑 | musl libctest static 已满分，撤回 2026-06-23 运行环境骨架回归 |
+| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 回到 9-command lite，全局运行环境骨架已撤回 |
+| 最新可见线上结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、lmbench=0 |
 | 最新稳定线上结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
-
-## 2026-06-23 LTP 12-case 提分探针
-
-- 用户明确停止继续投入 lmbench，下一步以优先提分为目标改其他测试点。
-- 最新用户截图结果为 `Accepted / 483.94872319405437`，说明撤回全局运行环境骨架后
-  483-484 基线已恢复。
-- 本轮选择 LTP，而不是 iozone/lmbench：LTP 是独立小二进制集合，可以按 allowlist
-  串行、逐项 timeout，不需要全局 `/lib` 或 `/bin/sh`，对现有 484 基线的污染面更小。
-- 新增 `L` 队列记录：输出 `RUN LTP CASE <case>`，执行单个 ELF；只有非 0 或超时才
-  输出 `FAIL LTP CASE <case> : ...`。
-- 首批 allowlist 控制为 12 个基础 syscall case：
-  `getpid01`、`getpid02`、`getppid01`、`getuid01`、`geteuid01`、`getgid03`、
-  `getegid02`、`gettid01`、`time01`、`uname01`、`gettimeofday01`、`getpagesize01`。
-- glibc/musl 分别从 `*/ltp/testcases/bin` 暂存到隔离 tmpfs 目录，动态运行时仍走
-  group-local runtime，不新增全局 runtime skeleton。
 
 ## 2026-06-23 运行环境骨架回滚
 
@@ -44,8 +29,8 @@
   原本隔离的 tmpfs staging。
 - 当前修复：撤回 `install_official_runtime_skeleton` 及其全局文件拷贝，只保留
   9-command lmbench lite、`/lmbench_all` 根别名、`lat_sig` 和 `/var/tmp` 兼容文件。
-- 下一次官方评测先确认总分恢复到 480 左右；lmbench/iozone/网络和全局 runtime
-  staging 继续暂停。
+- 下一次官方评测先确认总分恢复到 480 左右；恢复前不继续扩大 lmbench、iozone、
+  ltp、网络或全局 runtime staging。
 
 ## 2026-06-23 lmbench 环境骨架与 lite 回滚
 

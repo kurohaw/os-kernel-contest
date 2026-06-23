@@ -33,7 +33,6 @@ const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
-const LTP_TIMEOUT_MS: usize = 3_000;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
@@ -98,20 +97,6 @@ const LMBENCH_COMMANDS: &[&[&str]] = &[
     ],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
-];
-const LTP_ALLOWLIST: &[&str] = &[
-    "getpid01",
-    "getpid02",
-    "getppid01",
-    "getuid01",
-    "geteuid01",
-    "getgid03",
-    "getegid02",
-    "gettid01",
-    "time01",
-    "uname01",
-    "gettimeofday01",
-    "getpagesize01",
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -348,10 +333,6 @@ pub fn init() {
     let (libctest_groups, libctest_commands) = install_libctest_groups(&fs, &mut queue);
     installed_groups += libctest_groups;
     installed_commands += libctest_commands;
-
-    let (ltp_groups, ltp_commands) = install_ltp_groups(&fs, &mut queue);
-    installed_groups += ltp_groups;
-    installed_commands += ltp_commands;
 
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
@@ -844,105 +825,6 @@ fn is_allowed_libctest_case(name: &str) -> bool {
     LIBCTEST_ALLOWLIST.iter().any(|allowed| *allowed == name)
 }
 
-fn install_ltp_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
-    let candidates = [
-        (
-            "glibc/ltp/testcases/bin",
-            "oscomp-ltp-glibc",
-            "ltp-glibc",
-            BasicFlavor::Glibc,
-        ),
-        (
-            "musl/ltp/testcases/bin",
-            "oscomp-ltp-musl",
-            "ltp-musl",
-            BasicFlavor::Musl,
-        ),
-    ];
-
-    let mut installed_groups = 0usize;
-    let mut installed_commands = 0usize;
-    for (source_dir, group_dir, marker_name, flavor) in candidates {
-        match install_ltp_group(fs, source_dir, group_dir, marker_name, flavor, queue) {
-            Ok(command_count) if command_count > 0 => {
-                println!(
-                    "oscomp: found official ltp dir {} with {} cases",
-                    source_dir, command_count
-                );
-                installed_groups += 1;
-                installed_commands += command_count;
-            }
-            Ok(_) => {}
-            Err(message) => println!("oscomp: cannot stage {}: {}", source_dir, message),
-        }
-    }
-
-    (installed_groups, installed_commands)
-}
-
-fn install_ltp_group(
-    fs: &Ext4,
-    source_dir: &str,
-    group_dir: &str,
-    marker_name: &str,
-    flavor: BasicFlavor,
-    queue: &mut Vec<u8>,
-) -> Result<usize, &'static str> {
-    let Ok(Some(info)) = lookup_path_str(fs, source_dir) else {
-        return Ok(0);
-    };
-    if info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG {
-        return Err("ltp source path is not a directory");
-    }
-
-    install_tmpfs_dir_path(group_dir)?;
-    let mut interp_paths = Vec::new();
-    let mut staged_cases = Vec::new();
-    for case in LTP_ALLOWLIST {
-        let source_path = resolve_path(source_dir, case);
-        let Ok(Some(info)) = lookup_path_str(fs, &source_path) else {
-            continue;
-        };
-        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
-            continue;
-        }
-        let elf = read_file(fs, &source_path)?;
-        if elf.get(..4) != Some(b"\x7fELF") {
-            continue;
-        }
-        install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, case), &elf)?;
-        remember_interp(group_dir, &elf, &mut interp_paths)?;
-        staged_cases.push(*case);
-    }
-
-    if staged_cases.is_empty() {
-        return Ok(0);
-    }
-    if !interp_paths.is_empty() {
-        install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
-    }
-    install_tmpfs_dir_path(&alloc::format!("{}/tmp", group_dir))?;
-
-    push_queue_record(
-        queue,
-        b'G',
-        &alloc::format!(
-            "/{}\t#### OS COMP TEST GROUP START {} ####",
-            group_dir,
-            marker_name
-        ),
-    );
-    for case in &staged_cases {
-        push_ltp_record(queue, LTP_TIMEOUT_MS, case);
-    }
-    push_queue_record(
-        queue,
-        b'E',
-        &alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
-    );
-    Ok(staged_cases.len())
-}
-
 fn find_optional_regular_path(fs: &Ext4, paths: &[String]) -> Result<Option<String>, &'static str> {
     for path in paths {
         if let Ok(Some(info)) = lookup_path_str(fs, path) {
@@ -1204,11 +1086,6 @@ fn push_libctest_runtest_record(queue: &mut Vec<u8>, timeout_ms: usize, case: &s
         case
     );
     push_queue_record(queue, b'A', &payload);
-}
-
-fn push_ltp_record(queue: &mut Vec<u8>, timeout_ms: usize, case: &str) {
-    let payload = alloc::format!("{}\t{}\t{}", timeout_ms, case, case);
-    push_queue_record(queue, b'L', &payload);
 }
 
 fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {
