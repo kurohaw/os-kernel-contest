@@ -8,35 +8,15 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 484 基线可恢复，用户要求进入 aggressive 冲分 |
-| 当前提交 | 撤回 LTP 12-case 回归后，新增 `cyclictest/iperf/netperf` 脚本级超时探针 |
-| 最新可见线上结果 | 2026-06-23 15:42:29，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、ltp=0 |
+| 当前里程碑 | musl libctest static 已满分，撤回 2026-06-23 运行环境骨架回归 |
+| 当前提交 | submit 构建关闭默认 `stack_trace`，lmbench 回到 9-command lite，全局运行环境骨架已撤回 |
+| 最新可见线上结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、lmbench=0 |
 | 最新稳定线上结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
-
-## 2026-06-23 aggressive cyclictest/iperf/netperf 探针
-
-- 用户明确要求更激进冲分；本轮接受更高回退风险，目标是一次性试探
-  `cyclictest`、`iperf`、`netperf` 三个 0 分项。
-- 在 `f7abddf Revert "feat: add ltp smoke probe"` 的撤回版基础上，只新增队列末尾
-  的脚本级探针，不改变 basic、BusyBox、Lua、libcbench、libctest 的既有顺序。
-- 仅当官方盘存在 `glibc/*_testcode.sh` 或 `musl/*_testcode.sh` 时启用；每组暂存
-  `busybox` 和对应二进制，动态运行时仍使用 group-local 目录。
-- 每个脚本通过现有 `A` 队列执行，单组 20 秒超时，避免网络/周期测试长时间卡住。
-- 这是高风险提交：若线上低于 480 或再次回到 320，优先直接撤回该 aggressive 探针。
-
-## 2026-06-23 LTP 12-case 回归并撤回
-
-- 最新用户截图显示 2026-06-23 15:42:29 评测为 `Accepted / 320.0`。
-- 得分构成：basic=204、BusyBox=98、Lua=18；libcbench、libctest、ltp 均为 0。
-- 该结果来自 `c5ee433 feat: add ltp smoke probe`，说明 LTP 小批量探针仍会破坏后续
-  稳定计分。
-- 已通过 `f7abddf Revert "feat: add ltp smoke probe"` 撤回该改动，并推送到
-  GitHub/GitLab。
 
 ## 2026-06-23 运行环境骨架回滚
 

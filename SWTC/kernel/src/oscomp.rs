@@ -34,7 +34,6 @@ const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
-const AGGRESSIVE_SCRIPT_TIMEOUT_MS: usize = 20_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -99,9 +98,6 @@ const LMBENCH_COMMANDS: &[&[&str]] = &[
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
 ];
-const CYCLICTEST_RESOURCES: &[&str] = &["busybox", "cyclictest"];
-const IPERF_RESOURCES: &[&str] = &["busybox", "iperf", "iperf3"];
-const NETPERF_RESOURCES: &[&str] = &["busybox", "netperf", "netserver"];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
     "basename",
@@ -341,11 +337,6 @@ pub fn init() {
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
     installed_commands += lmbench_commands;
-
-    let (aggressive_groups, aggressive_commands) =
-        install_aggressive_script_groups(&fs, &mut queue);
-    installed_groups += aggressive_groups;
-    installed_commands += aggressive_commands;
 
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
@@ -970,167 +961,6 @@ fn install_lmbench_group(
     }
     push_queue_record(queue, b'E', &end_marker);
     Ok(LMBENCH_COMMANDS.len())
-}
-
-fn install_aggressive_script_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
-    let candidates: &[(&str, &str, &str, BasicFlavor, &[&str])] = &[
-        (
-            "glibc/cyclictest_testcode.sh",
-            "oscomp-cyclictest-glibc",
-            "cyclictest-glibc",
-            BasicFlavor::Glibc,
-            CYCLICTEST_RESOURCES,
-        ),
-        (
-            "musl/cyclictest_testcode.sh",
-            "oscomp-cyclictest-musl",
-            "cyclictest-musl",
-            BasicFlavor::Musl,
-            CYCLICTEST_RESOURCES,
-        ),
-        (
-            "glibc/iperf_testcode.sh",
-            "oscomp-iperf-glibc",
-            "iperf-glibc",
-            BasicFlavor::Glibc,
-            IPERF_RESOURCES,
-        ),
-        (
-            "musl/iperf_testcode.sh",
-            "oscomp-iperf-musl",
-            "iperf-musl",
-            BasicFlavor::Musl,
-            IPERF_RESOURCES,
-        ),
-        (
-            "glibc/netperf_testcode.sh",
-            "oscomp-netperf-glibc",
-            "netperf-glibc",
-            BasicFlavor::Glibc,
-            NETPERF_RESOURCES,
-        ),
-        (
-            "musl/netperf_testcode.sh",
-            "oscomp-netperf-musl",
-            "netperf-musl",
-            BasicFlavor::Musl,
-            NETPERF_RESOURCES,
-        ),
-    ];
-
-    let mut installed_groups = 0usize;
-    let mut installed_commands = 0usize;
-    for (script_path, group_dir, marker_name, flavor, resources) in candidates {
-        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
-            continue;
-        };
-        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
-            continue;
-        }
-        match install_aggressive_script_group(
-            fs,
-            script_path,
-            group_dir,
-            marker_name,
-            *flavor,
-            resources,
-            queue,
-        ) {
-            Ok(()) => {
-                println!("oscomp: found aggressive script {}", script_path);
-                installed_groups += 1;
-                installed_commands += 1;
-            }
-            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
-        }
-    }
-
-    (installed_groups, installed_commands)
-}
-
-fn install_aggressive_script_group(
-    fs: &Ext4,
-    script_path: &str,
-    group_dir: &str,
-    marker_name: &str,
-    flavor: BasicFlavor,
-    resources: &[&str],
-    queue: &mut Vec<u8>,
-) -> Result<(), &'static str> {
-    let source_dir = parent_path(script_path);
-    let script = read_file(fs, script_path)?;
-    let script_name = file_name(script_path)?;
-    let (start_marker, end_marker) = match core::str::from_utf8(&script) {
-        Ok(script) => (
-            find_group_marker(script, "START").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name)
-            }),
-            find_group_marker(script, "END").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name)
-            }),
-        ),
-        Err(_) => (
-            alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name),
-            alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
-        ),
-    };
-
-    install_tmpfs_dir_path(group_dir)?;
-    install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, script_name), &script)?;
-
-    let mut interp_paths = Vec::new();
-    let mut has_busybox = false;
-    let mut has_payload = false;
-    for resource in resources {
-        let path = resolve_path(&source_dir, resource);
-        let Ok(Some(info)) = lookup_path_str(fs, &path) else {
-            continue;
-        };
-        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
-            continue;
-        }
-        let data = read_file(fs, &path)?;
-        install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, resource), &data)?;
-        if *resource == "busybox" {
-            install_tmpfs_file_path("busybox", &data)?;
-            has_busybox = true;
-        } else {
-            has_payload = true;
-        }
-        if data.get(..4) == Some(b"\x7fELF") {
-            remember_interp(group_dir, &data, &mut interp_paths)?;
-        }
-    }
-
-    if !has_busybox {
-        return Err("busybox not found");
-    }
-    if !has_payload {
-        return Err("test payload not found");
-    }
-    if !interp_paths.is_empty() {
-        install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
-    }
-
-    install_tmpfs_dir_path(&alloc::format!("{}/tmp", group_dir))?;
-    install_tmpfs_dir_path(&alloc::format!("{}/var/tmp", group_dir))?;
-    install_tmpfs_file_path(
-        &alloc::format!("{}/etc/hosts", group_dir),
-        b"127.0.0.1 localhost\n::1 localhost\n",
-    )?;
-    install_tmpfs_file_path(
-        &alloc::format!("{}/etc/resolv.conf", group_dir),
-        b"nameserver 127.0.0.1\n",
-    )?;
-
-    push_queue_record(
-        queue,
-        b'G',
-        &alloc::format!("/{}\t{}", group_dir, start_marker),
-    );
-    push_argv_record(queue, AGGRESSIVE_SCRIPT_TIMEOUT_MS, script_name, &[]);
-    push_queue_record(queue, b'E', &end_marker);
-    Ok(())
 }
 
 fn find_first_regular_path(fs: &Ext4, paths: &[String]) -> Result<String, &'static str> {
