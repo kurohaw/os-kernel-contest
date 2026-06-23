@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 运行环境骨架回归，已撤回 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/lmbench 均为 0 |
-| 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
+| 官方页面最后可见结果 | 484 基线恢复 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
+| 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107、lmbench=0、cyclictest=0 |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
 | libc syscall 兼容修复 | 本地通过 | `getrusage/times/sched_getaffinity/fcntl/lseek` 完成低风险语义修正；不新增测试组 |
 | 无盘 QEMU 回归 | 本地通过 | `kernel-rv` 启动后输出 `oscomp: block device unavailable`、`!TEST FINISH!` 并主动关机 |
@@ -42,6 +42,7 @@
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
 | `C` libctest 队列协议 | 已线上验证 107 case | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
+| `K` cyclictest 队列协议 | 本地构建通过，待线上确认 | 仅执行 `NO_STRESS_P1/P8`，按官方脚本输出 begin/end，并依据真实退出码标记 success/fail |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
 | 动态解释器缺失 | 通过 | 返回 `ENOENT/ENOEXEC`，不再在 `memory_space/mod.rs:871` panic |
@@ -66,6 +67,7 @@
 | lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
+| cyclictest 非压力探针 | 本地构建通过，待线上确认 | 只在发现官方 cyclictest 脚本和 ELF 时暂存私有组，不复制全局 runtime，不启动 hackbench 压力组 |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
