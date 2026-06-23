@@ -4,25 +4,26 @@
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic、BusyBox、Lua 保持，libcbench/libctest/lmbench 为 0 |
+| 最新可见官方结果 | 2026-06-23 15:42:29，`Accepted / 320.0`；basic、BusyBox、Lua 保持，libcbench/libctest/ltp 为 0 |
 | 最新稳定官方结果 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；libctest-musl 仍为 107 分，lmbench 仍为 0 |
 | 最新高分结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
+| 最新已撤回回归 | `c5ee433` 的 LTP 12-case 探针导致 2026-06-23 15:42 回到 320，已由 `f7abddf` 撤回 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
 | 通过基线得分构成 | RISC-V basic `204`、BusyBox `98`、Lua `18`、libcbench `57.255157002759375`、libctest `107` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
-| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `0`、libctest `0`、lmbench `0` |
-| 当前修复方向 | 撤回全局运行环境骨架，先恢复 480 基线；保留 submit 默认关闭 `stack_trace` 和 9-command lmbench lite |
-| 本轮代码基线 | 在 `d6746eb fix: add lmbench runtime skeleton` 基础上，删除全局 `/bin/sh`、loader/lib、`/etc/passwd`、`/tmp/memfd` staging |
+| 最新线上得分 | basic `204`、BusyBox `98`、Lua `18`、libcbench `0`、libctest `0`、ltp `0` |
+| 当前修复方向 | 按用户要求进入 aggressive 冲分：在队尾尝试 `cyclictest/iperf/netperf` 脚本级探针 |
+| 本轮代码基线 | 在 `f7abddf` 撤回 LTP 探针基础上，仅追加高风险网络/周期测试脚本探针 |
 | 本轮新增门禁修复 | `64fe8b4` 已撤回 `8690e03 feat: add minimal iozone probe` |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
 | 当前已知边界 | LoongArch 占位 ELF；iozone、lmbench、ltp、网络/性能测试仍未稳定得分 |
 
-11:39 已确认 `d6746eb` 编译通过但回退到 320：基础组仍在，libcbench/libctest 全部
-丢分。下一轮的第一目标不是提 lmbench，而是撤回全局 runtime skeleton，确认 480
-基线恢复；恢复前不再扩大测试组或改全局 VFS 环境。
+15:42 已确认 `c5ee433` 编译通过但回退到 320：基础组仍在，libcbench/libctest 全部
+丢分，LTP 也未起分。该改动已撤回。本轮因用户要求更激进，改为在全部稳定组之后
+追加 `cyclictest/iperf/netperf` 脚本级探针；若低于 480，下一轮立即撤回。
 
 ## 本轮提交门禁
 
@@ -48,8 +49,8 @@
 - RISC-V Lua 保持 `18/18`。
 - libcbench 恢复约 `57` 分区间。
 - `libctest-musl` 恢复 `107/107`。
-- lmbench 若仍为 0，但总分保持 480 以上，才继续看串口日志研究真实 benchmark 输出。
-- 若总分仍低于 480，继续回滚 lmbench 队列变化，直到恢复 484 基线。
+- aggressive 探针若让 `cyclictest`、`iperf` 或 `netperf` 任一项起分，保留并继续按真实日志修。
+- 若总分仍低于 480，立即撤回本轮 aggressive 探针，恢复 `f7abddf` 附近的 484 基线。
 - 不再暂存或执行 iozone；完整脚本和 lite 探针都已证明会导致 320 回退。
 - 不再出现 `src/process/thread/exit.rs:74` panic。
 - 若遇到未支持 futex op，应返回 errno 或输出 warn，不应 kernel panic。
@@ -71,11 +72,11 @@
    `Select on 100 fd` 或 `Signal handler installation:`；没有这些行就继续修
    执行/超时路径，有这些行但不计分再查 parser 分组。
 4. iozone 暂停；没有完整官方串口日志前，不再做任何 iozone staging。
-5. 再推进 ltp、iperf、netperf 等更容易暴露网络或多进程语义的问题。
+5. 本轮已经按激进策略推进 `cyclictest/iperf/netperf`；LTP 暂停。
 6. LoongArch 作为独立里程碑，不与当前 RISC-V 稳定得分混合提交。
 
 ## 本轮暂缓
 
-- 不新增 iozone、iperf、netperf 或 ltp 正式执行组。
-- 不处理网络、多核和 LoongArch。
+- 不新增 iozone 或 ltp 正式执行组。
+- 不处理多核和 LoongArch。
 - 不一次性重新合入完整 iozone。

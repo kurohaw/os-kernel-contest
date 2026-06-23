@@ -4,7 +4,7 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 运行环境骨架回归，已撤回 | 2026-06-23 11:39:59，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/lmbench 均为 0 |
+| 官方页面最后可见结果 | LTP 探针回归，已撤回 | 2026-06-23 15:42:29，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/ltp 均为 0 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-22 18:46:51，`Accepted / 484.1693353980349`；basic=204、BusyBox=98、Lua=18、libcbench=57.16933539803484、libctest=107、lmbench=0 |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
 | 上一条稳定复测结果 | 483-484 基线稳定 | 2026-06-21 13:36:45，`Accepted / 483.16564668235225`；basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、libctest=107、lmbench=0 |
@@ -64,6 +64,8 @@
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
+| LTP 12-case 探针 | 已撤回 | `c5ee433` 导致 2026-06-23 15:42 线上回退到 `320.0`，已由 `f7abddf` 撤回 |
+| aggressive cyclictest/iperf/netperf 探针 | 待线上确认 | 只在官方脚本存在时启用，放在队尾，每个脚本 20 秒超时；若低于 480 立即撤回 |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
 未直接运行 `zhouzhouyi/os-contest:20260510` Docker 镜像，因为当前机器没有
