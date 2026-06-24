@@ -4,13 +4,13 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-23 |
+| 当前日期 | 2026-06-24 |
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 484 基线已恢复，开始尝试隔离的小测试组提分 |
-| 当前提交 | 在稳定 syscall 修复基础上，新增 cyclictest 非压力最小入口 |
-| 最新可见线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107、lmbench=0、cyclictest=0 |
+| 当前里程碑 | 已撤回 cyclictest 探针，恢复 483-484 分稳定代码路径 |
+| 当前提交 | 撤回 `d500180 feat: add cyclictest smoke queue`，保留此前 syscall 兼容修复 |
+| 最新可见线上结果 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、cyclictest=0 |
 | 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
@@ -18,24 +18,15 @@
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
-## 2026-06-23 cyclictest 非压力探针
+## 2026-06-24 cyclictest 回归撤回
 
-- 最新官方结果已恢复到 2026-06-23 18:05:27，`Accepted / 484.32498298746674`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、
-  libctest=107；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
-- 用户要求更激进地快速提分后，本轮不再继续微调 lmbench；选择 cyclictest 作为
-  最小新分项探针，因为官方脚本只有 4 个包装用例，且非压力 P1/P8 不需要
-  hackbench 后台压力进程。
-- 新增 `K` 队列记录，按官方脚本格式输出
-  `====== cyclictest <case> begin/end: success|fail ======`，并以真实子进程退出码决定
-  success 或 fail，不伪造通过结果。
-- `oscomp` 只在发现官方 `cyclictest_testcode.sh` 和 `cyclictest` ELF 时暂存该组；
-  运行时文件全部放在 `oscomp-cyclictest-*` 私有目录，不新增全局 `/lib`、`/bin`、
-  `/etc` 或 iozone 相关 staging，避免重现 320 回退。
-- 当前只执行 `NO_STRESS_P1` 和 `NO_STRESS_P8` 两个用例；如果线上有分，再补
-  hackbench 压力组；如果仍为 0，优先根据串口日志补 cyclictest 所需 syscall。
-- 本地验证：`cargo +nightly-2025-02-18 fmt`、`make all
-  RUST_TOOLCHAIN=nightly-2025-02-18`、无测试盘 QEMU 主动关机均通过。
+- `d500180 feat: add cyclictest smoke queue` 的线上结果为
+  `Accepted / 320.0`。
+- basic、BusyBox 和 Lua 保持原分，但 libcbench 与 libctest 同时归零，说明新增
+  cyclictest 扫描/暂存路径破坏了扩展队列，而不是 libcbench 性能波动。
+- 已完整撤回 cyclictest 的 `K` 队列协议、脚本扫描和 ELF/runtime 暂存，恢复到
+  `0bc7b07` 的稳定代码路径。
+- 在 483-484 基线重新得到线上确认前，不新增任何测试组 staging。
 
 ## 2026-06-23 稳定组内部 syscall 修复
 

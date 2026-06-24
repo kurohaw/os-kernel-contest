@@ -34,7 +34,6 @@ const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
-const CYCLICTEST_TIMEOUT_MS: usize = 5_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -98,16 +97,6 @@ const LMBENCH_COMMANDS: &[&[&str]] = &[
     ],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
-];
-const CYCLICTEST_COMMANDS: &[(&str, &[&str])] = &[
-    (
-        "NO_STRESS_P1",
-        &["-a", "-i", "1000", "-t1", "-p99", "-D", "1s", "-q"],
-    ),
-    (
-        "NO_STRESS_P8",
-        &["-a", "-i", "1000", "-t8", "-p99", "-D", "1s", "-q"],
-    ),
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -344,10 +333,6 @@ pub fn init() {
     let (libctest_groups, libctest_commands) = install_libctest_groups(&fs, &mut queue);
     installed_groups += libctest_groups;
     installed_commands += libctest_commands;
-
-    let (cyclictest_groups, cyclictest_commands) = install_cyclictest_groups(&fs, &mut queue);
-    installed_groups += cyclictest_groups;
-    installed_commands += cyclictest_commands;
 
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
@@ -851,141 +836,6 @@ fn find_optional_regular_path(fs: &Ext4, paths: &[String]) -> Result<Option<Stri
     Ok(None)
 }
 
-fn install_cyclictest_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
-    let candidates = [
-        (
-            "glibc/cyclictest_testcode.sh",
-            "oscomp-cyclictest-glibc",
-            "cyclictest-glibc",
-            BasicFlavor::Glibc,
-        ),
-        (
-            "musl/cyclictest_testcode.sh",
-            "oscomp-cyclictest-musl",
-            "cyclictest-musl",
-            BasicFlavor::Musl,
-        ),
-        (
-            "cyclictest/cyclictest_testcode.sh",
-            "oscomp-cyclictest",
-            "cyclictest",
-            BasicFlavor::Root,
-        ),
-        (
-            "scripts/cyclictest/cyclictest_testcode.sh",
-            "oscomp-cyclictest",
-            "cyclictest",
-            BasicFlavor::Root,
-        ),
-        (
-            "cyclictest_testcode.sh",
-            "oscomp-cyclictest",
-            "cyclictest",
-            BasicFlavor::Root,
-        ),
-    ];
-
-    let mut installed_groups = 0usize;
-    let mut installed_commands = 0usize;
-    for (script_path, group_dir, marker_name, flavor) in candidates {
-        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
-            continue;
-        };
-        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
-            continue;
-        }
-        match install_cyclictest_group(fs, script_path, group_dir, marker_name, flavor, queue) {
-            Ok(command_count) => {
-                println!("oscomp: found official cyclictest script {}", script_path);
-                installed_groups += 1;
-                installed_commands += command_count;
-            }
-            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
-        }
-    }
-
-    (installed_groups, installed_commands)
-}
-
-fn install_cyclictest_group(
-    fs: &Ext4,
-    script_path: &str,
-    group_dir: &str,
-    marker_name: &str,
-    flavor: BasicFlavor,
-    queue: &mut Vec<u8>,
-) -> Result<usize, &'static str> {
-    let source_dir = parent_path(script_path);
-    let cyclictest_path = find_first_regular_path(
-        fs,
-        &[
-            resolve_path(&source_dir, "cyclictest"),
-            resolve_path(&source_dir, "bin/cyclictest"),
-            resolve_path(&source_dir, "rt-tests/cyclictest"),
-            "cyclictest".to_string(),
-            "rt-tests-2.7/src/cyclictest/cyclictest".to_string(),
-        ],
-    )?;
-    let cyclictest = read_file(fs, &cyclictest_path)?;
-    if cyclictest.get(..4) != Some(b"\x7fELF") {
-        return Err("cyclictest is not an ELF file");
-    }
-
-    let script = read_file(fs, script_path)?;
-    let (start_marker, end_marker) = match core::str::from_utf8(&script) {
-        Ok(script) => (
-            find_group_marker(script, "START").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name)
-            }),
-            find_group_marker(script, "END").unwrap_or_else(|| {
-                alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name)
-            }),
-        ),
-        Err(_) => (
-            alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name),
-            alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name),
-        ),
-    };
-
-    install_tmpfs_dir_path(group_dir)?;
-    install_tmpfs_file_path(
-        &alloc::format!("{}/cyclictest_testcode.sh", group_dir),
-        &script,
-    )?;
-    install_tmpfs_file_path(&alloc::format!("{}/cyclictest", group_dir), &cyclictest)?;
-
-    if let Ok(Some(hackbench_path)) = find_optional_regular_path(
-        fs,
-        &[
-            resolve_path(&source_dir, "hackbench"),
-            "hackbench".to_string(),
-            "rt-tests-2.7/src/hackbench/hackbench".to_string(),
-        ],
-    ) {
-        install_tmpfs_file_path(
-            &alloc::format!("{}/hackbench", group_dir),
-            &read_file(fs, &hackbench_path)?,
-        )?;
-    }
-
-    let mut interp_paths = Vec::new();
-    remember_interp(group_dir, &cyclictest, &mut interp_paths)?;
-    if !interp_paths.is_empty() {
-        install_group_runtime(fs, flavor, group_dir, &interp_paths)?;
-    }
-
-    push_queue_record(
-        queue,
-        b'G',
-        &alloc::format!("/{}\t{}", group_dir, start_marker),
-    );
-    for (name, args) in CYCLICTEST_COMMANDS {
-        push_bench_argv_record(queue, b'K', CYCLICTEST_TIMEOUT_MS, name, "cyclictest", args);
-    }
-    push_queue_record(queue, b'E', &end_marker);
-    Ok(CYCLICTEST_COMMANDS.len())
-}
-
 fn install_lmbench_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
     let candidates = [
         (
@@ -1222,22 +1072,6 @@ fn push_argv_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, ar
         payload.push_str(arg);
     }
     push_queue_record(queue, b'A', &payload);
-}
-
-fn push_bench_argv_record(
-    queue: &mut Vec<u8>,
-    kind: u8,
-    timeout_ms: usize,
-    name: &str,
-    executable: &str,
-    args: &[&str],
-) {
-    let mut payload = alloc::format!("{}\t{}\t{}", timeout_ms, name, executable);
-    for arg in args {
-        payload.push('\t');
-        payload.push_str(arg);
-    }
-    push_queue_record(queue, kind, &payload);
 }
 
 fn push_libctest_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str, case: &str) {
