@@ -8,8 +8,8 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl libctest 动态 110 项已在官方镜像本地全部通过 |
-| 当前提交 | 在稳定代码路径上接入 musl dynamic libctest，并修正 submit 模式物理内存上界 |
+| 当前里程碑 | musl dynamic libctest 110 项与首批 LTP 22 项已在官方镜像本地全部通过 |
+| 当前提交 | 接入 LTP 稳定批次，并修复共享 mmap、wait4 重启和 exec ELF 缓存泄漏 |
 | 最新可见线上结果 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、cyclictest=0 |
 | 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -17,6 +17,27 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-24 LTP 首批 22 项稳定通过
+
+- `oscomp` 新增 EXT4 目录枚举，从 `musl/ltp/testcases/bin` 读取真实 LTP ELF，
+  以 `L` 队列记录串行执行并输出官方脚本要求的 `RUN/FAIL LTP CASE` 行。
+- 初次扩大到 256 项时定位到三类共性问题：
+  - LTP 结果页使用临时文件上的 `MAP_SHARED`，fork 时错误进入 COW，导致
+    子进程已经输出 TPASS，但父进程 summary 仍为 0。
+  - `execve` 将每个约 800 KiB LTP ELF 永久缓存到 inode 的 kernel heap，连续
+    执行约 88 项后耗尽堆。
+  - `wait4` 被普通信号事件打断后直接返回 `EINTR`，使 LTP 主进程过早退出，
+    后代进程继续干扰下一项。
+- 当前修复：
+  - 文件型和匿名 `MAP_SHARED` 在 fork 中共享原物理页，不再转成 COW。
+  - `execve` 使用单次局部 ELF 缓冲，进程替换完成后释放。
+  - `wait4` 消费普通信号事件后继续等待子进程。
+  - submit kernel heap 从 48 MiB 提到 128 MiB；补 `fchownat` 兼容、
+    `unlinkat(AT_REMOVEDIR)` 和最小 `/etc/passwd`、`/etc/group`。
+- 官方镜像本地结果：22 个 LTP case 全部返回 0，`ltp-musl` START/END 完整，
+  同轮 libctest 保持 static `107/107` + dynamic `110/110`，无 panic/oom 并主动关机。
+- 256 MiB 无盘 QEMU 兼容回归通过。LTP 22 分仍待线上评测确认。
 
 ## 2026-06-24 musl dynamic libctest 全量通过
 

@@ -43,6 +43,8 @@ use crate::utils::error::{SyscallErr, SyscallRet};
 use crate::utils::path::{self, is_relative_path};
 use crate::utils::string::c_str_to_string;
 
+const AT_REMOVEDIR: u32 = 0x200;
+
 /// get current working directory
 pub fn sys_getcwd(buf: usize, len: usize) -> SyscallRet {
     stack_trace!();
@@ -96,35 +98,44 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, _flags: u32) -> SyscallRet {
     })
 }
 
-pub fn sys_unlinkat(dirfd: isize, path: *const u8, _flags: u32) -> SyscallRet {
+pub fn sys_unlinkat(dirfd: isize, path: *const u8, flags: u32) -> SyscallRet {
     stack_trace!();
+    if flags & !AT_REMOVEDIR != 0 {
+        return Err(SyscallErr::EINVAL);
+    }
     let (target_inode, _, _) = path::path_to_inode_ffi(dirfd, path)?;
     stack_trace!();
     if target_inode.is_none() {
         return Err(SyscallErr::ENOENT);
     }
     let target_inode = target_inode.unwrap();
-    if target_inode.metadata().mode == InodeMode::FileDIR {
-        debug!("target_inode is dir");
-        Err(SyscallErr::EISDIR)
-    } else {
-        let mut inner = target_inode.metadata().inner.lock();
-        inner.st_atim = Duration::ZERO.into();
-        inner.st_ctim = Duration::ZERO.into();
-        inner.st_mtim = Duration::ZERO.into();
-        drop(inner);
-        let parent = target_inode.metadata().inner.lock().parent.clone();
-        match parent {
-            Some(parent) => {
-                let parent = parent.upgrade().unwrap();
-                debug!("Have a parent: {}", parent.metadata().name);
-                parent.unlink(target_inode)?;
-                Ok(0)
-            }
-            None => {
-                debug!("Have no parent, this inode is a root node which cannot be unlink");
-                Err(SyscallErr::EPERM)
-            }
+    let is_dir = target_inode.metadata().mode == InodeMode::FileDIR;
+    if is_dir && flags & AT_REMOVEDIR == 0 {
+        return Err(SyscallErr::EISDIR);
+    }
+    if !is_dir && flags & AT_REMOVEDIR != 0 {
+        return Err(SyscallErr::ENOTDIR);
+    }
+    if is_dir && !target_inode.metadata().inner.lock().children.is_empty() {
+        return Err(SyscallErr::ENOTEMPTY);
+    }
+
+    let mut inner = target_inode.metadata().inner.lock();
+    inner.st_atim = Duration::ZERO.into();
+    inner.st_ctim = Duration::ZERO.into();
+    inner.st_mtim = Duration::ZERO.into();
+    let parent = inner.parent.clone();
+    drop(inner);
+    match parent {
+        Some(parent) => {
+            let parent = parent.upgrade().ok_or(SyscallErr::ENOENT)?;
+            debug!("Have a parent: {}", parent.metadata().name);
+            parent.unlink(target_inode)?;
+            Ok(0)
+        }
+        None => {
+            debug!("Have no parent, this inode is a root node which cannot be unlink");
+            Err(SyscallErr::EPERM)
         }
     }
 }
@@ -1633,5 +1644,19 @@ pub async fn sys_pwrite64(fd: usize, buf_ptr: usize, len: usize, offset: usize) 
 
 pub fn sys_fchmodat() -> SyscallRet {
     stack_trace!();
+    Ok(0)
+}
+
+pub fn sys_fchownat(
+    dirfd: isize,
+    pathname: *const u8,
+    _owner: u32,
+    _group: u32,
+    _flags: u32,
+) -> SyscallRet {
+    stack_trace!();
+    path::path_to_inode_ffi(dirfd, pathname)?
+        .0
+        .ok_or(SyscallErr::ENOENT)?;
     Ok(0)
 }

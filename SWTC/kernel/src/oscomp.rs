@@ -23,6 +23,7 @@ const EXT4_ROOT_INO: u32 = 2;
 const EXT4_EXTENTS_FL: u32 = 0x0008_0000;
 const EXT4_EXTENT_MAGIC: u16 = 0xf30a;
 const EXT4_S_IFREG: u16 = 0x8000;
+const EXT4_S_IFDIR: u16 = 0x4000;
 const EXT4_MODE_TYPE_MASK: u16 = 0xf000;
 const MAX_BLOCK_SIZE: usize = 4096;
 const INODE_SIZE: usize = 160;
@@ -35,6 +36,8 @@ const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
 const MAX_DYNAMIC_LIBCTEST_CASES: usize = 110;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
+const LTP_TIMEOUT_MS: usize = 3_000;
+const MAX_LTP_CASES: usize = 22;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -98,6 +101,30 @@ const LMBENCH_COMMANDS: &[&[&str]] = &[
     ],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "install"],
     &["lat_sig", "-P", "1", "-W", "1", "-N", "10", "catch"],
+];
+const LTP_ALLOWLIST: &[&str] = &[
+    "alarm02",
+    "chown01",
+    "close01",
+    "close02",
+    "dup01",
+    "dup02",
+    "dup03",
+    "dup04",
+    "dup06",
+    "dup07",
+    "dup202",
+    "dup204",
+    "dup206",
+    "dup207",
+    "exit02",
+    "exit_group01",
+    "fork01",
+    "fork03",
+    "fork05",
+    "fork07",
+    "fork08",
+    "fork10",
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -225,6 +252,11 @@ struct InodeInfo {
     size: u64,
 }
 
+struct DirectoryEntry {
+    name: String,
+    info: InodeInfo,
+}
+
 struct BasicCommand {
     executable_path: String,
 }
@@ -338,6 +370,10 @@ pub fn init() {
     let (lmbench_groups, lmbench_commands) = install_lmbench_groups(&fs, &mut queue);
     installed_groups += lmbench_groups;
     installed_commands += lmbench_commands;
+
+    let (ltp_groups, ltp_commands) = install_ltp_groups(&fs, &mut queue);
+    installed_groups += ltp_groups;
+    installed_commands += ltp_commands;
 
     if installed_groups == 0 {
         println!("oscomp: official script not found or no runnable group");
@@ -1049,6 +1085,120 @@ fn install_lmbench_group(
     Ok(LMBENCH_COMMANDS.len())
 }
 
+fn install_ltp_groups(fs: &Ext4, queue: &mut Vec<u8>) -> (usize, usize) {
+    let candidates = [(
+        "musl/ltp_testcode.sh",
+        "musl/ltp/testcases/bin",
+        "oscomp-ltp-musl",
+        "ltp-musl",
+    )];
+
+    for (script_path, bin_dir, group_dir, marker_name) in candidates {
+        let Ok(Some(info)) = lookup_path_str(fs, script_path) else {
+            continue;
+        };
+        if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
+            continue;
+        }
+        match install_ltp_group(fs, bin_dir, group_dir, marker_name, queue) {
+            Ok(command_count) => {
+                println!("oscomp: found official ltp script {}", script_path);
+                return (1, command_count);
+            }
+            Err(message) => println!("oscomp: cannot stage {}: {}", script_path, message),
+        }
+    }
+
+    (0, 0)
+}
+
+fn install_ltp_group(
+    fs: &Ext4,
+    bin_dir: &str,
+    group_dir: &str,
+    marker_name: &str,
+    queue: &mut Vec<u8>,
+) -> Result<usize, &'static str> {
+    let mut entries = list_directory(fs, bin_dir)?;
+    entries.retain(|entry| is_ltp_candidate(&entry.name, entry.info));
+    entries.sort_by(|left, right| left.name.cmp(&right.name));
+    entries.truncate(MAX_LTP_CASES);
+    if entries.is_empty() {
+        return Err("no supported LTP case found");
+    }
+
+    install_tmpfs_dir_path(group_dir)?;
+    install_tmpfs_dir_path("tmp")?;
+    install_tmpfs_dir_path("var/tmp")?;
+    install_tmpfs_dir_path("etc")?;
+    install_tmpfs_file_path(
+        "etc/passwd",
+        b"root:x:0:0:root:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/bin/false\n",
+    )?;
+    install_tmpfs_file_path(
+        "etc/group",
+        b"root:x:0:\nnogroup:x:65534:\nnobody:x:65534:\n",
+    )?;
+
+    let mut interp_paths = Vec::new();
+    let mut staged_names = Vec::new();
+    for entry in entries {
+        let source = alloc::format!("{}/{}", bin_dir, entry.name);
+        let executable = read_file(fs, &source)?;
+        if executable.get(..4) != Some(b"\x7fELF") {
+            continue;
+        }
+        remember_interp(group_dir, &executable, &mut interp_paths)?;
+        install_tmpfs_file_path(&alloc::format!("{}/{}", group_dir, entry.name), &executable)?;
+        staged_names.push(entry.name);
+    }
+    if staged_names.is_empty() {
+        return Err("no LTP ELF staged");
+    }
+    install_group_runtime(fs, BasicFlavor::Musl, group_dir, &interp_paths)?;
+
+    let start_marker = alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name);
+    let end_marker = alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name);
+    push_queue_record(
+        queue,
+        b'G',
+        &alloc::format!("/{}\t{}", group_dir, start_marker),
+    );
+    for name in &staged_names {
+        push_ltp_record(queue, LTP_TIMEOUT_MS, name);
+    }
+    push_queue_record(queue, b'E', &end_marker);
+    Ok(staged_names.len())
+}
+
+fn is_ltp_candidate(name: &str, info: InodeInfo) -> bool {
+    info.mode & EXT4_MODE_TYPE_MASK == EXT4_S_IFREG
+        && info.size >= 100_000
+        && info.size <= MAX_TEST_FILE_SIZE as u64
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+        && LTP_ALLOWLIST.contains(&name)
+        && ![
+            "child",
+            "helper",
+            "stress",
+            "hang",
+            "race",
+            "verify",
+            "datafile",
+            "fork_procs",
+            "mmap-corruption",
+            "open_by_handle",
+            "open_tree",
+        ]
+        .iter()
+        .any(|part| name.contains(part))
+        && !["_16", "_32", "_64"]
+            .iter()
+            .any(|suffix| name.ends_with(suffix))
+}
+
 fn find_first_regular_path(fs: &Ext4, paths: &[String]) -> Result<String, &'static str> {
     for path in paths {
         if let Ok(Some(info)) = lookup_path_str(fs, path) {
@@ -1168,6 +1318,10 @@ fn push_libctest_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str
 fn push_libctest_runtest_record(queue: &mut Vec<u8>, timeout_ms: usize, entry: &str, case: &str) {
     let payload = alloc::format!("{}\truntest.exe\t-w\t{}\t{}", timeout_ms, entry, case);
     push_queue_record(queue, b'A', &payload);
+}
+
+fn push_ltp_record(queue: &mut Vec<u8>, timeout_ms: usize, name: &str) {
+    push_queue_record(queue, b'L', &alloc::format!("{}\t{}", timeout_ms, name));
 }
 
 fn install_minimal_musl_dynamic_runtime(
@@ -1442,6 +1596,10 @@ fn read_file(fs: &Ext4, path: &str) -> Result<Vec<u8>, &'static str> {
     if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFREG {
         return Err("path is not a regular file");
     }
+    read_inode_data(fs, info)
+}
+
+fn read_inode_data(fs: &Ext4, info: InodeInfo) -> Result<Vec<u8>, &'static str> {
     let size = usize::try_from(info.size).map_err(|_| "file is too large")?;
     if size > MAX_TEST_FILE_SIZE {
         return Err("file exceeds staging limit");
@@ -1460,6 +1618,50 @@ fn read_file(fs: &Ext4, path: &str) -> Result<Vec<u8>, &'static str> {
         read_classic_file(fs, &inode[40..100], &mut output)?;
     }
     Ok(output)
+}
+
+fn list_directory(fs: &Ext4, path: &str) -> Result<Vec<DirectoryEntry>, &'static str> {
+    let info = lookup_path_str(fs, path)?.ok_or("directory not found")?;
+    if info.mode & EXT4_MODE_TYPE_MASK != EXT4_S_IFDIR {
+        return Err("path is not a directory");
+    }
+    let data = read_inode_data(fs, info)?;
+    let mut entries = Vec::new();
+    for block in data.chunks(fs.block_size) {
+        let mut offset = 0usize;
+        while offset + 8 <= block.len() {
+            let inode_no = le_u32(block, offset);
+            let record_len = le_u16(block, offset + 4) as usize;
+            let name_len = block[offset + 6] as usize;
+            if record_len < 8 || offset + record_len > block.len() {
+                break;
+            }
+            if inode_no != 0 && name_len != 0 && name_len <= record_len - 8 {
+                let name_bytes = &block[offset + 8..offset + 8 + name_len];
+                if name_bytes != b"." && name_bytes != b".." {
+                    if let Ok(name) = core::str::from_utf8(name_bytes) {
+                        if !entries
+                            .iter()
+                            .any(|entry: &DirectoryEntry| entry.name == name)
+                        {
+                            let mut inode = [0u8; INODE_SIZE];
+                            read_inode(fs, inode_no, &mut inode)?;
+                            entries.push(DirectoryEntry {
+                                name: name.to_string(),
+                                info: InodeInfo {
+                                    inode_no,
+                                    mode: le_u16(&inode, 0),
+                                    size: inode_file_size(&inode),
+                                },
+                            });
+                        }
+                    }
+                }
+            }
+            offset += record_len;
+        }
+    }
+    Ok(entries)
 }
 
 fn read_extent_file_node(fs: &Ext4, node: &[u8], output: &mut [u8]) -> Result<(), &'static str> {

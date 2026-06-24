@@ -7,6 +7,10 @@
 | 官方页面最后可见结果 | cyclictest 探针回归，已撤回 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/cyclictest 均为 0 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 官方镜像 musl libctest | 本地 `217/217` | static `107/107`、dynamic `110/110`，共 217 个 `Pass!`，无失败、OOM 或 panic |
+| 官方镜像 LTP 首批 | 本地 `22/22` 返回 0 | `alarm/chown/close/dup/exit/fork` 稳定批次完整 START/END，同轮 libctest 217/217，最终主动关机 |
+| 文件型 `MAP_SHARED` fork | 本地通过 | LTP 临时结果页在父子进程间可见，summary 不再错误显示 passed 0 |
+| exec ELF 生命周期 | 本地通过 | 不再把每个测试 ELF 永久缓存到 inode heap；连续 LTP 执行无 heap allocation panic |
+| wait4 普通信号重启 | 本地通过 | LTP 后代进程可完整回收，不再因 `EINTR` 串扰后续 case |
 | submit 物理内存范围 | 已修复 | 从固定 128 MiB 改为匹配官方 `-m 1G` 的 `0x80000000..0xc0000000`，完整官方镜像可运行到最终关机 |
 | 256 MiB 无盘兼容回归 | 本地通过 | 扩大 submit 内存上界后仍能启动、输出 `kernel will shutdown`，无 `Panicked`/`cannot alloc` |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
@@ -44,6 +48,7 @@
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
+| `L` LTP 队列协议 | 本地通过 | 输出官方 `RUN LTP CASE` 和 `FAIL LTP CASE name : status`，22 项均返回 0 |
 | `C` libctest 队列协议 | 已线上验证 107 case | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
@@ -70,6 +75,7 @@
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
 | cyclictest 非压力探针 | 已撤回 | `d500180` 导致 2026-06-24 线上回退到 `320.0`，libcbench/libctest 同时归零；不得重新启用该 staging |
+| LTP staging | 首批本地稳定 | 仅启用官方镜像中真实返回 0 的 22 项；256 项探索中发现的 panic 项未进入提交清单 |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 

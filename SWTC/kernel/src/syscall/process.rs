@@ -278,12 +278,10 @@ pub fn sys_execve(path: *const u8, mut args: *const usize, mut envs: *const usiz
     }
     let app_inode = app_inode.unwrap();
     let app_file = app_inode.open(app_inode.clone())?;
-    let elf_data_arc = app_inode.metadata().inner.lock().elf_data.clone();
-    let elf_data = elf_data_arc.get_unchecked_mut();
-    if elf_data.is_empty() {
-        app_file.read_all_from_start(elf_data)?;
-    }
-    // app_file.read_all_from_start(elf_data)?;
+    // Keep the ELF buffer local to this exec. Caching every staged test binary
+    // in the inode permanently exhausts the kernel heap in large suites.
+    let mut elf_data = Vec::new();
+    app_file.read_all_from_start(&mut elf_data)?;
     current_process()
         .exec(&elf_data, Some(&app_file), args_vec, envs_vec)
         .map_err(|error| {
@@ -412,16 +410,21 @@ pub async fn sys_wait4(pid: isize, exit_status_addr: usize, options: i32) -> Sys
 
     let mut concernd_events = Event::all();
     concernd_events.remove(Event::CHILD_EXIT);
-    match Select2Futures::new(
-        WaitFuture::new(options, pid as usize, exit_status_addr),
-        current_task().wait_for_events(concernd_events),
-    )
-    .await
-    {
-        SelectOutput::Output1(ret) => ret,
-        SelectOutput::Output2(intr) => {
-            log::warn!("[sys_wait4] interrupt by event {:?}", intr);
-            Err(SyscallErr::EINTR)
+    loop {
+        match Select2Futures::new(
+            WaitFuture::new(options, pid as usize, exit_status_addr),
+            current_task().wait_for_events(concernd_events),
+        )
+        .await
+        {
+            SelectOutput::Output1(ret) => return ret,
+            SelectOutput::Output2(intr) if intr == Event::OTHER_SIGNAL => {
+                log::debug!("[sys_wait4] restart after signal event");
+            }
+            SelectOutput::Output2(intr) => {
+                log::warn!("[sys_wait4] interrupt by event {:?}", intr);
+                return Err(SyscallErr::EINTR);
+            }
         }
     }
 }

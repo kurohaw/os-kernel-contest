@@ -23,6 +23,7 @@ use crate::{
     process::aux::*,
     processor::current_process,
     stack_trace,
+    syscall::MmapFlags,
     utils::{
         cell::SyncUnsafeCell,
         error::{GeneralRet, SyscallErr},
@@ -1105,8 +1106,13 @@ impl MemorySpace {
                         pte.flags()
                     );
 
-                    let (pte_flags, ppn) = match area.vma_type {
-                        VmAreaType::Shm => {
+                    let is_shared = matches!(area.vma_type, VmAreaType::Shm)
+                        || area
+                            .mmap_flags
+                            .map(|flags| flags.contains(MmapFlags::MAP_SHARED))
+                            .unwrap_or(false);
+                    let (pte_flags, ppn) = match is_shared {
+                        true => {
                             // If shared memory,
                             // then we don't need to modify the pte flags,
                             // i.e. no copy-on-write.
@@ -1118,7 +1124,7 @@ impl MemorySpace {
                                 .insert(vpn, ph_frame.clone());
                             (pte.flags(), ph_frame.data_frame.ppn)
                         }
-                        _ => {
+                        false => {
                             // Else,
                             // copy-on-write
                             let mut new_flags = pte.flags() | PTEFlags::COW;

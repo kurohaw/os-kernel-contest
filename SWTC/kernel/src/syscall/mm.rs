@@ -38,8 +38,12 @@ pub fn sys_mmap(
         if offset != 0 {
             return Err(SyscallErr::EINVAL);
         }
-        // TODO: support shared memory(i.e. MAP_ANONYMOUS | MAP_SHARED)
         current_process().inner_handler(|proc| {
+            let vma_type = if flags.contains(MmapFlags::MAP_SHARED) {
+                VmAreaType::Shm
+            } else {
+                VmAreaType::Mmap
+            };
             let mut vma = {
                 // if flags.contains(MmapFlags::MAP_FIXED) {
                 //     proc.memory_space
@@ -47,7 +51,7 @@ pub fn sys_mmap(
                 //         .ok_or(SyscallErr::ENOMEM)?
                 // } else {
                 proc.memory_space
-                    .allocate_area(length, map_permission, VmAreaType::Mmap)
+                    .allocate_area(length, map_permission, vma_type)
                     .ok_or(SyscallErr::ENOMEM)?
                 // }
             };
@@ -57,6 +61,12 @@ pub fn sys_mmap(
             vma.handler = Some(handler.arc_clone());
             let start_va: VirtAddr = vma.start_vpn().into();
             let end_va: VirtAddr = vma.end_vpn().into();
+            if flags.contains(MmapFlags::MAP_SHARED) {
+                // Shared anonymous mappings must have frames before fork so both
+                // processes keep mapping the same physical pages instead of
+                // faulting in independent copies later.
+                vma.map();
+            }
             proc.memory_space.insert_area(vma);
 
             debug!("[sys_mmap]: finished, vma: {:#x}", start_va.0,);
