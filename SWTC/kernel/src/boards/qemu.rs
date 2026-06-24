@@ -6,7 +6,8 @@ use crate::{
 
 pub const CLOCK_FREQ: usize = 10000000;
 #[cfg(feature = "submit")]
-pub const MEMORY_END: usize = (KERNEL_DIRECT_OFFSET << PAGE_SIZE_BITS) + 0x88000000;
+// The official preliminary evaluation starts QEMU with 1 GiB at 0x8000_0000.
+pub const MEMORY_END: usize = (KERNEL_DIRECT_OFFSET << PAGE_SIZE_BITS) + 0xc0000000;
 #[cfg(not(feature = "submit"))]
 // pub const MEMORY_END: usize = (KERNEL_DIRECT_OFFSET << PAGE_SIZE_BITS) + 0x8e000000;
 pub const MEMORY_END: usize = (KERNEL_DIRECT_OFFSET << PAGE_SIZE_BITS) + 0x9f000000;

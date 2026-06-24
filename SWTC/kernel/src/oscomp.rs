@@ -33,6 +33,7 @@ const QUEUE_FILE: &str = "oscomp-queue";
 const MAX_BASIC_COMMANDS: usize = 32;
 const LIBCTEST_TIMEOUT_MS: usize = 3_000;
 const MAX_LIBCTEST_CASES: usize = 107;
+const MAX_DYNAMIC_LIBCTEST_CASES: usize = 110;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
@@ -703,6 +704,25 @@ fn install_libctest_group(
             resolve_path(&source_dir, "libc-test/entry-static.exe"),
         ],
     )?;
+    let run_dynamic_path = find_optional_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "run-dynamic.sh"),
+            resolve_path(&source_dir, "run-dynamic"),
+            resolve_path(&source_dir, "libctest/run-dynamic.sh"),
+            resolve_path(&source_dir, "libctest/run-dynamic"),
+            resolve_path(&source_dir, "libc-test/run-dynamic.sh"),
+            resolve_path(&source_dir, "libc-test/run-dynamic"),
+        ],
+    )?;
+    let entry_dynamic_path = find_optional_regular_path(
+        fs,
+        &[
+            resolve_path(&source_dir, "entry-dynamic.exe"),
+            resolve_path(&source_dir, "libctest/entry-dynamic.exe"),
+            resolve_path(&source_dir, "libc-test/entry-dynamic.exe"),
+        ],
+    )?;
     let runtest_path = find_optional_regular_path(
         fs,
         &[
@@ -715,6 +735,10 @@ fn install_libctest_group(
     if cases.is_empty() {
         return Err("no allowed libctest case found");
     }
+    let dynamic_cases = match &run_dynamic_path {
+        Some(path) => find_libctest_dynamic_cases(fs, path)?,
+        None => Vec::new(),
+    };
 
     let script = read_file(fs, script_path)?;
     let run_static = read_file(fs, &run_static_path)?;
@@ -722,6 +746,16 @@ fn install_libctest_group(
     if entry.get(..4) != Some(b"\x7fELF") {
         return Err("entry-static.exe is not an ELF file");
     }
+    let dynamic = match &entry_dynamic_path {
+        Some(path) if !dynamic_cases.is_empty() => {
+            let data = read_file(fs, path)?;
+            if data.get(..4) != Some(b"\x7fELF") {
+                return Err("entry-dynamic.exe is not an ELF file");
+            }
+            Some(data)
+        }
+        _ => None,
+    };
     let runtest = match &runtest_path {
         Some(path) => {
             let data = read_file(fs, path)?;
@@ -755,6 +789,14 @@ fn install_libctest_group(
     )?;
     install_tmpfs_file_path(&alloc::format!("{}/run-static.sh", group_dir), &run_static)?;
     install_tmpfs_file_path(&alloc::format!("{}/entry-static.exe", group_dir), &entry)?;
+    if let (Some(path), Some(dynamic)) = (&run_dynamic_path, &dynamic) {
+        install_tmpfs_file_path(
+            &alloc::format!("{}/run-dynamic.sh", group_dir),
+            &read_file(fs, path)?,
+        )?;
+        install_tmpfs_file_path(&alloc::format!("{}/entry-dynamic.exe", group_dir), dynamic)?;
+        install_minimal_musl_dynamic_runtime(fs, &source_dir, group_dir, dynamic)?;
+    }
     if let Some(runtest) = &runtest {
         install_tmpfs_file_path(&alloc::format!("{}/runtest.exe", group_dir), runtest)?;
     }
@@ -766,13 +808,22 @@ fn install_libctest_group(
     );
     for case in &cases {
         if runtest.is_some() {
-            push_libctest_runtest_record(queue, LIBCTEST_TIMEOUT_MS, case);
+            push_libctest_runtest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-static.exe", case);
         } else {
             push_libctest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-static.exe", case);
         }
     }
+    if dynamic.is_some() {
+        for case in &dynamic_cases {
+            if runtest.is_some() {
+                push_libctest_runtest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-dynamic.exe", case);
+            } else {
+                push_libctest_record(queue, LIBCTEST_TIMEOUT_MS, "entry-dynamic.exe", case);
+            }
+        }
+    }
     push_queue_record(queue, b'E', &end_marker);
-    Ok(cases.len())
+    Ok(cases.len() + dynamic_cases.len())
 }
 
 fn find_libctest_cases(fs: &Ext4, run_static_path: &str) -> Result<Vec<String>, &'static str> {
@@ -807,6 +858,41 @@ fn push_libctest_words(value: &str, cases: &mut Vec<String>) {
             }
         }
     }
+}
+
+fn find_libctest_dynamic_cases(
+    fs: &Ext4,
+    run_dynamic_path: &str,
+) -> Result<Vec<String>, &'static str> {
+    let script = read_text_file(fs, run_dynamic_path)?;
+    let mut cases = Vec::new();
+    for raw_line in script.lines() {
+        let words = split_shell_words(raw_line.split('#').next().unwrap_or(""));
+        let Some(entry_index) = words
+            .iter()
+            .position(|word| file_name(word).ok() == Some("entry-dynamic.exe"))
+        else {
+            continue;
+        };
+        let Some(case) = words.get(entry_index + 1) else {
+            continue;
+        };
+        let case = normalize_libctest_case(case);
+        if is_safe_libctest_case(&case) && !cases.iter().any(|known| known == &case) {
+            cases.push(case);
+            if cases.len() >= MAX_DYNAMIC_LIBCTEST_CASES {
+                break;
+            }
+        }
+    }
+    Ok(cases)
+}
+
+fn is_safe_libctest_case(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
 
 fn normalize_libctest_case(value: &str) -> String {
@@ -1079,13 +1165,58 @@ fn push_libctest_record(queue: &mut Vec<u8>, timeout_ms: usize, executable: &str
     push_queue_record(queue, b'C', &payload);
 }
 
-fn push_libctest_runtest_record(queue: &mut Vec<u8>, timeout_ms: usize, case: &str) {
-    let payload = alloc::format!(
-        "{}\truntest.exe\t-w\tentry-static.exe\t{}",
-        timeout_ms,
-        case
-    );
+fn push_libctest_runtest_record(queue: &mut Vec<u8>, timeout_ms: usize, entry: &str, case: &str) {
+    let payload = alloc::format!("{}\truntest.exe\t-w\t{}\t{}", timeout_ms, entry, case);
     push_queue_record(queue, b'A', &payload);
+}
+
+fn install_minimal_musl_dynamic_runtime(
+    fs: &Ext4,
+    source_dir: &str,
+    group_dir: &str,
+    dynamic: &[u8],
+) -> Result<(), &'static str> {
+    let interp = elf_interp_path(dynamic)?.ok_or("entry-dynamic.exe has no interpreter")?;
+    if !is_riscv64_musl_interp_path(&interp) {
+        return Err("entry-dynamic.exe has unsupported interpreter");
+    }
+    let libc = read_first_disk_file(
+        fs,
+        &[
+            &resolve_path(source_dir, "lib/libc.so"),
+            "musl/lib/libc.so",
+            "musl/lib/ld-musl-riscv64-sf.so.1",
+            "lib/ld-musl-riscv64-sf.so.1",
+        ],
+    )
+    .ok_or("required musl dynamic runtime not found")?;
+    install_interp_alias(group_dir, &interp, &libc)?;
+    install_tmpfs_file_path(&alloc::format!("{}/lib/libc.so", group_dir), &libc)?;
+
+    for name in ["dlopen_dso.so", "tls_get_new-dtv_dso.so"] {
+        let path = find_first_regular_path(
+            fs,
+            &[
+                resolve_path(source_dir, name),
+                resolve_path(source_dir, &alloc::format!("lib/{}", name)),
+            ],
+        )?;
+        install_tmpfs_file_path(
+            &alloc::format!("{}/{}", group_dir, name),
+            &read_file(fs, &path)?,
+        )?;
+    }
+    Ok(())
+}
+
+fn is_riscv64_musl_interp_path(path: &str) -> bool {
+    matches!(
+        file_name(path),
+        Ok("ld-musl-riscv64-lp64d.so.1")
+            | Ok("ld-musl-riscv64-lp64.so.1")
+            | Ok("ld-musl-riscv64.so.1")
+            | Ok("ld-musl-riscv64-sf.so.1")
+    )
 }
 
 fn elf_interp_path(elf_data: &[u8]) -> Result<Option<String>, &'static str> {

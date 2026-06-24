@@ -6,6 +6,9 @@
 |---|---|---|
 | 官方页面最后可见结果 | cyclictest 探针回归，已撤回 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/cyclictest 均为 0 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
+| 官方镜像 musl libctest | 本地 `217/217` | static `107/107`、dynamic `110/110`，共 217 个 `Pass!`，无失败、OOM 或 panic |
+| submit 物理内存范围 | 已修复 | 从固定 128 MiB 改为匹配官方 `-m 1G` 的 `0x80000000..0xc0000000`，完整官方镜像可运行到最终关机 |
+| 256 MiB 无盘兼容回归 | 本地通过 | 扩大 submit 内存上界后仍能启动、输出 `kernel will shutdown`，无 `Panicked`/`cannot alloc` |
 | submit 关闭默认 `stack_trace` | 本地通过 | `make all RUST_TOOLCHAIN=nightly-2025-02-18` 日志显示内核 feature 为 `submit tmpfs`，不再包含 `stack_trace` |
 | libc syscall 兼容修复 | 本地通过 | `getrusage/times/sched_getaffinity/fcntl/lseek` 完成低风险语义修正；不新增测试组 |
 | 无盘 QEMU 回归 | 本地通过 | `kernel-rv` 启动后输出 `oscomp: block device unavailable`、`!TEST FINISH!` 并主动关机 |
@@ -60,7 +63,7 @@
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
-| musl libctest staging | static 全量已通过 | 官方 `libc-test/static.txt` 归一化后的 107 个 static case 已全部进入 musl-rv 得分 |
+| musl libctest staging | static 线上通过，dynamic 本地全过 | static 107 已线上得分；官方镜像本地 static 107 + dynamic 110 均通过，dynamic 待线上确认 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | futex/time/robust 内部修复 | 本地构建通过，待累计评测 | 清理 futex stale waiter、修正 timeout/requeue、补 robust list，`clock_gettime/getres` 常见路径免锁 |
 | lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
@@ -113,7 +116,7 @@ oscomp: staged 2 test groups with 64 commands
 | `oscomp.rs` | EXT4 fixed path、extent 读取或脚本解析退化 |
 | `runtestcase.rs` | `G/X/E` 队列、工作目录切换、argv 或 END 标记退化 |
 | `A` 队列记录 | 超时轮询、kill 或 argv 构造错误会拖死后续组 |
-| musl libctest | `run-static.sh` 或 `entry-static.exe` 布局不匹配可能仍为 0，但不得影响现有 8 组 |
+| musl libctest | dynamic 运行时必须保持组内隔离；解释器、`libc.so` 或两个测试 DSO 缺失会使新增 110 项归零 |
 | lmbench-lite | 若短轮次后仍不出现 `Simple/Select/Signal handler` 输出，可能继续 0 分；不得影响 484 基线 |
 | iozone | 完整脚本和 lite 探针均导致 libcbench/libctest 归零；没有官方串口日志前暂停 |
 | 动态 loader | 缺失/无效解释器重新触发 panic，或组间 libc 相互覆盖 |

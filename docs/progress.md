@@ -8,8 +8,8 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | `SWTC/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 已撤回 cyclictest 探针，恢复 483-484 分稳定代码路径 |
-| 当前提交 | 撤回 `d500180 feat: add cyclictest smoke queue`，保留此前 syscall 兼容修复 |
+| 当前里程碑 | musl libctest 动态 110 项已在官方镜像本地全部通过 |
+| 当前提交 | 在稳定代码路径上接入 musl dynamic libctest，并修正 submit 模式物理内存上界 |
 | 最新可见线上结果 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、cyclictest=0 |
 | 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -17,6 +17,21 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-24 musl dynamic libctest 全量通过
+
+- 使用官方 `pre-20250615` RISC-V 测试镜像完成完整 1 GiB、单核 QEMU 回归。
+- `oscomp` 解析 `musl/run-dynamic.sh` 的 110 个动态 case，暂存
+  `entry-dynamic.exe`、真实 musl 解释器、`libc.so`、`dlopen_dso.so` 和
+  `tls_get_new-dtv_dso.so`，与现有 107 个 static case 串行执行。
+- 本地串口结果：static `107/107`、dynamic `110/110`，共 `217/217` 个
+  `Pass!`；无 `Fail!`、无 `cannot alloc`、无 `Panicked`，最终主动关机。
+- 修正 `submit` 模式内存上界：此前只管理 `0x80000000..0x88000000`
+  的 128 MiB，完整测试盘在 libcbench 阶段耗尽物理帧；现在按官方
+  `-m 1G` 参数管理到 `0xc0000000`。
+- 兼容回归：相同内核仍可在无测试盘的 `-m 256M` QEMU 中启动并主动关机。
+- 这仍是本地官方镜像结果，不能在新一轮线上评测前写成官方线上 217 分；
+  按现有线上 static 107 基线，预计 dynamic 可新增约 110 分。
 
 ## 2026-06-24 cyclictest 回归撤回
 
