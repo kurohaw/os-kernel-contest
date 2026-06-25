@@ -1,0 +1,14 @@
+[package]
+name = "xcache"
+version = "0.1.0"
+edition = "2024"
+authors = ["Anekoique <ctolu01@gmail.com>"]
+
+[dependencies]
+axerrno = { workspace = true }
+axhal.workspace = true
+
+log         = { workspace = true }
+lru         = "0.17"
+memory_addr = { workspace = true }
+spin        = { workspace = true }

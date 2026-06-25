@@ -1,8 +1,10 @@
 SWTC_DIR := SWTC
 SWTC_KERNEL := $(SWTC_DIR)/kernel
 SWTC_USER := $(SWTC_DIR)/user
+SWTC_LA := SWTC-la
 TARGET_RV := riscv64gc-unknown-none-elf
-RUST_TOOLCHAIN := nightly-2025-02-01
+TARGET_LA := loongarch64-unknown-none
+RUST_TOOLCHAIN ?= nightly-2025-02-18
 MODE := release
 SWTC_ELF := $(SWTC_KERNEL)/target/$(TARGET_RV)/$(MODE)/kernel
 SWTC_BIN := $(SWTC_ELF).bin
@@ -10,6 +12,7 @@ WRAPPER_OBJ := $(SWTC_KERNEL)/target/$(TARGET_RV)/$(MODE)/kernel-rv-wrapper.o
 WRAPPER_LD := $(SWTC_KERNEL)/kernel-rv-wrapper.ld
 KERNEL_RV := kernel-rv
 KERNEL_LA := kernel-la
+SWTC_LA_ELF := $(SWTC_LA)/SWTC-la_loongarch64-qemu-virt.elf
 
 export RUSTUP_TOOLCHAIN := $(RUST_TOOLCHAIN)
 
@@ -25,19 +28,27 @@ check-tools:
 	@command -v rust-objcopy >/dev/null || { echo "error: rust-objcopy is required"; exit 1; }
 	@test -d "$(RUST_SYSROOT)/lib/rustlib/$(TARGET_RV)/lib" || { \
 		echo "error: Rust target $(TARGET_RV) is not installed for $(RUST_TOOLCHAIN)"; exit 1; }
+	@test -d "$(RUST_SYSROOT)/lib/rustlib/$(TARGET_LA)/lib" || { \
+		echo "error: Rust target $(TARGET_LA) is not installed for $(RUST_TOOLCHAIN)"; exit 1; }
 	@test -x "$(RUST_LLD)" || { \
 		echo "error: rust-lld is not installed for $(RUST_TOOLCHAIN)"; exit 1; }
+	@command -v cmake >/dev/null || { echo "error: cmake is required for kernel-la"; exit 1; }
+	@command -v loongarch64-linux-musl-gcc >/dev/null || { \
+		echo "error: loongarch64-linux-musl-gcc is required for kernel-la"; exit 1; }
 
 restore-vendor:
 	find $(SWTC_DIR)/vendor -name cargo-checksum.json -exec sh -c \
 		'cp "$$1" "$$(dirname "$$1")/.cargo-checksum.json"' _ {} \;
+	find $(SWTC_LA)/vendor -name cargo-checksum.json -exec sh -c \
+		'cp "$$1" "$$(dirname "$$1")/.cargo-checksum.json"' _ {} \;
 
 prepare-cargo: check-tools restore-vendor
-	mkdir -p $(SWTC_KERNEL)/.cargo $(SWTC_USER)/.cargo
+	mkdir -p $(SWTC_KERNEL)/.cargo $(SWTC_USER)/.cargo $(SWTC_LA)/.cargo
 	cp $(SWTC_KERNEL)/cargo-config/config.toml $(SWTC_KERNEL)/.cargo/config.toml
 	cp $(SWTC_USER)/cargo-config/config.toml $(SWTC_USER)/.cargo/config.toml
+	cp $(SWTC_LA)/cargo-config/config.toml $(SWTC_LA)/.cargo/config.toml
 
-build: prepare-cargo
+build-rv: prepare-cargo
 	$(MAKE) -C $(SWTC_USER) build PRELIMINARY=0
 	$(MAKE) -C $(SWTC_KERNEL) kernel TMPFS=1 SUBMIT=1
 	rust-objcopy $(SWTC_ELF) --strip-all -O binary $(SWTC_BIN)
@@ -47,12 +58,18 @@ build: prepare-cargo
 		$(notdir $(SWTC_BIN)) $(notdir $(WRAPPER_OBJ))
 	$(RUST_LLD) -flavor gnu -m elf64lriscv -T $(WRAPPER_LD) \
 		-o $(KERNEL_RV) $(WRAPPER_OBJ)
-	cp $(KERNEL_RV) $(KERNEL_LA)
-	@echo "warning: kernel-la is a temporary placeholder; LoongArch is not implemented."
+
+build-la: prepare-cargo
+	$(MAKE) -C $(SWTC_LA) TOOLCHAIN=$(RUST_TOOLCHAIN) ARCH=loongarch64 \
+		BLK=y NET=y FEATURES=fp_simd,lwext4_rs,driver-virtio-blk build
+	cp $(SWTC_LA_ELF) $(KERNEL_LA)
+
+build: build-rv build-la
 
 clean:
 	$(MAKE) -C $(SWTC_KERNEL) clean
 	$(MAKE) -C $(SWTC_USER) clean
+	$(MAKE) -C $(SWTC_LA) clean
 	rm -f $(KERNEL_RV) $(KERNEL_LA)
 
-.PHONY: all check-tools restore-vendor prepare-cargo build clean
+.PHONY: all check-tools restore-vendor prepare-cargo build build-rv build-la clean

@@ -1,0 +1,23 @@
+[package]
+name = "xutils"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+axhal.workspace = true
+axfs-ng.workspace = true
+axfs-ng-vfs.workspace = true
+axlog.workspace = true
+
+axerrno.workspace = true
+bitflags.workspace = true
+
+bitmaps = { version = "3.2.1", default-features = false }
+flatten_objects = "0.2.4"
+linux-raw-sys = { workspace = true, features = ["ioctl"] }
+weak-map = { workspace = true }
+slab = { version = "0.4.9", default-features = false }
+strum = { version = "0.28", default-features = false, features = ["derive"] }

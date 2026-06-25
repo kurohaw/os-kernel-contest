@@ -1,0 +1,48 @@
+[net]
+offline = true
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/KuangjuX/ixgbe-driver.git?rev=8e5eb74"]
+git = "https://github.com/KuangjuX/ixgbe-driver.git"
+rev = "8e5eb74"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/Mivik/rust-fatfs?rev=2685439"]
+git = "https://github.com/Mivik/rust-fatfs"
+rev = "2685439"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/arceos-org/slab_allocator.git?tag=v0.3.1"]
+git = "https://github.com/arceos-org/slab_allocator.git"
+tag = "v0.3.1"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/elliott10/fxmac_rs.git?rev=0dbc3916"]
+git = "https://github.com/elliott10/fxmac_rs.git"
+rev = "0dbc3916"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/jasonwhite/syscalls.git?rev=92624de"]
+git = "https://github.com/jasonwhite/syscalls.git"
+rev = "92624de"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/lhw2002426/bcm2835-sdhci.git?rev=e974f16"]
+git = "https://github.com/lhw2002426/bcm2835-sdhci.git"
+rev = "e974f16"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/os-module/visionfive2-sd.git?rev=af75139"]
+git = "https://github.com/os-module/visionfive2-sd.git"
+rev = "af75139"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/rcore-os/smoltcp.git?rev=2ade274"]
+git = "https://github.com/rcore-os/smoltcp.git"
+rev = "2ade274"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

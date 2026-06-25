@@ -4,8 +4,14 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | cyclictest 探针回归，已撤回 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18，libcbench/libctest/cyclictest 均为 0 |
+| 官方页面最后可见结果 | 484 基线已恢复 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
+| 根双架构离线构建 | 本地通过 | `make all` 同时生成真实 RISC-V `kernel-rv` 与 LoongArch `kernel-la` |
+| `kernel-la` 格式 | 本地通过 | LoongArch executable ELF，入口 `0x80000000`，不再是 RISC-V 占位 |
+| LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
+| LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
+| LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
+| LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
 | 官方镜像 musl libctest | 本地 `217/217` | static `107/107`、dynamic `110/110`，共 217 个 `Pass!`，无失败、OOM 或 panic |
 | 官方镜像 LTP 首批 | 本地 `22/22` 返回 0 | `alarm/chown/close/dup/exit/fork` 稳定批次完整 START/END，同轮 libctest 217/217，最终主动关机 |
 | 文件型 `MAP_SHARED` fork | 本地通过 | LTP 临时结果页在父子进程间可见，summary 不再错误显示 passed 0 |

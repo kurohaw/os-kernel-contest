@@ -12,6 +12,9 @@ kernel-rv
 kernel-la
 disk.img
 disk-la.img
+SWTC-la/target-tools/
+SWTC-la/.axconfig.*.toml
+SWTC-la/**/.*
 AGENTS.md
 office-test.txt
 .DS_Store

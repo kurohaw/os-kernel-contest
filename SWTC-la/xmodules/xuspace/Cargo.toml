@@ -1,0 +1,12 @@
+[package]
+name = "xuspace"
+version = "0.1.0"
+edition = "2024"
+authors = ["Anekoique <ctolu01@gmail.com>"]
+
+[dependencies]
+axerrno              = { workspace = true }
+memory_addr          = { workspace = true }
+percpu               = { workspace = true }
+page_table_multiarch = { workspace = true }
+log                  = { workspace = true }

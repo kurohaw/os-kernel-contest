@@ -28,12 +28,27 @@ SWTC 当前主线参考 Titanix 往届开源作品的架构：
 | 2026-06-12 | 新增 vendor checksum 工具，修复隐藏文件过滤后的 53 个 manifest |
 | 2026-06-12 | 完成隐藏文件过滤、强制离线构建、ELF、无盘、basic 和 BusyBox 探针回归 |
 | 2026-06-12 | 实现完整 basic 串行队列，暂存依赖资源并由官方解析器本地确认 `91/102` |
+| 2026-06-25 | 接入真实 LoongArch `kernel-la`，完成离线 vendor、启动栈修复、EXT4 和 basic 64/64 |
+
+## LoongArch 基础版本
+
+SWTC 的 LoongArch 主线参考 StarryX 和 ArceOS：
+
+- StarryX：https://github.com/Anekoique/StarryX
+- 导入提交：`d77359efece4f3216dc2cfac5165b68d1d679923`
+- ArceOS：https://github.com/arceos-org/arceos
+- 许可证：GPL-3.0-or-later、Apache-2.0 或 MulanPSL-2.0
+- lwext4 binding/C implementation：保留其 GPL-2.0 许可证
+
+本队新增内容包括：官方工具链兼容、LoongArch 早期启动栈修复、完整离线构建、
+官方 EXT4 镜像启动、SWTC init、相对路径 execve 修复、确定性关机与根构建接入。
+源码与许可证位于 `SWTC-la/`。
 
 ## 其他参考
 
 - rCore-Tutorial-v3：理解 Rust/RISC-V 内核基础。
 - 旧自建内核：仅通过 `codex/basic-102-archive` 参考官方 EXT4 和 ABI 经验。
-- Phoenix、Starry、NoAxiom：仅参考设计和比赛推进方法，不直接复制代码。
+- Phoenix、NoAxiom：仅参考设计和比赛推进方法，不直接复制代码。
 
 Titanix 上游 README 和 `SWTC/docs/` 记录了 BusyBox、libc、动态链接、网络和
 性能测试能力及历史问题。这些内容只能用于判断潜在能力与风险；在当前 2026

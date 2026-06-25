@@ -4,19 +4,41 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-24 |
+| 当前日期 | 2026-06-25 |
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
-| 当前内核主体 | `SWTC/` |
+| 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | musl dynamic libctest 110 项与首批 LTP 22 项已在官方镜像本地全部通过 |
-| 当前提交 | 接入 LTP 稳定批次，并修复共享 mmap、wait4 重启和 exec ELF 缓存泄漏 |
-| 最新可见线上结果 | 2026-06-24 13:40:19，`Accepted / 320.0`；basic=204、BusyBox=98、Lua=18、libcbench=0、libctest=0、cyclictest=0 |
+| 当前里程碑 | 真实 `kernel-la` 已接入；官方 LA 镜像本地 basic 64/64 通过 |
+| 当前提交 | 双架构离线构建、LoongArch EXT4/basic 和确定性关机 |
+| 最新可见线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-25 真实 LoongArch kernel-la
+
+- 新增独立 `SWTC-la/` 主体，参考 StarryX commit
+  `d77359efece4f3216dc2cfac5165b68d1d679923` 和 ArceOS，保留原作者与
+  GPL/Apache/Mulan 许可证。
+- 根目录 `make all` 不再复制 `kernel-rv`，而是离线构建真实 LoongArch ELF：
+  machine 为 LoongArch，入口 `0x80000000`。
+- 将上游不可获取的 `nightly-2026-03-15` 兼容到已验证的
+  `nightly-2025-02-18`，补 `let_chains`、`naked_functions` 和
+  `unsigned_is_multiple_of` feature。
+- 修复 LA 启动栈：早期 `la.global BOOT_STACK` 在旧 LLVM 下经过未加载 GOT，
+  导致首个函数压栈后跳到零地址；改为 PC-relative `la.local`。
+- vendored 268 个外部 crate；官方过滤隐藏文件后可由非隐藏
+  `cargo-checksum.json` 和 `cargo-config/config.toml` 恢复离线构建。
+- `axconfig-gen` 不再联网安装，改为从 `SWTC-la/vendor/axconfig-gen-0.2.1`
+  离线安装到构建目录。
+- 修复相对路径 `execve("test_echo", ...)`，为动态加载器传入 `./test_echo`。
+- 官方 `pre-20250615` LA 镜像本地结果：musl basic 32 项、glibc basic 32 项，
+  START=64、END=64、错误=0；脚本结束后内核主动关机。
+- 同轮 RISC-V `256M` 无盘回归保持 `!TEST FINISH!` 和主动关机。
+- 以上仍是本地官方镜像结果，线上评测前不能计作正式 LA 分数。
 
 ## 2026-06-24 LTP 首批 22 项稳定通过
 
