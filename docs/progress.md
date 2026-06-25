@@ -40,6 +40,19 @@
 - 同轮 RISC-V `256M` 无盘回归保持 `!TEST FINISH!` 和主动关机。
 - 以上仍是本地官方镜像结果，线上评测前不能计作正式 LA 分数。
 
+## 2026-06-25 双工具链隔离修复
+
+- 线上 Compile Error 显示 RISC-V 用户态被根 Makefile 强制切换到
+  `nightly-2025-02-18`，该评测环境中缺少
+  `riscv64gc-unknown-none-elf` 的 `core`，因此 `spin`、`bitflags` 首先报
+  `E0463: can't find crate for core`。
+- 根 Makefile 移除全局 `RUSTUP_TOOLCHAIN`，恢复 RISC-V 使用官方预装的
+  `nightly-2025-02-01`，LoongArch 单独使用 `nightly-2025-02-18`。
+- 构建准备、vendor 恢复、target 检查和子 Make 调用均按架构拆分，避免任一
+  工具链覆盖另一架构。
+- target 门禁现在检查真实 `libcore-*.rlib`，不再只检查可能存在但内容不完整的
+  target 目录。
+
 ## 2026-06-24 LTP 首批 22 项稳定通过
 
 - `oscomp` 新增 EXT4 目录枚举，从 `musl/ltp/testcases/bin` 读取真实 LTP ELF，

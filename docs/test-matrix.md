@@ -34,7 +34,7 @@
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | RISC-V Lua | 通过并得分 | 线上 glibc-rv=9、musl-rv=9 |
 | 根目录 `make all` | 通过 | 移除 `hashbrown` 后，强制离线构建生成 `kernel-rv`、`kernel-la` |
-| 官方同版本 Rust 工具链 | 通过 | `nightly-2025-02-18`，构建日志无联网安装请求 |
+| Rust 工具链隔离 | 本地通过 | RISC-V 固定 `nightly-2025-02-01`，LoongArch 固定 `nightly-2025-02-18`，根 Makefile 不再导出全局覆盖 |
 | vendor checksum | 已本地修复 | `tools/vendor_checksums.py --check` 为 53 个 manifest、0 个问题 |
 | `allocator-api2` checksum | 已刷新 | 同步 `aed0d6a` 后发现 22 个哈希不匹配；已重建 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json` |
 | `managed` path/patch | 本地通过 | 直接依赖和 crates.io patch 均指向 `SWTC/vendor/managed-0.8.0`，Cargo.lock 不再记录其 registry source |
