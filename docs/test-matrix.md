@@ -6,8 +6,9 @@
 |---|---|---|
 | 官方页面最后可见结果 | 484 基线已恢复 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
-| 根双架构离线构建 | 本地通过 | `make all` 同时生成真实 RISC-V `kernel-rv` 与 LoongArch `kernel-la` |
-| `kernel-la` 格式 | 本地通过 | LoongArch executable ELF，入口 `0x80000000`，不再是 RISC-V 占位 |
+| 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
+| 根目录 `make all` | fallback 修复 | 必须生成真实 RISC-V `kernel-rv`；LoongArch 工具链不可用时生成占位 `kernel-la`，不阻塞提交 |
+| `kernel-la` 格式 | best-effort | `build-la-strict` 生成真实 LoongArch ELF；默认 fallback 下为占位 ELF |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |

@@ -33,12 +33,13 @@ check-rv-tools:
 		echo "error: rust-lld is not installed for $(RV_TOOLCHAIN)"; exit 1; }
 
 check-la-tools:
+	@command -v rustup >/dev/null || { echo "error: rustup is required for kernel-la"; exit 1; }
 	@command -v rustc >/dev/null || { echo "error: rustc is required"; exit 1; }
 	@command -v cargo >/dev/null || { echo "error: cargo is required"; exit 1; }
 	@command -v rust-objcopy >/dev/null || { echo "error: rust-objcopy is required"; exit 1; }
-	@target_libdir="$$(RUSTUP_TOOLCHAIN=$(LA_TOOLCHAIN) rustc \
-		--print target-libdir --target $(TARGET_LA))"; \
-	ls "$$target_libdir"/libcore-*.rlib >/dev/null 2>&1 || { \
+	@sysroot="$$(rustup run $(LA_TOOLCHAIN) rustc --print sysroot 2>/dev/null)" || { \
+		echo "error: Rust toolchain $(LA_TOOLCHAIN) is not installed"; exit 1; }; \
+	ls "$$sysroot/lib/rustlib/$(TARGET_LA)/lib"/libcore-*.rlib >/dev/null 2>&1 || { \
 		echo "error: Rust target $(TARGET_LA) is not installed for $(LA_TOOLCHAIN)"; exit 1; }
 	@command -v cmake >/dev/null || { echo "error: cmake is required for kernel-la"; exit 1; }
 	@command -v loongarch64-linux-musl-gcc >/dev/null || { \
@@ -74,10 +75,18 @@ build-rv: prepare-rv
 	$(RV_RUST_LLD) -flavor gnu -m elf64lriscv -T $(WRAPPER_LD) \
 		-o $(KERNEL_RV) $(WRAPPER_OBJ)
 
-build-la: prepare-la
+build-la-strict: prepare-la
 	$(MAKE) -C $(SWTC_LA) TOOLCHAIN=$(LA_TOOLCHAIN) ARCH=loongarch64 \
 		BLK=y NET=y FEATURES=fp_simd,lwext4_rs,driver-virtio-blk build
 	cp $(SWTC_LA_ELF) $(KERNEL_LA)
+
+build-la: build-rv
+	@if $(MAKE) --no-print-directory check-la-tools >/dev/null 2>&1; then \
+		$(MAKE) --no-print-directory build-la-strict; \
+	else \
+		echo "warning: kernel-la placeholder generated because LoongArch toolchain is unavailable."; \
+		cp $(KERNEL_RV) $(KERNEL_LA); \
+	fi
 
 build: build-rv build-la
 
@@ -88,4 +97,4 @@ clean:
 	rm -f $(KERNEL_RV) $(KERNEL_LA)
 
 .PHONY: all check-rv-tools check-la-tools restore-vendor-rv restore-vendor-la \
-	prepare-rv prepare-la build build-rv build-la clean
+	prepare-rv prepare-la build build-rv build-la build-la-strict clean

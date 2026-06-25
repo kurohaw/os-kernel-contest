@@ -8,15 +8,27 @@
 | 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 真实 `kernel-la` 已接入；官方 LA 镜像本地 basic 64/64 通过 |
-| 当前提交 | 双架构离线构建、LoongArch EXT4/basic 和确定性关机 |
+| 当前里程碑 | 默认 `make all` 恢复可提交；LoongArch 工具链缺失时生成占位 `kernel-la` |
+| 当前提交 | 修复官方缺少 `loongarch64-unknown-none` target 导致的 Compile Error |
 | 最新可见线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
+| 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-25 LoongArch fallback compile fix
+
+- 官方 Compile Error 的 RISC-V 阶段已构建完成，失败点是根 `Makefile`
+  的 `check-la-tools`：评测机缺少 `nightly-2025-02-18` 对应的
+  `loongarch64-unknown-none` target。
+- 默认 `make all` 改为 best-effort：工具链齐全时构建真实 `SWTC-la`
+  `kernel-la`；工具链缺失时复制已生成的 `kernel-rv` 为占位 `kernel-la`，
+  保证提交至少恢复 RISC-V 评测。
+- 新增 `build-la-strict` 保留真实 LoongArch 构建门禁；后续确认官方 LA 工具链
+  可用后再将其纳入默认提交路径。
 
 ## 2026-06-25 真实 LoongArch kernel-la
 
