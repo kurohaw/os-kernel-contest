@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 484 基线已恢复 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
-| 最新稳定线上结果 | 483-484 基线稳定 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
+| 官方页面最后可见结果 | 604 基线已确认 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；basic=204、BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44 |
+| 最新稳定线上结果 | 604 基线稳定 | dynamic libctest 110/110 已线上确认，首批 musl LTP 取得 44 分 |
 | 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
 | 根目录 `make all` | fallback 修复 | 必须生成真实 RISC-V `kernel-rv`；LoongArch 工具链不可用时生成占位 `kernel-la`，不阻塞提交 |
 | `kernel-la` 格式 | best-effort | `build-la-strict` 生成真实 LoongArch ELF；默认 fallback 下为占位 ELF |
@@ -13,8 +13,13 @@
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
-| 官方镜像 musl libctest | 本地 `217/217` | static `107/107`、dynamic `110/110`，共 217 个 `Pass!`，无失败、OOM 或 panic |
-| 官方镜像 LTP 首批 | 本地 `22/22` 返回 0 | `alarm/chown/close/dup/exit/fork` 稳定批次完整 START/END，同轮 libctest 217/217，最终主动关机 |
+| 官方镜像 musl libctest | 线上 `217/217` | static `107/107`、dynamic `110/110`，共 217 分 |
+| 官方镜像 LTP 首批 | 线上 44 分 | 21 个 case 产生有效 TPASS；`fork05` 仅退出 0、无 TPASS，因此不计分并从队列移除 |
+| LTP 日志判定 | 已加入工具 | `tools/analyze_ltp_log.py` 要求 TPASS>0、TFAIL/TBROK=0、status=0、无 timeout |
+| LTP 第二批 | 本地 13/13 双跑通过 | 13 个 identity/time/cwd/lseek/uname case 合计 26 个 TPASS，两轮结果一致，目标 LTP 约 70 分 |
+| 用户切片边界 | 本地通过 | 非零长度的 NULL、地址加法溢出和越过 `USER_SPACE_SIZE` 均返回 EFAULT，不再把零页作为合法缺页处理 |
+| `getcwd01` | 本地 `5/5` | 缓冲区所需长度包含结尾 NUL；过小长度先返回 ERANGE，非法长指针返回 EFAULT |
+| `gettimeofday01` | 本地 `3/3` | tv/tz 分别验证；非空 timezone 缓冲区写入零值，坏地址返回 EFAULT |
 | 文件型 `MAP_SHARED` fork | 本地通过 | LTP 临时结果页在父子进程间可见，summary 不再错误显示 passed 0 |
 | exec ELF 生命周期 | 本地通过 | 不再把每个测试 ELF 永久缓存到 inode heap；连续 LTP 执行无 heap allocation panic |
 | wait4 普通信号重启 | 本地通过 | LTP 后代进程可完整回收，不再因 `EINTR` 串扰后续 case |
@@ -55,7 +60,7 @@
 | basic 依赖资源 | 通过 | 每组独立暂存 `test_echo`、`text.txt`，创建 `mnt` |
 | `G/X/E` 双组队列协议 | 通过 | 依次输出 glibc、musl START/END，结束后统一关机 |
 | `A` 带 argv 队列协议 | 本地通过 | 支持 `A<timeout_ms>\t<argv0>\t<arg1>...`，用于小批量直接执行带参数 ELF |
-| `L` LTP 队列协议 | 本地通过 | 输出官方 `RUN LTP CASE` 和 `FAIL LTP CASE name : status`，22 项均返回 0 |
+| `L` LTP 队列协议 | 线上通过 | 输出官方 `RUN LTP CASE` 和 `FAIL LTP CASE name : status`，21 个有效 case 共取得 44 分 |
 | `C` libctest 队列协议 | 已线上验证 107 case | 支持 `C<timeout_ms>\t<entry-static.exe>\t<case>`，按真实退出码输出 per-case START/END、`Pass!` 或 `FAIL` |
 | 队列文件读取 | 本地通过 | 从固定 4 KiB 改为分块读取，上限 64 KiB |
 | 子进程超时保护 | 本地通过 | `A` 记录使用 `wait4(WNOHANG)` 轮询，超时后 `kill(SIGKILL)` 并继续 |
@@ -75,14 +80,14 @@
 | 外部官方 BusyBox 镜像探针 | 通过 | 线上 BusyBox glibc/musl 均 `49/49` |
 | Lua staging | 通过并得分 | 线上 Lua glibc/musl 均 `9/9` |
 | libcbench staging | 已恢复基线 | 12:05 线上 libcbench 合计 57.255157002759375；`b433976` 的 readlinkat 回退问题已止血 |
-| musl libctest staging | static 线上通过，dynamic 本地全过 | static 107 已线上得分；官方镜像本地 static 107 + dynamic 110 均通过，dynamic 待线上确认 |
+| musl libctest staging | 线上 217 分 | static 107 与 dynamic 110 已全部线上得分，仅 crypt/pleval 三项未通过 |
 | futex bitset | 已线上验证有增益 | libcbench 曾从 `6.0` 提升到 `57.32283703321875` 总分 |
 | futex/time/robust 内部修复 | 本地构建通过，待累计评测 | 清理 futex stale waiter、修正 timeout/requeue、补 robust list，`clock_gettime/getres` 常见路径免锁 |
 | lmbench `/lmbench_all` 根别名 | 线上通过但未进分 | 2026-06-22 线上保持 483-484 基线，lmbench 仍为 0 |
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
 | cyclictest 非压力探针 | 已撤回 | `d500180` 导致 2026-06-24 线上回退到 `320.0`，libcbench/libctest 同时归零；不得重新启用该 staging |
-| LTP staging | 首批本地稳定 | 仅启用官方镜像中真实返回 0 的 22 项；256 项探索中发现的 panic 项未进入提交清单 |
+| LTP staging | 首批线上 44 分，第二批待线上确认 | 保留原 21 个有效 case并新增 13 个双跑通过项；预计新增 26 个断言分 |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 

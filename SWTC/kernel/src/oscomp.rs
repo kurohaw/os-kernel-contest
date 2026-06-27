@@ -37,7 +37,6 @@ const MAX_LIBCTEST_CASES: usize = 107;
 const MAX_DYNAMIC_LIBCTEST_CASES: usize = 110;
 const LMBENCH_TIMEOUT_MS: usize = 10_000;
 const LTP_TIMEOUT_MS: usize = 3_000;
-const MAX_LTP_CASES: usize = 22;
 const LUA_RESOURCES: &[&str] = &[
     "test.sh",
     "date.lua",
@@ -121,10 +120,22 @@ const LTP_ALLOWLIST: &[&str] = &[
     "exit_group01",
     "fork01",
     "fork03",
-    "fork05",
     "fork07",
     "fork08",
     "fork10",
+    "getcwd01",
+    "getegid02",
+    "geteuid01",
+    "getgid03",
+    "getpid02",
+    "getppid02",
+    "gettimeofday01",
+    "gettimeofday02",
+    "getuid01",
+    "lseek01",
+    "lseek07",
+    "uname01",
+    "uname04",
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -1122,7 +1133,7 @@ fn install_ltp_group(
     let mut entries = list_directory(fs, bin_dir)?;
     entries.retain(|entry| is_ltp_candidate(&entry.name, entry.info));
     entries.sort_by(|left, right| left.name.cmp(&right.name));
-    entries.truncate(MAX_LTP_CASES);
+    entries.truncate(LTP_ALLOWLIST.len());
     if entries.is_empty() {
         return Err("no supported LTP case found");
     }

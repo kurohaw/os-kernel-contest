@@ -4,20 +4,43 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-25 |
-| 当前开发分支 | `codex/swtc-architecture`，本轮完成后推送到 `main` |
+| 当前日期 | 2026-06-27 |
+| 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 默认 `make all` 恢复可提交；LoongArch 工具链缺失时生成占位 `kernel-la` |
-| 当前提交 | 修复官方缺少 `loongarch64-unknown-none` target 导致的 Compile Error |
-| 最新可见线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
-| 最新稳定线上结果 | 2026-06-23 18:05:27，`Accepted / 484.32498298746674`；basic=204、BusyBox=98、Lua=18、libcbench=57.32498298746679、libctest=107 |
+| 当前里程碑 | dynamic libctest 已满 110 分，首批 musl LTP 已线上拿到 44 分 |
+| 当前提交 | 在 604 稳定基线上筛选第二批低风险 musl LTP case |
+| 最新可见线上结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；basic=204、BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44 |
+| 最新稳定线上结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；musl-rv 合计 449 分，glibc-rv 190.88927300946003 分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-27 官方 604 分与 LTP 扩容
+
+- dynamic libctest 110 项全部线上通过；static 107 加 dynamic 110，
+  `libctest-musl=217`。当前仅 `dynamic crypt`、`static crypt`、`static pleval`
+  未得分。
+- 首批 22 个 LTP ELF 中，21 个产生有效 TPASS，共取得 44 分；`fork05`
+  是仅适用于 i386 LDT 的旧测试，在 RISC-V 上只输出 TINFO，退出 0 但没有
+  TPASS，因此从正式队列移除。
+- 下一轮只扩容 musl LTP。候选必须在完整官方 RISC-V 镜像中连续运行两次，
+  至少一个 TPASS、零 TFAIL/TBROK、退出状态 0 且无 timeout，才允许进入提交。
+- 新增 `tools/analyze_ltp_log.py`，按 `RUN LTP CASE` 边界统计断言和退出状态，
+  防止把 `fork05` 这类“退出成功但不计分”的程序误判为通过。
+- 使用官方 `os-contest:20260510` 镜像中的 RISC-V musl 工具链交叉构建 LTP
+  20240524，制作独立 EXT4 探测盘。24 个候选中最终保留 13 个：
+  `getcwd01`、`getegid02`、`geteuid01`、`getgid03`、`getpid02`、
+  `getppid02`、`gettimeofday01/02`、`getuid01`、`lseek01/07`、
+  `uname01/04`。
+- 两轮 submit 构建结果均为 13/13 case 安全、26 个 TPASS、零
+  TFAIL/TBROK/timeout/panic，并完整输出 LTP END 和 `!TEST FINISH!`。
+- 修复候选暴露的两个通用 ABI 问题：用户切片检查拒绝空指针、溢出和越过
+  用户空间的范围；`getcwd` 正确计算结尾 NUL，`gettimeofday` 验证并清零
+  非空 timezone 缓冲区。下一次线上 LTP 目标由 44 提升到约 70 分。
 
 ## 2026-06-25 LoongArch fallback compile fix
 
