@@ -59,7 +59,8 @@ run_ltp_subset() (
         dup01 dup02 dup03 dup04 dup06 dup07 dup202 dup204 dup206 dup207 \
         exit02 exit_group01 fork01 fork03 fork07 fork08 fork10 \
         getcwd01 getegid02 geteuid01 getgid03 getpid02 getppid02 \
-        gettimeofday01 getuid01 lseek01 lseek07 uname01 uname04
+        gettimeofday01 getuid01 lseek01 lseek07 uname01 uname04 \
+        mkdir05 mkdirat01 pipe01 pipe06 pipe10 pipe11 pipe14 readv01 rmdir01
     do
         if [ ! -f "./$case_name" ]; then
             continue
@@ -83,6 +84,12 @@ run_script /musl busybox_testcode.sh
 run_script /glibc busybox_testcode.sh
 run_script /musl lua_testcode.sh
 run_script /glibc lua_testcode.sh
+
+# Keep performance tests isolated in their own official directories.  The
+# libcbench scripts are already part of the stable RISC-V score baseline and
+# require no global runtime files beyond the links prepared above.
+run_script_with_timeout /musl libcbench_testcode.sh 180
+run_script_with_timeout /glibc libcbench_testcode.sh 180
 
 # The official image has used both layouts across revisions.
 if [ -f /musl/libctest_testcode.sh ]; then

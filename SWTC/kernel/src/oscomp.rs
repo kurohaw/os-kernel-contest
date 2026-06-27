@@ -136,6 +136,15 @@ const LTP_ALLOWLIST: &[&str] = &[
     "lseek07",
     "uname01",
     "uname04",
+    "mkdir05",
+    "mkdirat01",
+    "pipe01",
+    "pipe06",
+    "pipe10",
+    "pipe11",
+    "pipe14",
+    "readv01",
+    "rmdir01",
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",
@@ -1166,7 +1175,9 @@ fn install_ltp_group(
     if staged_names.is_empty() {
         return Err("no LTP ELF staged");
     }
-    install_group_runtime(fs, BasicFlavor::Musl, group_dir, &interp_paths)?;
+    if !interp_paths.is_empty() {
+        install_group_runtime(fs, BasicFlavor::Musl, group_dir, &interp_paths)?;
+    }
 
     let start_marker = alloc::format!("#### OS COMP TEST GROUP START {} ####", marker_name);
     let end_marker = alloc::format!("#### OS COMP TEST GROUP END {} ####", marker_name);
