@@ -14,6 +14,8 @@ disk.img
 disk-la.img
 SWTC-la/target-tools/
 SWTC-la/.axconfig.*.toml
+SWTC-la/arceos/crates/lwext4_rust/c/lwext4/build_musl-generic/
+SWTC-la/arceos/crates/lwext4_rust/c/lwext4/liblwext4-*.a
 SWTC-la/**/.*
 AGENTS.md
 office-test.txt

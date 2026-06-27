@@ -1,4 +1,4 @@
-TOOLCHAIN ?= nightly-2025-02-18
+TOOLCHAIN ?= nightly-2025-05-20
 ROOT_DIR  := $(CURDIR)
 
 # ----- Build configuration -----------------------------------------------------
