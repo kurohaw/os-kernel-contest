@@ -18,6 +18,12 @@ SWTC_LA_ELF := $(SWTC_LA)/SWTC-la_loongarch64-qemu-virt.elf
 RV_RUST_SYSROOT = $(shell RUSTUP_TOOLCHAIN=$(RV_TOOLCHAIN) rustc --print sysroot)
 RV_RUST_HOST = $(shell RUSTUP_TOOLCHAIN=$(RV_TOOLCHAIN) rustc -vV | sed -n 's/^host: //p')
 RV_RUST_LLD = $(RV_RUST_SYSROOT)/lib/rustlib/$(RV_RUST_HOST)/bin/rust-lld
+LA_BUILD_STD = $(shell sysroot="$$(rustup run $(LA_TOOLCHAIN) rustc --print sysroot 2>/dev/null)" && \
+	if ls "$$sysroot/lib/rustlib/$(TARGET_LA)/lib"/libcore-*.rlib >/dev/null 2>&1; then \
+		echo 0; \
+	else \
+		echo 1; \
+	fi)
 
 all: build
 
@@ -39,8 +45,11 @@ check-la-tools:
 	@command -v rust-objcopy >/dev/null || { echo "error: rust-objcopy is required"; exit 1; }
 	@sysroot="$$(rustup run $(LA_TOOLCHAIN) rustc --print sysroot 2>/dev/null)" || { \
 		echo "error: Rust toolchain $(LA_TOOLCHAIN) is not installed"; exit 1; }; \
-	ls "$$sysroot/lib/rustlib/$(TARGET_LA)/lib"/libcore-*.rlib >/dev/null 2>&1 || { \
-		echo "error: Rust target $(TARGET_LA) is not installed for $(LA_TOOLCHAIN)"; exit 1; }
+	if ! ls "$$sysroot/lib/rustlib/$(TARGET_LA)/lib"/libcore-*.rlib >/dev/null 2>&1; then \
+		if ! test -d "$$sysroot/lib/rustlib/src/rust/library"; then \
+			echo "error: neither Rust target $(TARGET_LA) nor rust-src is installed for $(LA_TOOLCHAIN)"; exit 1; \
+		fi; \
+	fi
 	@command -v cmake >/dev/null || { echo "error: cmake is required for kernel-la"; exit 1; }
 	@command -v loongarch64-linux-musl-gcc >/dev/null || { \
 		echo "error: loongarch64-linux-musl-gcc is required for kernel-la"; exit 1; }
@@ -77,14 +86,16 @@ build-rv: prepare-rv
 
 build-la-strict: prepare-la
 	$(MAKE) -C $(SWTC_LA) TOOLCHAIN=$(LA_TOOLCHAIN) ARCH=loongarch64 \
+		BUILD_STD=$(LA_BUILD_STD) \
 		BLK=y NET=y FEATURES=fp_simd,lwext4_rs,driver-virtio-blk build
 	cp $(SWTC_LA_ELF) $(KERNEL_LA)
 
 build-la: build-rv
-	@if $(MAKE) --no-print-directory check-la-tools >/dev/null 2>&1; then \
-		$(MAKE) --no-print-directory build-la-strict; \
+	@if $(MAKE) --no-print-directory check-la-tools >/dev/null 2>&1 \
+		&& $(MAKE) --no-print-directory build-la-strict; then \
+		:; \
 	else \
-		echo "warning: kernel-la placeholder generated because LoongArch toolchain is unavailable."; \
+		echo "warning: kernel-la placeholder generated because the real LoongArch build is unavailable."; \
 		cp $(KERNEL_RV) $(KERNEL_LA); \
 	fi
 

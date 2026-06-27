@@ -4,19 +4,21 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 604 基线已确认 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；basic=204、BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44 |
-| 最新稳定线上结果 | 604 基线稳定 | dynamic libctest 110/110 已线上确认，首批 musl LTP 取得 44 分 |
+| 官方页面最后可见结果 | 608 基线已确认 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69，LA=0 |
+| 最新稳定线上结果 | 608 基线稳定 | dynamic libctest 110/110 保持，第二批 musl LTP 已线上提升到 69 分 |
 | 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
-| 根目录 `make all` | fallback 修复 | 必须生成真实 RISC-V `kernel-rv`；LoongArch 工具链不可用时生成占位 `kernel-la`，不阻塞提交 |
+| 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
+| LoongArch build-std fallback | 参数验证通过，真编译待确认 | 缺预编译 target 但有 `rust-src` 时使用 `-Z build-std=core,alloc,compiler_builtins`；本机缺 LA nightly，未完成真实编译 |
 | `kernel-la` 格式 | best-effort | `build-la-strict` 生成真实 LoongArch ELF；默认 fallback 下为占位 ELF |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
+| LoongArch 扩展 functional groups | 待 LA 镜像/线上验证 | basic 后按存在性执行 BusyBox、Lua、musl libctest，并运行 33 个已验证 LTP case；libctest 300 秒、LTP 单项 5 秒超时 |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
 | 官方镜像 musl libctest | 线上 `217/217` | static `107/107`、dynamic `110/110`，共 217 分 |
-| 官方镜像 LTP 首批 | 线上 44 分 | 21 个 case 产生有效 TPASS；`fork05` 仅退出 0、无 TPASS，因此不计分并从队列移除 |
+| 官方镜像 LTP 第二批 | 线上 69 分 | 34 个入队 case 中 `gettimeofday02` 未得分，其余 case 将 LTP 从 44 提升到 69 |
 | LTP 日志判定 | 已加入工具 | `tools/analyze_ltp_log.py` 要求 TPASS>0、TFAIL/TBROK=0、status=0、无 timeout |
-| LTP 第二批 | 本地 13/13 双跑通过 | 13 个 identity/time/cwd/lseek/uname case 合计 26 个 TPASS，两轮结果一致，目标 LTP 约 70 分 |
+| LTP 第二批 | 线上已确认 | identity/time/cwd/lseek/uname 批次将 LTP 从 44 提升到 69；`gettimeofday02` 官网明细仍为 0 |
 | 用户切片边界 | 本地通过 | 非零长度的 NULL、地址加法溢出和越过 `USER_SPACE_SIZE` 均返回 EFAULT，不再把零页作为合法缺页处理 |
 | `getcwd01` | 本地 `5/5` | 缓冲区所需长度包含结尾 NUL；过小长度先返回 ERANGE，非法长指针返回 EFAULT |
 | `gettimeofday01` | 本地 `3/3` | tv/tz 分别验证；非空 timezone 缓冲区写入零值，坏地址返回 EFAULT |

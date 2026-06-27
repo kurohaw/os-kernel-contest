@@ -25,3 +25,13 @@ GPL-2.0 license files.
 Local validation with the official `pre-20250615` LoongArch image completed
 all 32 musl basic tests and all 32 glibc basic tests with matching START/END
 markers. This is local evidence, not an official online score.
+
+The root build can use Cargo `-Z build-std` when the LoongArch target libraries
+are absent but `rust-src` is installed. The default build still falls back to
+the RISC-V placeholder if the real LoongArch build fails, so RISC-V evaluation
+remains available.
+
+After both basic groups, the embedded init script probes and runs the official
+BusyBox, Lua, musl libctest, and a bounded LTP subset. Libctest has a 300-second
+group timeout and each LTP case has a 5-second timeout. These expanded groups
+have not yet been validated on the official LoongArch evaluator.

@@ -10,10 +10,17 @@ endif
 
 build_args-release := --release
 
+ifeq ($(BUILD_STD),1)
+  build_std_args := -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem
+else
+  build_std_args :=
+endif
+
 build_args := \
   -Z unstable-options \
   --target $(TARGET) \
   --target-dir $(TARGET_DIR) \
+  $(build_std_args) \
   $(build_args-$(MODE)) \
   $(verbose)
 

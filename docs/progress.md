@@ -8,16 +8,38 @@
 | 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | dynamic libctest 已满 110 分，首批 musl LTP 已线上拿到 44 分 |
-| 当前提交 | 在 604 稳定基线上筛选第二批低风险 musl LTP case |
-| 最新可见线上结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；basic=204、BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44 |
-| 最新稳定线上结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；musl-rv 合计 449 分，glibc-rv 190.88927300946003 分 |
+| 当前里程碑 | RISC-V LTP 第二批已线上确认到 69 分，开始解决 LoongArch 线上 0 分 |
+| 当前提交 | 保留 608 基线，尝试用 rust-src/build-std 生成真实 `kernel-la`，并扩展 LA functional groups |
+| 最新可见线上结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69，LA 四列仍为 0 |
+| 最新稳定线上结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；RISC-V 继续稳定，LoongArch 尚未产生线上得分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-27 官方 608 分与 LoongArch 冲刺
+
+- 2026-06-27 12:24 提交的评测于 14:25 完成，状态 `Accepted`，总分
+  `608.9687897690079`。第二批 musl LTP 已从 44 提升到 69，RISC-V basic、
+  BusyBox、Lua、libctest 保持稳定。
+- 官网明细显示 glibc-la、musl-la 所有组仍为 0；本地生成的 `kernel-la`
+  也确认是 RISC-V 占位 ELF，线上未进入真实 LoongArch 内核。
+- 根构建不再仅接受预编译 `loongarch64-unknown-none/libcore`：若 target
+  未安装但 `rust-src` 存在，则给 SWTC-la Cargo 增加
+  `-Z build-std=core,alloc,compiler_builtins`，尝试离线生成目标核心库。
+- 默认 `make all` 仍保留保分 fallback：真实 LA 构建任一阶段失败时覆盖为
+  RV 占位 `kernel-la`，避免 LoongArch 尝试把整个提交变成 Compile Error。
+- LA init 保持已本地验证的 musl/glibc basic 顺序，随后按文件存在性执行
+  BusyBox、Lua、musl libctest；LTP 只执行 RISC-V 已线上得分的 33 个 case，
+  每项由 BusyBox timeout 限制为 5 秒。iozone、cyclictest、iperf、netperf
+  未启用。
+- 本地验证：`make all` 通过；本机缺 LA 工具链时正确 fallback；RV
+  `kernel-rv` 为入口 `0x80200000` 的 RISC-V ELF；官方 basic 镜像执行
+  32 个 glibc command，完整输出 START/END、`!TEST FINISH!` 并主动关机。
+- 当前机器缺少可用的 `nightly-2025-02-18` LA 工具链和官方 LA 镜像，
+  因此 build-std 真编译以及新增 LA 组仍必须由严格工具链环境或下一次官方评测确认。
 
 ## 2026-06-27 官方 604 分与 LTP 扩容
 

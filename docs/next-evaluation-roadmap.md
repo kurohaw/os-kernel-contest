@@ -1,22 +1,25 @@
 # 2026-06-27 下一次评测路线
 
-## 604 分后的主线
+## 608 分后的主线
 
-2026-06-27 09:43:41 官方结果为 `Accepted / 604.3224084239476`：basic=204、
-BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44。
-dynamic libctest 与首批 LTP 已完成线上确认，下一阶段只扩大经过完整镜像双跑的
-musl LTP case。`fork05` 在 RISC-V 上没有 TPASS，不再进入执行队列。
+2026-06-27 14:25:14 官方结果为 `Accepted / 608.9687897690079`：basic=204、
+BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69。
+第二批 LTP 已完成线上确认；官网四个 LA 汇总列仍全部为 0，当前最高收益方向
+转为让官方环境生成并启动真实 LoongArch ELF。
 
-第一批候选限定为身份、时间、uname、cwd 和基础顺序 I/O 测试。每个候选必须
-TPASS>0、TFAIL/TBROK=0、退出状态 0、无 timeout，并连续两轮一致；正式新增不超过
-24 项。第一批线上确认后，第二批才考虑 pipe、readv/writev 和目录变更测试。
+根构建新增 rust-src/build-std 路径：官方若缺预编译
+`loongarch64-unknown-none` target、但存在 `rust-src`，则离线构建
+core/alloc/compiler_builtins；若真实 LA 构建仍失败，继续 fallback 到 RV
+占位，保证 RISC-V 608 基线不因 LA 尝试变成 Compile Error。
 
-第一批现已完成：24 个候选中保留 13 个，连续两轮均得到 26 个 TPASS，零
-TFAIL/TBROK/timeout/panic。正式队列由原 21 个有效 case 扩到 34 个，下一次
-官方目标是 LTP 从 44 提升到约 70、总分从 604 提升到约 630。失败候选不提交。
+真实 LA init 在原 basic 64/64 路径之后按文件存在性增加 BusyBox、Lua、
+musl libctest 和 33 个稳定 LTP case；libctest 整组限制 300 秒、LTP 单项限制
+5 秒。iozone、cyclictest、iperf 和 netperf 仍不进入本轮。
 
-libctest 剩余三项最多 3 分，放在 LTP 扩容之后。iozone、cyclictest、lmbench、
-网络测试和 LoongArch 不与本轮混合。
+当前机器只能验证 RV 构建、fallback 和 basic 回归，不能验证真实 LA
+build-std 或新增 LA 组。下一次提交的验收顺序是：Compile Accepted、
+RISC-V 不低于 608、`kernel-la` 被官方识别为 LoongArch、LA basic 首先非零，
+再观察 BusyBox/Lua/libctest/LTP。
 
 ## 2026-06-25 Compile Error 修复
 
@@ -31,8 +34,8 @@ LoongArch 严格工具链检查。评测机缺少 `nightly-2025-02-18` 的
 
 | 证据 | 结论 |
 |---|---|
-| 最新可见官方结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；basic=204、BusyBox=100、Lua=18、libcbench=56.88927300946003、libctest=217、LTP=44 |
-| 最新稳定官方结果 | 2026-06-27 09:43:41，`Accepted / 604.3224084239476`；dynamic libctest 和首批 LTP 已线上确认 |
+| 最新可见官方结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69、LA=0 |
+| 最新稳定官方结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；dynamic libctest 和第二批 LTP 已线上确认 |
 | 最新高分结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；iozone-lite 撤回后已恢复 |
 | 已止血问题 | `4602678` 扩容 libctest 后曾在 libcbench-glibc 阶段触发 `src/process/thread/exit.rs:74` 父进程 weak unwrap panic；14:43 结果已恢复且无 panic |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594` |
@@ -45,7 +48,7 @@ LoongArch 严格工具链检查。评测机缺少 `nightly-2025-02-18` 的
 | 本轮新增门禁修复 | `64fe8b4` 已撤回 `8690e03 feat: add minimal iozone probe` |
 | 本地双组 basic | 官方解析器复跑 `102/102` |
 | 本地 libcbench staging | glibc/musl libcbench 脚本和静态 ELF 可从 EXT4 暂存到 tmpfs，线上已证明能得分 |
-| 当前已知边界 | LoongArch、cyclictest、iozone、lmbench、网络/性能测试仍未稳定得分；LTP 可继续按通过项扩容 |
+| 当前已知边界 | LoongArch build-std 与扩展组尚未本地真跑；cyclictest、iozone、lmbench、网络/性能测试仍未稳定得分 |
 
 ## 2026-06-24 快速增长四路线
 
