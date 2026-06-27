@@ -34,5 +34,8 @@ remains available.
 After both basic groups, the embedded init script probes and runs the official
 BusyBox, Lua, glibc/musl libcbench, musl libctest, and a bounded LTP subset.
 Libcbench has a 180-second group timeout, libctest has a 300-second group
-timeout, and each LTP case has a 5-second timeout. These expanded groups have
-not yet been validated on the official LoongArch evaluator.
+timeout, and each LTP case has a 5-second timeout. A local QEMU 9.2.1 run with
+the official `pre-2025` static musl BusyBox completed all 55 commands with no
+failure, panic, or unsupported syscall and shut down in about 135 seconds.
+Lua, libcbench, libctest, LTP, and all online LoongArch scores still require
+official evaluator confirmation.

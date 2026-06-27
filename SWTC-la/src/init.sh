@@ -5,6 +5,7 @@ echo "================ SWTC LOONGARCH BASIC ================"
 /musl/busybox ln -sf /musl/busybox /bin/echo
 /musl/busybox ln -sf /musl/busybox /bin/sleep
 /musl/busybox ln -sf /musl/busybox /bin/cat
+/musl/busybox ln -sf /musl/busybox /bin/ls
 /musl/busybox ln -sf /musl/busybox /bin/sync
 /musl/busybox ln -sf /musl/lib/libc.so /lib/ld-musl-loongarch-lp64d.so.1
 /musl/busybox ln -sf /glibc/lib/ld-linux-loongarch-lp64d.so.1 /lib/ld-linux-loongarch-lp64d.so.1

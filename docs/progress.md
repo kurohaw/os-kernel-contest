@@ -8,8 +8,8 @@
 | 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | RISC-V LTP 已线上确认到 70 分；真实 LoongArch 提交构建已本地严格通过 |
-| 当前提交 | `nightly-2025-05-20` 真实 LA ELF、LA libcbench/functional groups、RISC-V LTP 第三批 9 项 |
+| 当前里程碑 | RISC-V LTP 已线上确认到 70 分；真实 LoongArch ELF 已在 QEMU 9.2.1 完成 BusyBox 55/55 本地回归 |
+| 当前提交 | `nightly-2025-05-20` 真实 LA ELF、LA libcbench/functional groups、BusyBox PATH 修复、RISC-V LTP 第三批 9 项 |
 | 最新可见线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；basic=204、BusyBox=100、Lua=18、libcbench=55.565189668706445、libctest=217、LTP=70，LA 四列仍为 0 |
 | 最新稳定线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；RISC-V 继续稳定，LoongArch 尚未产生线上得分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -37,9 +37,16 @@
   `pipe06`、`pipe10`、`pipe11`、`pipe14`、`readv01`、`rmdir01`。
 - 最终队列复跑为 9/9 安全，共 91 个 TPASS，零 TFAIL/TBROK/timeout/panic；
   `readv02` 会触发 `src/fs/file.rs` panic，已连同其他失败项全部排除。
-- 本机 Ubuntu QEMU 8.2 无法启动该 LA virt 镜像；官方说明使用 QEMU 9.2，
-  因此本轮新增 LA 运行组仍需官方评测确认。此前官方 LA 镜像 basic 64/64
-  的本地证据保持不变。
+- 本机从官方 QEMU `v9.2.1` 源码构建 `loongarch64-softmmu` 后，真实
+  `kernel-la` 已按官方 `virtio-blk-pci` 参数启动。使用官方 `pre-2025`
+  源码构建的静态 musl BusyBox 最小 EXT4 镜像完整执行 55 条命令，首次
+  `which ls` 因 `/bin/ls` 缺失得到 54/55；补链接后复跑为 55/55，零 fail、
+  零 panic、零 unsupported syscall，并在 135 秒内主动退出。
+- 仅保留 BusyBox、不放测试脚本的镜像在约 40 秒主动退出，确认 `/bin/sync`
+  和平台关机链路没有卡死。此前 180 秒运行被外部 timeout 截断属于测试耗时。
+- 当前从 `pre-2025` 源码临时重编的 32 个 LA basic ELF 均带从 `0x0` 开始的
+  `PT_LOAD`，运行退出码为 139，不作为官方镜像回归证据；此前官方
+  `pre-20250615` LA 镜像 basic 64/64 的本地证据保持不变。
 
 ## 2026-06-27 官方 608 分与 LoongArch 冲刺
 

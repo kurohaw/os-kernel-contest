@@ -22,6 +22,9 @@ libcbench=55.565189668706445、libctest=217、LTP=70；LoongArch 仍为 0。
   `0x80000000`。
 - LoongArch 使用官方 `pre-20250615` 测试镜像本地验证：musl basic `32/32`、
   glibc basic `32/32`，共 64 个 START/END 完整匹配，无 panic 或 loader 错误。
+- 使用源码构建的 QEMU 9.2.1 和官方 `pre-2025` 静态 musl BusyBox 最小盘复测：
+  55 条命令全部 success，START/END 完整，无 panic 或 unsupported syscall，
+  约 135 秒主动退出。
 - LoongArch 构建依赖已全部 vendor，`axconfig-gen` 也从仓库离线构建。
 - 上述 LoongArch 结果是本地官方镜像证据，尚不能写成线上官方分数。
 
@@ -70,8 +73,8 @@ libcbench=55.565189668706445、libctest=217、LTP=70；LoongArch 仍为 0。
 本轮 LoongArch 冲刺已用官方同源 GCC 13.2 musl 工具链完成严格构建，生成入口
 `0x80000000` 的真实 LoongArch ELF；basic 后按文件存在性执行 BusyBox、Lua、
 glibc/musl libcbench、musl libctest 和 42 个受限 LTP case。RISC-V 同时新增
-9 个双跑通过的 LTP case，共产生 91 个 TPASS。以上增量仍待线上确认，不应提前
-计入官方分数。
+9 个双跑通过的 LTP case，共产生 91 个 TPASS。LA BusyBox 已在 QEMU 9.2.1
+本地通过 55/55；其他新增组和全部 LA 分数仍待线上确认，不应提前计入官方分数。
 
 最近可信线上结果为 2026-06-23 18:05:27：编译状态 `Accepted`，总分
 `484.32498298746674`。其中 RISC-V basic 为 `204`，BusyBox 为 `98`，Lua 为

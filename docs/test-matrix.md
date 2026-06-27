@@ -11,7 +11,9 @@
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
 | `kernel-la` 格式 | 通过 | `build-la-strict` 生成 LoongArch executable ELF，入口 `0x80000000`；默认 fallback 仍保留 |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
-| LoongArch 扩展 functional groups | 待官方运行确认 | basic 后执行 BusyBox、Lua、glibc/musl libcbench、musl libctest 和 42 个受限 LTP case；超时分别为 180/300/5 秒 |
+| LoongArch QEMU 9.2.1 启动 | 本地通过 | 源码构建 `loongarch64-softmmu`，真实 `kernel-la` 从 x0 EXT4 启动并主动关机 |
+| LoongArch BusyBox | 本地 `55/55` | 官方 `pre-2025` 静态 musl BusyBox；补 `/bin/ls` 后零 fail、零 panic、零 unsupported syscall，约 135 秒主动退出 |
+| LoongArch 扩展 functional groups | 部分本地通过，待官方确认 | BusyBox 已通过；Lua、glibc/musl libcbench、musl libctest 和 42 个受限 LTP case 已接入，超时分别为 180/300/5 秒 |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
