@@ -26,10 +26,17 @@ use crate::{
     },
 };
 
-pub fn sys_get_time(time_val_ptr: *mut TimeVal) -> SyscallRet {
+pub fn sys_get_time(time_val_ptr: *mut TimeVal, timezone_ptr: *mut u8) -> SyscallRet {
     stack_trace!();
-    UserCheck::new()
-        .check_writable_slice(time_val_ptr as *mut u8, core::mem::size_of::<TimeVal>())?;
+    let user_check = UserCheck::new();
+    if !time_val_ptr.is_null() {
+        user_check
+            .check_writable_slice(time_val_ptr as *mut u8, core::mem::size_of::<TimeVal>())?;
+    }
+    if !timezone_ptr.is_null() {
+        user_check.check_writable_slice(timezone_ptr, core::mem::size_of::<[i32; 2]>())?;
+    }
+    drop(user_check);
     let _sum_guard = SumGuard::new();
     let current_time = current_time_ms();
     let time_val = TimeVal {
@@ -38,7 +45,12 @@ pub fn sys_get_time(time_val_ptr: *mut TimeVal) -> SyscallRet {
     };
     // debug!("get time of day, time(ms): {}", current_time);
     unsafe {
-        time_val_ptr.write_volatile(time_val);
+        if !time_val_ptr.is_null() {
+            time_val_ptr.write_volatile(time_val);
+        }
+        if !timezone_ptr.is_null() {
+            timezone_ptr.write_bytes(0, core::mem::size_of::<[i32; 2]>());
+        }
     }
     Ok(0)
 }

@@ -4,7 +4,10 @@ use log::{debug, error, warn};
 use riscv::register::{scause::Scause, stvec, utvec::TrapMode};
 
 use crate::{
-    config::{mm::PAGE_SIZE, process::SYSCALL_STR_ARG_MAX_LEN},
+    config::{
+        mm::{PAGE_SIZE, USER_SPACE_SIZE},
+        process::SYSCALL_STR_ARG_MAX_LEN,
+    },
     processor::{current_process, current_task, SumGuard},
     signal::SIGSEGV,
     stack_trace,
@@ -66,11 +69,9 @@ impl UserCheck {
     /// Check wether the given user addr is readable or not
     pub fn check_readable_slice(&self, buf: *const u8, len: usize) -> GeneralRet<()> {
         stack_trace!();
+        validate_user_slice(buf as usize, len)?;
         let buf_start: VirtAddr = VirtAddr::from(buf as usize).floor().into();
-        let mut buf_end: VirtAddr = VirtAddr::from(buf as usize + len).ceil().into();
-        if buf_end.0 == 0 && buf_start.0 > 0 {
-            buf_end.0 = usize::MAX;
-        }
+        let buf_end: VirtAddr = VirtAddr::from(buf as usize + len).ceil().into();
         let mut va = buf_start;
         while va < buf_end {
             if let Some(scause) = self.try_read_u8(va.into()) {
@@ -84,6 +85,7 @@ impl UserCheck {
     /// Check wether the given user addr is writable or not
     pub fn check_writable_slice(&self, buf: *mut u8, len: usize) -> GeneralRet<()> {
         stack_trace!();
+        validate_user_slice(buf as usize, len)?;
         let buf_start: VirtAddr = VirtAddr::from(buf as usize).floor().into();
         let buf_end: VirtAddr = VirtAddr::from(buf as usize + len).ceil().into();
         let mut va = buf_start;
@@ -194,4 +196,15 @@ impl UserCheck {
             }
         }
     }
+}
+
+fn validate_user_slice(start: usize, len: usize) -> GeneralRet<()> {
+    if len == 0 {
+        return Ok(());
+    }
+    let end = start.checked_add(len).ok_or(SyscallErr::EFAULT)?;
+    if start == 0 || start >= USER_SPACE_SIZE || end > USER_SPACE_SIZE {
+        return Err(SyscallErr::EFAULT);
+    }
+    Ok(())
 }

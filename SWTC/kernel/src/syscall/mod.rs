@@ -368,7 +368,9 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         SYSCALL_UNAME => sys_handler!(sys_uname, (args[0])),
         SYSCALL_GETRUSAGE => sys_handler!(sys_getrusage, (args[0] as i32, args[1])),
         SYSCALL_UMASK => sys_handler!(sys_umask, (args[0] as u32)),
-        SYSCALL_GET_TIME => sys_handler!(sys_get_time, (args[0] as *mut TimeVal)),
+        SYSCALL_GET_TIME => {
+            sys_handler!(sys_get_time, (args[0] as *mut TimeVal, args[1] as *mut u8))
+        }
         SYSCALL_GETPID => sys_handler!(sys_getpid, ()),
         SYSCALL_GETPPID => sys_handler!(sys_getppid, ()),
         SYSCALL_GETUID => sys_handler!(sys_getuid, ()),
