@@ -9,7 +9,7 @@ It is adapted from the open-source StarryX project and its ArceOS base:
 - Imported StarryX baseline: commit `d77359efece4f3216dc2cfac5165b68d1d679923`
 
 The SWTC adaptation adds an offline build, compatibility with
-`nightly-2025-02-18`, a corrected LoongArch early boot stack address, official
+`nightly-2025-05-20`, a corrected LoongArch early boot stack address, official
 EXT4 test-image startup, SWTC branding, deterministic shutdown, and relative
 `execve` path handling.
 
@@ -32,6 +32,7 @@ the RISC-V placeholder if the real LoongArch build fails, so RISC-V evaluation
 remains available.
 
 After both basic groups, the embedded init script probes and runs the official
-BusyBox, Lua, musl libctest, and a bounded LTP subset. Libctest has a 300-second
-group timeout and each LTP case has a 5-second timeout. These expanded groups
-have not yet been validated on the official LoongArch evaluator.
+BusyBox, Lua, glibc/musl libcbench, musl libctest, and a bounded LTP subset.
+Libcbench has a 180-second group timeout, libctest has a 300-second group
+timeout, and each LTP case has a 5-second timeout. These expanded groups have
+not yet been validated on the official LoongArch evaluator.

@@ -8,16 +8,38 @@
 | 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | RISC-V LTP 第二批已线上确认到 69 分，开始解决 LoongArch 线上 0 分 |
-| 当前提交 | 保留 608 基线，尝试用 rust-src/build-std 生成真实 `kernel-la`，并扩展 LA functional groups |
-| 最新可见线上结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69，LA 四列仍为 0 |
-| 最新稳定线上结果 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；RISC-V 继续稳定，LoongArch 尚未产生线上得分 |
+| 当前里程碑 | RISC-V LTP 已线上确认到 70 分；真实 LoongArch 提交构建已本地严格通过 |
+| 当前提交 | `nightly-2025-05-20` 真实 LA ELF、LA libcbench/functional groups、RISC-V LTP 第三批 9 项 |
+| 最新可见线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；basic=204、BusyBox=100、Lua=18、libcbench=55.565189668706445、libctest=217、LTP=70，LA 四列仍为 0 |
+| 最新稳定线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；RISC-V 继续稳定，LoongArch 尚未产生线上得分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
+
+- 官网最新结果为 `607.8318219303549`：RISC-V basic=204、BusyBox=100、
+  Lua=18、libctest=217、LTP=70；libcbench 的约 1.3 分下降属于性能波动，
+  LoongArch 所有列仍为 0。
+- LoongArch 工具链切换到官方 Dockerfile 明确预装的
+  `nightly-2025-05-20`，并按该版本要求把 5 处裸函数属性改为
+  `#[unsafe(naked)]`。
+- 本机在 E 盘补齐 GCC 13.2 `loongarch64-linux-musl` 工具链和 Rust LA target；
+  `build-la-strict` 已带 `lwext4_rs`、virtio-blk、网络和 FP/SIMD 完整通过，
+  `kernel-la` 为入口 `0x80000000` 的 LoongArch ELF。
+- LA init 在 BusyBox/Lua 后新增 glibc/musl libcbench，单组上限 180 秒；
+  libctest 仍为 300 秒，LTP 单项仍为 5 秒，并追加本轮验证通过的 9 项。
+- RISC-V 使用 LTP 20240524 静态 musl ELF 和 128 MiB EXT4 探测盘筛选 37 个
+  pipe/readv/writev/目录候选。最终只保留 `mkdir05`、`mkdirat01`、`pipe01`、
+  `pipe06`、`pipe10`、`pipe11`、`pipe14`、`readv01`、`rmdir01`。
+- 最终队列复跑为 9/9 安全，共 91 个 TPASS，零 TFAIL/TBROK/timeout/panic；
+  `readv02` 会触发 `src/fs/file.rs` panic，已连同其他失败项全部排除。
+- 本机 Ubuntu QEMU 8.2 无法启动该 LA virt 镜像；官方说明使用 QEMU 9.2，
+  因此本轮新增 LA 运行组仍需官方评测确认。此前官方 LA 镜像 basic 64/64
+  的本地证据保持不变。
 
 ## 2026-06-27 官方 608 分与 LoongArch 冲刺
 

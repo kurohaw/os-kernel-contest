@@ -10,9 +10,9 @@ glibc、musl basic、BusyBox、Lua、libcbench、musl libctest 和稳定 LTP 子
 根构建优先生成真实 LoongArch `kernel-la`；工具链或真实构建失败时仍复制
 RISC-V 占位 ELF，避免阻塞已稳定的 RISC-V 评测。
 
-最新可见线上结果为 2026-06-27 14:25:14：`Accepted / 608.9687897690079`。
-RISC-V basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、
-libctest=217、LTP=69；LoongArch 仍为 0。
+最新可见线上结果为 2026-06-27 16:06:27 提交：
+`Accepted / 607.8318219303549`。RISC-V basic=204、BusyBox=100、Lua=18、
+libcbench=55.565189668706445、libctest=217、LTP=70；LoongArch 仍为 0。
 
 ## 2026-06-25 双架构里程碑
 
@@ -29,7 +29,7 @@ libctest=217、LTP=69；LoongArch 仍为 0。
 
 - 根目录 `make all` 可完全离线构建 SWTC。
 - RISC-V 使用官方镜像预装的 `nightly-2025-02-01`；LoongArch 独立使用
-  `nightly-2025-02-18`，根构建不会再用一个全局工具链覆盖两套架构。
+  `nightly-2025-05-20`，根构建不会再用一个全局工具链覆盖两套架构。
 - 生成官方要求的 RISC-V `kernel-rv` 和 `kernel-la`；缺预编译 LA target
   但有 `rust-src` 时尝试 build-std，失败时安全 fallback。
 - 使用官方完整 `1G`、单核、网络设备与 RTC 参数启动并主动关机。
@@ -67,9 +67,11 @@ libctest=217、LTP=69；LoongArch 仍为 0。
 - 本地官方 `test_runner.py` 对双组 basic 的解析结果为 `102/102`。
 - 两套架构按各自固定工具链完成隐藏文件过滤、强制离线构建验证。
 
-本轮 LoongArch 冲刺在已验证 basic 之后按文件存在性执行 BusyBox、Lua、
-musl libctest 和 33 个稳定 LTP case；这些扩展及 build-std 真构建尚待官方
-环境验证，不应提前计入线上分数。
+本轮 LoongArch 冲刺已用官方同源 GCC 13.2 musl 工具链完成严格构建，生成入口
+`0x80000000` 的真实 LoongArch ELF；basic 后按文件存在性执行 BusyBox、Lua、
+glibc/musl libcbench、musl libctest 和 42 个受限 LTP case。RISC-V 同时新增
+9 个双跑通过的 LTP case，共产生 91 个 TPASS。以上增量仍待线上确认，不应提前
+计入官方分数。
 
 最近可信线上结果为 2026-06-23 18:05:27：编译状态 `Accepted`，总分
 `484.32498298746674`。其中 RISC-V basic 为 `204`，BusyBox 为 `98`，Lua 为

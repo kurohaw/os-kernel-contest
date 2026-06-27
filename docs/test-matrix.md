@@ -4,21 +4,22 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 608 基线已确认 | 2026-06-27 14:25:14，`Accepted / 608.9687897690079`；basic=204、BusyBox=100、Lua=18、libcbench=56.88608534938183、libctest=217、LTP=69，LA=0 |
-| 最新稳定线上结果 | 608 基线稳定 | dynamic libctest 110/110 保持，第二批 musl LTP 已线上提升到 69 分 |
+| 官方页面最后可见结果 | 607 基线已确认 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；basic=204、BusyBox=100、Lua=18、libcbench=55.565189668706445、libctest=217、LTP=70，LA=0 |
+| 最新稳定线上结果 | 607 基线稳定 | dynamic libctest 110/110 保持，第二批 musl LTP 已线上提升到 70 分 |
 | 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
 | 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
-| LoongArch build-std fallback | 参数验证通过，真编译待确认 | 缺预编译 target 但有 `rust-src` 时使用 `-Z build-std=core,alloc,compiler_builtins`；本机缺 LA nightly，未完成真实编译 |
-| `kernel-la` 格式 | best-effort | `build-la-strict` 生成真实 LoongArch ELF；默认 fallback 下为占位 ELF |
+| LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
+| `kernel-la` 格式 | 通过 | `build-la-strict` 生成 LoongArch executable ELF，入口 `0x80000000`；默认 fallback 仍保留 |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
-| LoongArch 扩展 functional groups | 待 LA 镜像/线上验证 | basic 后按存在性执行 BusyBox、Lua、musl libctest，并运行 33 个已验证 LTP case；libctest 300 秒、LTP 单项 5 秒超时 |
+| LoongArch 扩展 functional groups | 待官方运行确认 | basic 后执行 BusyBox、Lua、glibc/musl libcbench、musl libctest 和 42 个受限 LTP case；超时分别为 180/300/5 秒 |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
 | 官方镜像 musl libctest | 线上 `217/217` | static `107/107`、dynamic `110/110`，共 217 分 |
-| 官方镜像 LTP 第二批 | 线上 69 分 | 34 个入队 case 中 `gettimeofday02` 未得分，其余 case 将 LTP 从 44 提升到 69 |
+| 官方镜像 LTP 第二批 | 线上 70 分 | 34 个入队 case 均已得分，最新一轮 `gettimeofday02` 从 0 提升为 1 |
 | LTP 日志判定 | 已加入工具 | `tools/analyze_ltp_log.py` 要求 TPASS>0、TFAIL/TBROK=0、status=0、无 timeout |
-| LTP 第二批 | 线上已确认 | identity/time/cwd/lseek/uname 批次将 LTP 从 44 提升到 69；`gettimeofday02` 官网明细仍为 0 |
+| LTP 第二批 | 线上已确认 | identity/time/cwd/lseek/uname 批次将 LTP 从 44 提升到 70；`gettimeofday02` 最新官网明细为 1 |
+| LTP 第三批 | 本地双跑通过 | 37 个候选只保留 9 个；最终 91 TPASS、零 TFAIL/TBROK/timeout/panic，`readv02` panic 项已排除 |
 | 用户切片边界 | 本地通过 | 非零长度的 NULL、地址加法溢出和越过 `USER_SPACE_SIZE` 均返回 EFAULT，不再把零页作为合法缺页处理 |
 | `getcwd01` | 本地 `5/5` | 缓冲区所需长度包含结尾 NUL；过小长度先返回 ERANGE，非法长指针返回 EFAULT |
 | `gettimeofday01` | 本地 `3/3` | tv/tz 分别验证；非空 timezone 缓冲区写入零值，坏地址返回 EFAULT |
@@ -42,7 +43,7 @@
 | RISC-V BusyBox | 通过并得分 | 线上 glibc-rv=49、musl-rv=49 |
 | RISC-V Lua | 通过并得分 | 线上 glibc-rv=9、musl-rv=9 |
 | 根目录 `make all` | 通过 | 移除 `hashbrown` 后，强制离线构建生成 `kernel-rv`、`kernel-la` |
-| Rust 工具链隔离 | 本地通过 | RISC-V 固定 `nightly-2025-02-01`，LoongArch 固定 `nightly-2025-02-18`，根 Makefile 不再导出全局覆盖 |
+| Rust 工具链隔离 | 本地通过 | RISC-V 固定 `nightly-2025-02-01`，LoongArch 固定 `nightly-2025-05-20`，根 Makefile 不再导出全局覆盖 |
 | vendor checksum | 已本地修复 | `tools/vendor_checksums.py --check` 为 53 个 manifest、0 个问题 |
 | `allocator-api2` checksum | 已刷新 | 同步 `aed0d6a` 后发现 22 个哈希不匹配；已重建 `SWTC/vendor/allocator-api2-0.2.21/cargo-checksum.json` |
 | `managed` path/patch | 本地通过 | 直接依赖和 crates.io patch 均指向 `SWTC/vendor/managed-0.8.0`，Cargo.lock 不再记录其 registry source |
@@ -89,7 +90,7 @@
 | lmbench 全局运行环境骨架 | 已撤回 | `d6746eb` 导致 2026-06-23 线上回退到 `320.0`，不得继续全局补 `/bin/sh`、`/lib`、`/etc/passwd` |
 | lmbench lite 隔离队列 | 待线上确认恢复 | 当前仅保留 9-command lite、`/lmbench_all`、`lat_sig`、`/var/tmp/lmbench`、`/var/tmp/XXX` 和 `/tmp/hello` |
 | cyclictest 非压力探针 | 已撤回 | `d500180` 导致 2026-06-24 线上回退到 `320.0`，libcbench/libctest 同时归零；不得重新启用该 staging |
-| LTP staging | 首批线上 44 分，第二批待线上确认 | 保留原 21 个有效 case并新增 13 个双跑通过项；预计新增 26 个断言分 |
+| LTP staging | 线上 70 分，第三批待确认 | 在现有 34 项后新增 9 个双跑通过项；本地第三批产生 91 个 TPASS |
 | iozone staging | 已撤回并暂停 | `b10e9f0` 和 `8690e03` 均导致线上回退到 `320.0`，不得继续暂存 iozone |
 | 旧自建内核官方 basic | 历史基线 | 曾取得线上 basic=102 |
 
