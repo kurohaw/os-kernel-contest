@@ -6,10 +6,9 @@
 |---|---|---|
 | 官方页面最后可见结果 | 983 基线已确认 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
 | 最新稳定线上结果 | 983 基线稳定 | RISC-V basic/BusyBox/Lua/libcbench/libctest/LTP 保持，LoongArch basic/BusyBox/Lua/libcbench 已开始线上计分 |
-| 本轮 LA 大分区批量探测 | 待官方确认 | LA musl/glibc 批量接入 `lmbench`、`iozone`、`iperf`、`netperf`、`cyclictest` no-stress；全部位于稳定组之后并有单项 timeout |
-| 本轮脚本语法 | 本地通过 | `sh -n SWTC-la/src/init.sh` 与 `bash -n SWTC-la/src/init.sh` 均退出 0 |
-| 本轮 LA 测试盘资源路径 | 本地通过 | 官方 LA 镜像中 musl/glibc 两侧均存在 `lmbench_all`、`iozone`、`iperf3`、`netserver`、`netperf`、`cyclictest` |
-| 本轮 RISC-V 构建回归 | 本地通过 | `make build-rv RV_TOOLCHAIN=nightly-2025-02-18` 通过；`kernel-rv` 为 RISC-V ELF，入口 `0x80200000` |
+| 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
+| LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |
+| LoongArch lmbench 后置探针 | 已接入，待线上确认 | 官方 lmbench 命令序列改为逐命令 timeout，并放在所有 functional 组之后；失败不应截断 basic/BusyBox/libcbench/libctest/LTP |
 | 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
 | 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
@@ -17,7 +16,7 @@
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
 | LoongArch QEMU 9.2.1 启动 | 本地通过 | 源码构建 `loongarch64-softmmu`，真实 `kernel-la` 从 x0 EXT4 启动并主动关机 |
 | LoongArch BusyBox | 本地 `55/55` | 官方 `pre-2025` 静态 musl BusyBox；补 `/bin/ls` 后零 fail、零 panic、零 unsupported syscall，约 135 秒主动退出 |
-| LoongArch 扩展 functional groups | 继续推进 | BusyBox 已线上得分，Lua 和 libcbench 部分得分；libctest/LTP 已做逐 case/官方收尾行修复，本轮进一步批量探测大分区 |
+| LoongArch 扩展 functional groups | 继续推进 | BusyBox 已线上得分，Lua 和 libcbench 部分得分；本轮将 libctest 改为逐 case timeout，并让 LTP 每 case 输出官方收尾行 |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |
