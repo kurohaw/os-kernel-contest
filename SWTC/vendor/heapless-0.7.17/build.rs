@@ -5,6 +5,10 @@ use std::{env, error::Error};
 use rustc_version::Channel;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Cargo only caps lints for registry dependencies. This vendored crate is
+    // patched in as a path dependency, so its `deny(warnings)` also applies to
+    // rustc's `unexpected_cfgs` lint. Declare every cfg emitted or consumed by
+    // this build script before selecting the target-specific ones below.
     for cfg in [
         "armv6m",
         "armv7a",
@@ -18,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "has_cas",
         "unstable_channel",
     ] {
-        println!("cargo:rustc-check-cfg=cfg({})", cfg);
+        println!("cargo:rustc-check-cfg=cfg({cfg})");
     }
 
     let target = env::var("TARGET")?;

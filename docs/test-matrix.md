@@ -9,7 +9,7 @@
 | 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
 | LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |
 | LoongArch lmbench 后置探针 | 已接入，待线上确认 | 官方 lmbench 命令序列改为逐命令 timeout，并放在所有 functional 组之后；失败不应截断 basic/BusyBox/libcbench/libctest/LTP |
-| 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
+| 最新官方编译错误 | 已本地复现并修复 | 2026-06-28 两次 Compile Error；`heapless` path patch 使其 `deny(warnings)` 接管 `unexpected_cfgs`，build script 补齐 `rustc-check-cfg` 后离线 `make all` 通过 |
 | 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
 | `kernel-la` 格式 | 通过 | `build-la-strict` 生成 LoongArch executable ELF，入口 `0x80000000`；默认 fallback 仍保留 |

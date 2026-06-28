@@ -14,10 +14,22 @@
 | 最新稳定线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
-| 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
+| 最新官方编译错误 | 2026-06-28 两次提交均为 `Compile Error`；本地同步 `b5b2d38c` 后复现为 path 依赖 `heapless` 的 31 个 `unexpected_cfgs` 硬错误，本轮已修复并完成离线 `make all` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-28 heapless path 依赖编译修复
+
+- 伙伴将 `heapless 0.7.17` 从 registry 依赖改为本地 path patch，以避免官方
+  隐藏文件过滤后的依赖解析失败；但 path 依赖不再享受 Cargo 对第三方依赖的
+  lint cap。
+- `heapless` 自身启用 `#![deny(warnings)]`，`nightly-2025-02-01` 因 build script
+  未声明自定义 cfg，把 `has_cas`、`has_atomics`、`cas_atomic_polyfill` 等
+  31 个 `unexpected_cfgs` warning 提升为编译错误。
+- 在 vendored `heapless/build.rs` 中用 `cargo:rustc-check-cfg` 声明全部自定义
+  cfg，并刷新非隐藏 `cargo-checksum.json`。本地强制离线 `make all` 已重新生成
+  RISC-V ELF；本机无真实 LoongArch 工具链时按设计生成 `kernel-la` 占位。
 
 ## 2026-06-28 838 回退与 BusyBox 沙箱止血
 
