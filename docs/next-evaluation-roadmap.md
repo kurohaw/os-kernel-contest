@@ -2,6 +2,10 @@
 
 2800 分分区缺口、三轮冲刺目标和评测结果分叉处理见
 [`score-2800-roadmap.md`](score-2800-roadmap.md)。
+当前排队评测出结果后，先按
+[`post-evaluation-triage.md`](post-evaluation-triage.md) 提取关键字段；若
+983 基线恢复，再从 [`ltp-next-candidates.md`](ltp-next-candidates.md) 选择
+下一批 LTP 候选。
 
 ## 838 回退后的主线
 
