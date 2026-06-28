@@ -1,9 +1,10 @@
 # 下一轮 LTP 大批量候选
 
 本文记录 LTP 提分清单和启用状态。2026-06-29 已在批次 A 主体之后继续启用
-批次 B 的 fd/pipe/vector-I/O 子集、批次 C 的进程/信号/时间子集，以及批次
-D 中已有 syscall 支撑的文件操作子集；后续不要重复加入这些 case，应根据
-官方结果决定回滚、拆分或继续推进剩余 D 批。
+批次 B 的 fd/pipe/vector-I/O 子集、批次 C 的进程/信号/时间子集、批次 D 中
+已有 syscall 支撑的文件操作子集，并继续打开 eventfd/flock/timerfd 子集；后续
+不要重复加入这些 case，应根据官方结果决定回滚、拆分或继续推进剩余 hardlink
+或性能组。
 
 ## 当前基线
 
@@ -61,15 +62,17 @@ openat01 openat02 openat03 openat04 openat201 openat202 openat203
 
 - `openat02_child`、`getrusage03_child` 这类 helper 不直接加入。
 - `*_16` 兼容旧 16-bit uid/gid 的 case 暂缓，避免一次引入 ABI 分叉。
+- 状态：2026-06-29 已在后续 E 批补齐 RISC-V `eventfd2=19` 后启用
+  `eventfd01-06` 和 `eventfd2_01-03`。
 
 ## 批次 B：fd、pipe、vector I/O 和锁
 
 目的：吃掉 pipe/readv/writev/fcntl 类分数。该批比 A 风险高，建议 A 在线上
 确认后再上。
 
-状态：2026-06-29 已启用其中的 `fcntl*`、`pipe*`、`pipe2_*`、`writev*`、
-`preadv*`、`pwritev*`、`pwrite02*`、`poll01/02`、`pselect*`、
-`select01-04`。仍未启用 `flock*`，也没有恢复禁止项 `readv02`。
+状态：2026-06-29 已启用其中的 `fcntl*`、`flock*`、`pipe*`、`pipe2_*`、
+`writev*`、`preadv*`、`pwritev*`、`pwrite02*`、`poll01/02`、`pselect*`、
+`select01-04`。仍没有恢复禁止项 `readv02`。
 
 ```text
 fcntl01 fcntl01_64 fcntl02 fcntl02_64 fcntl03 fcntl03_64
@@ -99,8 +102,8 @@ select01 select02 select03 select04
 建议放在 A/B 后。
 
 状态：2026-06-29 已启用其中的 `alarm03/05/06/07`、`nanosleep01/02/04`、
-`kill02/03/05-13`、`waitpid01/03/04/06-13` 和 `fork04/09/13/14`。
-`timerfd*` 暂不启用，因为 RISC-V 主线尚未提供 timerfd fd 对象实现。
+`timerfd*`、`kill02/03/05-13`、`waitpid01/03/04/06-13` 和
+`fork04/09/13/14`。RISC-V 主线已补最小 timerfd fd 对象实现。
 
 ```text
 alarm03 alarm05 alarm06 alarm07

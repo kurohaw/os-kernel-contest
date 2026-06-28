@@ -62,6 +62,21 @@
   `status=0` 也作为收尾 marker，保持与 RISC-V `runtestcase` 已线上计分的
   LTP 协议一致。
 
+## 2026-06-29 LTP 批次 E eventfd/flock/timerfd 子集
+
+- 继续推进图二要求的 LTP 大分区，不等待官方排队结果再做小步试探。
+- RISC-V 补齐 `eventfd2=19`，新增匿名 `EventFd` 文件对象，支持普通计数、
+  `EFD_SEMAPHORE`、`EFD_NONBLOCK` 和 `EFD_CLOEXEC`。
+- RISC-V 补齐 `flock=32` 的低风险占位语义：校验 fd 和操作类型，当前不做真实
+  锁冲突，先支撑 LTP flock functional case 不因 `ENOSYS` 归零。
+- RISC-V 补齐 `timerfd_create=85`、`timerfd_settime=86` 和
+  `timerfd_gettime=87`，新增最小 `TimerFd` fd 对象，支持相对/绝对定时、
+  `gettime`、`read` 到期次数和 nonblock 边界。
+- RV/LA 同步追加 `eventfd01-06`、`eventfd2_01-03`、`flock01/02/03/04/06`、
+  `timerfd_create01`、`timerfd_gettime01`、`timerfd_settime01/02` 和
+  `timerfd01/02/04`。`readv02`、`link*`、iozone、cyclictest 和网络组仍不进入
+  本轮。
+
 ## 2026-06-28 heapless path 依赖编译修复
 
 - 伙伴将 `heapless 0.7.17` 从 registry 依赖改为本地 path patch，以避免官方
@@ -121,8 +136,8 @@
 - 按 `docs/ltp-next-candidates.md` 的 900-1100 分支，RISC-V `LTP_ALLOWLIST`
   从 43 项扩到 102 项；新增部分覆盖 access/faccessat、chmod/fchmod、
   chown/fchown、getrlimit/getrusage/gettid/getrandom、dup/dup3 和 openat。
-- 暂不加入 eventfd、`readv02`、`fork05`、iozone/cyclictest/network 相关项。
-  eventfd 当前没有 syscall 入口，先避免把队列扩成大量确定失败项。
+- 当时暂不加入 eventfd、`readv02`、`fork05`、iozone/cyclictest/network 相关项。
+  eventfd 在 2026-06-29 后续批次已补 RISC-V `eventfd2` 后重新打开。
 - `SWTC-la/src/init.sh` 同步扩展 LTP 子集，并将 LA libctest 单项 timeout 从
   3 秒放宽到 8 秒，优先排除 LoongArch 慢启动导致 `libctest-musl-la=0`
   的可能。
@@ -142,8 +157,9 @@
   0，短读/短写停止，降低 LTP 边界 case 对内核稳定性的冲击。
 - LTP 队列在批次 A 后追加批次 B 的相对稳妥子集：`fcntl*`、`pipe*`、
   `pipe2_*`、`writev*`、`preadv*`、`pwritev*`、`pwrite02*`、
-  `poll01/02`、`pselect*` 和 `select01-04`。仍不加入 `flock*`、
-  `readv02`、eventfd、stat/rename/sendfile 或网络/性能组。
+  `poll01/02`、`pselect*` 和 `select01-04`。当时仍不加入 `flock*`、
+  `readv02`、eventfd、stat/rename/sendfile 或网络/性能组；后续已打开
+  `flock*`、eventfd 以及 D 批 stat/rename/sendfile。
 - LoongArch `SWTC-la/src/init.sh` 同步追加同一批 case，保持四列路线一致。
 - 本地验证：`cargo fmt`、`sh -n`、`bash -n` 和 `make build-rv` 通过；下一步
   仍需 `make all` 作为提交门禁。
@@ -157,8 +173,8 @@
   `tv_nsec`。本轮改为 `nanosleep(req, rem)`，校验 `tv_nsec < 1e9`，被信号
   打断时安全写回零剩余时间，避免 LTP 边界项因为坏参数或 rem 指针导致错误路径。
 - `clock_nanosleep` 同步补 `tv_nsec` 合法性检查。
-- `timerfd*` 仍不加入：LoongArch 有实现，但 RISC-V 主线还没有 timerfd fd
-  对象，直接加入会制造确定失败项。
+- 当时 `timerfd*` 仍不加入：LoongArch 有实现，但 RISC-V 主线还没有 timerfd
+  fd 对象。2026-06-29 后续批次已补最小 RISC-V timerfd fd 后重新打开。
 
 ## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
 

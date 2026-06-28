@@ -935,6 +935,22 @@ const F_GETLK: i32 = 5;
 const F_SETLK: i32 = 6;
 const F_SETLKW: i32 = 7;
 const F_UNLCK: i16 = 2;
+const LOCK_SH: u32 = 1;
+const LOCK_EX: u32 = 2;
+const LOCK_NB: u32 = 4;
+const LOCK_UN: u32 = 8;
+
+pub fn sys_flock(fd: usize, operation: u32) -> SyscallRet {
+    stack_trace!();
+    current_process().inner_handler(|proc| {
+        proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
+        Ok(())
+    })?;
+    match operation & !LOCK_NB {
+        LOCK_SH | LOCK_EX | LOCK_UN => Ok(0),
+        _ => Err(SyscallErr::EINVAL),
+    }
+}
 
 pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> SyscallRet {
     stack_trace!();

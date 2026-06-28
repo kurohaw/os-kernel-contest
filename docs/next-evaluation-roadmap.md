@@ -52,21 +52,23 @@ basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`
    中的 vector positioned I/O case。
 2. RV/LA 同步追加批次 B 子集：`fcntl*`、`pipe*`、`pipe2_*`、`writev*`、
    `preadv*`、`pwritev*`、`pwrite02*`、`poll01/02`、`pselect*`、`select01-04`。
-3. 继续排除 `readv02`、eventfd、flock、stat/rename/sendfile、iozone 和网络组。
+3. 当时继续排除 `readv02`、eventfd、flock、stat/rename/sendfile、iozone 和
+   网络组；后续批次已补齐 eventfd/flock 以及 D 批 stat/rename/sendfile。
 4. 下一次评测若 LTP 明显上涨，继续向 C/D 批推进；若 LTP 不涨但不回退，则看
    串口日志拆 poll/select 或 fcntl；若总分回退，优先回滚本轮 B 子集而不是动
    basic/BusyBox/Lua/libctest。
 
 ## 2026-06-29 批次 C 子集
 
-在批次 B 基础上继续推进进程/信号/时间类 LTP，但不打开 timerfd：
+在批次 B 基础上继续推进进程/信号/时间类 LTP；timerfd 当时暂缓，后续 E 批
+已补齐最小 fd 对象后打开：
 
 1. 修复 RISC-V `nanosleep(req, rem)`：syscall 表传入第二参数，校验
    `tv_nsec < 1e9`，被信号打断时可安全写回 `rem`。
 2. RV/LA 同步追加 `alarm03/05/06/07`、`nanosleep01/02/04`、
    `kill02/03/05-13`、`waitpid01/03/04/06-13`、`fork04/09/13/14`。
-3. `timerfd_create/gettime/settime` 继续暂缓，原因是 RV 侧尚无 timerfd fd
-   对象；贸然加入只会增加确定失败项。
+3. `timerfd_create/gettime/settime` 当时继续暂缓，原因是 RV 侧尚无 timerfd
+   fd 对象；后续 E 批已补齐最小实现。
 4. 若这批导致 LTP 截断，优先拆回 `kill*` 和 `alarm*`，保留
    `nanosleep/waitpid/fork` 观察。
 
@@ -85,6 +87,20 @@ basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`
    与 RISC-V `runtestcase` 已线上计分的 LTP 协议保持一致。
 4. 暂不加入 `link*`；硬链接需要 VFS 支持多名字共享同一 inode 以及正确删除
    语义，当前贸然放开会比软链接更容易造成整组截断。
+
+## 2026-06-29 批次 E eventfd/flock/timerfd 子集
+
+在 A/B/C/D 批基础上继续打开此前暂缓但 syscall 边界明确的 LTP 项：
+
+1. RISC-V 补齐 `eventfd2=19`、`flock=32`、`timerfd_create=85`、
+   `timerfd_settime=86` 和 `timerfd_gettime=87`。
+2. RV/LA 同步追加 `eventfd01-06`、`eventfd2_01-03`、
+   `flock01/02/03/04/06`、`timerfd_create01`、`timerfd_gettime01`、
+   `timerfd_settime01/02` 和 `timerfd01/02/04`。
+3. 继续排除 `readv02`、`link*`、iozone、cyclictest、iperf 和 netperf，避免
+   把已满分 basic/BusyBox/Lua 的保底盘再次拖回 320 或 838。
+4. 若下一次 LTP 不涨或截断，优先拆回 timerfd 子集；eventfd/flock 的 syscall
+   语义更局部，可作为第二回滚顺序。
 
 ## 838 回退后的主线
 

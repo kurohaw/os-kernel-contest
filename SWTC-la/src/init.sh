@@ -146,12 +146,15 @@ run_ltp_subset() (
         getrusage01 getrusage02 getrusage03 getrusage04 \
         gettid01 gettid02 \
         getrandom01 getrandom02 getrandom03 getrandom04 getrandom05 \
+        eventfd01 eventfd02 eventfd03 eventfd04 eventfd05 eventfd06 \
+        eventfd2_01 eventfd2_02 eventfd2_03 \
         dup05 dup201 dup203 dup205 dup3_01 dup3_02 \
         openat01 openat02 openat03 openat04 openat201 openat202 openat203 \
         fcntl01 fcntl01_64 fcntl02 fcntl02_64 fcntl03 fcntl03_64 \
         fcntl04 fcntl04_64 fcntl05 fcntl05_64 fcntl07 fcntl07_64 \
         fcntl08 fcntl08_64 fcntl09 fcntl09_64 fcntl10 fcntl10_64 \
         fcntl11 fcntl11_64 fcntl12 fcntl12_64 fcntl13 fcntl13_64 \
+        flock01 flock02 flock03 flock04 flock06 \
         pipe02 pipe03 pipe04 pipe05 pipe07 pipe08 pipe09 pipe12 pipe13 pipe15 \
         pipe2_01 pipe2_02 pipe2_04 \
         writev01 writev02 writev03 writev05 writev06 writev07 \
@@ -163,6 +166,8 @@ run_ltp_subset() (
         select01 select02 select03 select04 \
         alarm03 alarm05 alarm06 alarm07 \
         nanosleep01 nanosleep02 nanosleep04 \
+        timerfd_create01 timerfd_gettime01 timerfd_settime01 timerfd_settime02 \
+        timerfd01 timerfd02 timerfd04 \
         kill02 kill03 kill05 kill06 kill07 kill08 kill09 kill10 kill11 kill12 kill13 \
         waitpid01 waitpid03 waitpid04 waitpid06 waitpid07 waitpid08 \
         waitpid09 waitpid10 waitpid11 waitpid12 waitpid13 \
