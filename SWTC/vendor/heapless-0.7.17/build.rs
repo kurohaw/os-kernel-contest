@@ -5,6 +5,22 @@ use std::{env, error::Error};
 use rustc_version::Channel;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    for cfg in [
+        "armv6m",
+        "armv7a",
+        "armv7m",
+        "armv7r",
+        "armv8m_base",
+        "armv8m_main",
+        "cas_atomic_polyfill",
+        "full_atomic_polyfill",
+        "has_atomics",
+        "has_cas",
+        "unstable_channel",
+    ] {
+        println!("cargo:rustc-check-cfg=cfg({})", cfg);
+    }
+
     let target = env::var("TARGET")?;
 
     if target.starts_with("thumbv6m-") {

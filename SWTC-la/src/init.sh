@@ -135,7 +135,19 @@ run_ltp_subset() (
         exit02 exit_group01 fork01 fork03 fork07 fork08 fork10 \
         getcwd01 getegid02 geteuid01 getgid03 getpid02 getppid02 \
         gettimeofday01 gettimeofday02 getuid01 lseek01 lseek07 uname01 uname04 \
-        mkdir05 mkdirat01 pipe01 pipe06 pipe10 pipe11 pipe14 readv01 rmdir01
+        mkdir05 mkdirat01 pipe01 pipe06 pipe10 pipe11 pipe14 readv01 rmdir01 \
+        access01 access02 access03 access04 \
+        faccessat01 faccessat02 faccessat201 faccessat202 \
+        chmod01 chmod03 chmod05 chmod06 chmod07 \
+        fchmod01 fchmod02 fchmod03 fchmod04 fchmod05 fchmod06 fchmodat01 fchmodat02 \
+        chown02 chown03 chown04 chown05 \
+        fchown01 fchown02 fchown03 fchown04 fchown05 fchownat01 fchownat02 \
+        getrlimit01 getrlimit02 getrlimit03 \
+        getrusage01 getrusage02 getrusage03 getrusage04 \
+        gettid01 gettid02 \
+        getrandom01 getrandom02 getrandom03 getrandom04 getrandom05 \
+        dup05 dup201 dup203 dup205 dup3_01 dup3_02 \
+        openat01 openat02 openat03 openat04 openat201 openat202 openat203
     do
         if [ ! -f "./$case_name" ]; then
             continue
@@ -182,7 +194,7 @@ run_libctest_list() {
             continue
         fi
         case_name="$4"
-        /musl/busybox timeout 3 ./runtest.exe -w "$entry_name" "$case_name"
+        /musl/busybox timeout 8 ./runtest.exe -w "$entry_name" "$case_name"
         status="$?"
         if [ "$status" -ne 0 ]; then
             echo "FAIL LIBCTEST CASE $case_name : $status"

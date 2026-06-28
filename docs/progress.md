@@ -8,10 +8,10 @@
 | 当前开发分支 | `codex/swtc-architecture`，推送到 GitHub/GitLab `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；先修复 838 回退，再后置冲击 lmbench 大分区 |
-| 当前提交 | 撤回 `301e9717` 中 iozone/iperf/netperf/cyclictest 等高风险批量入口；LA BusyBox 改为在 `/tmp/swtc-busybox-*` 沙箱目录中运行，并把 lmbench 官方序列作为所有 functional 组之后的逐命令限时探针 |
-| 最新可见线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
-| 最新稳定线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分 |
+| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
+| 当前提交 | LTP 追加批次 A 中 55 个有现有 syscall 路径支撑的候选；LA libctest 逐 case timeout 从 3 秒放宽到 8 秒；修复 `heapless` path patch 在新 Rust 下的 `unexpected_cfgs` 编译问题 |
+| 最新可见线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；basic=408、BusyBox=208、Lua=36、libcbench=84.78489437045744、libctest=217、LTP=156 |
+| 最新稳定线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
@@ -57,6 +57,24 @@
 - 本地验证：`sh -n` 和 `bash -n` 均通过；RISC-V 使用本机可用
   `nightly-2025-02-18` 完成 `make build-rv`，`kernel-rv` 仍为入口 `0x80200000`
   的 RISC-V ELF。本机缺完整 `nightly-2025-05-20`，未完成 LA 真机构建。
+
+## 2026-06-28 982 分后的 LTP 批次 A 和 LA libctest 放宽
+
+- 最新结果为 `982.3134986891687`：basic=408、BusyBox=208、Lua=36、
+  libcbench=84.78489437045744、musl-rv libctest=217、musl-rv LTP=156。
+  LoongArch libctest 和 LTP 仍为 0。
+- 按 `docs/ltp-next-candidates.md` 的 900-1100 分支，RISC-V `LTP_ALLOWLIST`
+  从 43 项扩到 102 项；新增部分覆盖 access/faccessat、chmod/fchmod、
+  chown/fchown、getrlimit/getrusage/gettid/getrandom、dup/dup3 和 openat。
+- 暂不加入 eventfd、`readv02`、`fork05`、iozone/cyclictest/network 相关项。
+  eventfd 当前没有 syscall 入口，先避免把队列扩成大量确定失败项。
+- `SWTC-la/src/init.sh` 同步扩展 LTP 子集，并将 LA libctest 单项 timeout 从
+  3 秒放宽到 8 秒，优先排除 LoongArch 慢启动导致 `libctest-musl-la=0`
+  的可能。
+- 本地验证：已修复本机 WSL 的 `nightly-2025-02-01` 工具链和 `llvm-tools`；
+  `sh -n`、`bash -n`、离线 `cargo metadata`、`make build-rv` 和根目录
+  `make all` 均通过。本机缺真实 LoongArch 工具链时，`make all` 按设计生成
+  `kernel-la` 占位。
 
 ## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
 

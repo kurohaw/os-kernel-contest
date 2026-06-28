@@ -7,6 +7,23 @@
 983 基线恢复，再从 [`ltp-next-candidates.md`](ltp-next-candidates.md) 选择
 下一批 LTP 候选。
 
+## 2026-06-28 982 分后的本轮动作
+
+2026-06-28 22:55:36 开始的官方结果为 `Accepted / 982.3134986891687`：
+basic 四列满分 `408`，BusyBox 合计 `208`，Lua 合计 `36`，libcbench 合计
+约 `84.78`，musl-rv libctest `217`，musl-rv LTP `156`。LoongArch
+basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`。
+
+按图二要求，本轮不再做十几分微调，进入大分路线：
+
+1. LTP 优先：在已验证 43 个 case 的基础上，追加批次 A 中有现有 syscall
+   路径支撑的 55 个候选；暂不加入 eventfd 和已知风险项。
+2. LA libctest 补分：保持逐 case 执行和 START/END marker，把 LoongArch
+   `runtest.exe -w entry-*.exe case` 单项 timeout 从 3 秒放宽到 8 秒，降低
+   慢启动导致 217 分整组为 0 的风险。
+3. lmbench、iozone、network、cyclictest 继续后置，不和本轮 LTP/libctest
+   首次大扩容混在一起。
+
 ## 838 回退后的主线
 
 `301e9717 feat: batch LoongArch big test probes` 的官方结果内嵌 JSON 显示
