@@ -9,7 +9,7 @@
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | LTP 追加批次 A 中 55 个有现有 syscall 路径支撑的候选；LA libctest 逐 case timeout 从 3 秒放宽到 8 秒；修复 `heapless` path patch 在新 Rust 下的 `unexpected_cfgs` 编译问题 |
+| 当前提交 | 在批次 A 基础上继续推进 LTP 批次 B 子集；RISC-V 新接 `preadv/pwritev/preadv2/pwritev2`，RV/LA 队列追加 fd、pipe、writev、preadv/pwritev 和 poll/select 候选 |
 | 最新可见线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；basic=408、BusyBox=208、Lua=36、libcbench=84.78489437045744、libctest=217、LTP=156 |
 | 最新稳定线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -87,6 +87,23 @@
   `sh -n`、`bash -n`、离线 `cargo metadata`、`make build-rv` 和根目录
   `make all` 均通过。本机缺真实 LoongArch 工具链时，`make all` 按设计生成
   `kernel-la` 占位。
+
+## 2026-06-29 LTP 批次 B 子集与 preadv/pwritev
+
+- 按图二“LTP 优先，单轮加入 100-300 TPASS 潜力”的要求，不再继续投入
+  lmbench 微调，先推进更容易转化为 functional 分数的 LTP。
+- RISC-V syscall 表补齐 `preadv=69`、`pwritev=70`、`preadv2=286`、
+  `pwritev2=287`；`preadv2/pwritev2` 当前支持 `flags=0`，非零 flags
+  返回 `EOPNOTSUPP`，避免未知 flag 触发 panic。
+- `sys_preadv2/sys_pwritev2` 按 `IOV_MAX=1024` 校验 iovec，零长度直接返回
+  0，短读/短写停止，降低 LTP 边界 case 对内核稳定性的冲击。
+- LTP 队列在批次 A 后追加批次 B 的相对稳妥子集：`fcntl*`、`pipe*`、
+  `pipe2_*`、`writev*`、`preadv*`、`pwritev*`、`pwrite02*`、
+  `poll01/02`、`pselect*` 和 `select01-04`。仍不加入 `flock*`、
+  `readv02`、eventfd、stat/rename/sendfile 或网络/性能组。
+- LoongArch `SWTC-la/src/init.sh` 同步追加同一批 case，保持四列路线一致。
+- 本地验证：`cargo fmt`、`sh -n`、`bash -n` 和 `make build-rv` 通过；下一步
+  仍需 `make all` 作为提交门禁。
 
 ## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
 

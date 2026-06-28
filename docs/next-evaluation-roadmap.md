@@ -24,6 +24,20 @@ basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`
 3. lmbench、iozone、network、cyclictest 继续后置，不和本轮 LTP/libctest
    首次大扩容混在一起。
 
+## 2026-06-29 继续压 LTP 大分区
+
+上一轮已经把批次 A 主体放入队列。本轮继续走图二的 LTP 大分路线，不等下一次
+评测再做十几分小步：
+
+1. RISC-V 补齐 `preadv/pwritev/preadv2/pwritev2` syscall 入口，支撑批次 B
+   中的 vector positioned I/O case。
+2. RV/LA 同步追加批次 B 子集：`fcntl*`、`pipe*`、`pipe2_*`、`writev*`、
+   `preadv*`、`pwritev*`、`pwrite02*`、`poll01/02`、`pselect*`、`select01-04`。
+3. 继续排除 `readv02`、eventfd、flock、stat/rename/sendfile、iozone 和网络组。
+4. 下一次评测若 LTP 明显上涨，继续向 C/D 批推进；若 LTP 不涨但不回退，则看
+   串口日志拆 poll/select 或 fcntl；若总分回退，优先回滚本轮 B 子集而不是动
+   basic/BusyBox/Lua/libctest。
+
 ## 838 回退后的主线
 
 `301e9717 feat: batch LoongArch big test probes` 的官方结果内嵌 JSON 显示

@@ -44,6 +44,7 @@ use crate::utils::path::{self, is_relative_path};
 use crate::utils::string::c_str_to_string;
 
 const AT_REMOVEDIR: u32 = 0x200;
+const IOV_MAX: usize = 1024;
 
 /// get current working directory
 pub fn sys_getcwd(buf: usize, len: usize) -> SyscallRet {
@@ -1641,6 +1642,116 @@ pub async fn sys_pwrite64(fd: usize, buf_ptr: usize, len: usize, offset: usize) 
     let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, len) };
     // debug!("[sys_write]: start to write file, fd {}, buf {:?}", fd, buf);
     file.file.pwrite(buf, offset).await
+}
+
+pub async fn sys_preadv(fd: usize, iov: usize, iovcnt: usize, offset: usize) -> SyscallRet {
+    sys_preadv2(fd, iov, iovcnt, offset, 0).await
+}
+
+pub async fn sys_pwritev(fd: usize, iov: usize, iovcnt: usize, offset: usize) -> SyscallRet {
+    sys_pwritev2(fd, iov, iovcnt, offset, 0).await
+}
+
+pub async fn sys_preadv2(
+    fd: usize,
+    iov: usize,
+    iovcnt: usize,
+    mut offset: usize,
+    flags: u32,
+) -> SyscallRet {
+    stack_trace!();
+    if flags != 0 {
+        return Err(SyscallErr::EOPNOTSUPP);
+    }
+    if iovcnt > IOV_MAX {
+        return Err(SyscallErr::EINVAL);
+    }
+    if iovcnt == 0 {
+        return Ok(0);
+    }
+
+    let fd_info = current_process()
+        .inner_handler(move |proc| proc.fd_table.get_ref(fd).cloned())
+        .ok_or(SyscallErr::EBADF)?;
+    if !fd_info.flags.readable() {
+        return Err(SyscallErr::EBADF);
+    }
+
+    let iovec_size = core::mem::size_of::<Iovec>();
+    let iovec_bytes = iovec_size.checked_mul(iovcnt).ok_or(SyscallErr::EINVAL)?;
+    UserCheck::new().check_readable_slice(iov as *const u8, iovec_bytes)?;
+
+    let _sum_guard = SumGuard::new();
+    let mut total = 0;
+    for index in 0..iovcnt {
+        let current = iov + iovec_size * index;
+        let iovec = unsafe { &*(current as *const Iovec) };
+        if iovec.iov_len == 0 {
+            continue;
+        }
+
+        UserCheck::new().check_writable_slice(iovec.iov_base as *mut u8, iovec.iov_len)?;
+        let buf =
+            unsafe { core::slice::from_raw_parts_mut(iovec.iov_base as *mut u8, iovec.iov_len) };
+        let read = fd_info.file.pread(buf, offset).await?;
+        total += read;
+        offset += read;
+        if read < iovec.iov_len {
+            break;
+        }
+    }
+    Ok(total)
+}
+
+pub async fn sys_pwritev2(
+    fd: usize,
+    iov: usize,
+    iovcnt: usize,
+    mut offset: usize,
+    flags: u32,
+) -> SyscallRet {
+    stack_trace!();
+    if flags != 0 {
+        return Err(SyscallErr::EOPNOTSUPP);
+    }
+    if iovcnt > IOV_MAX {
+        return Err(SyscallErr::EINVAL);
+    }
+    if iovcnt == 0 {
+        return Ok(0);
+    }
+
+    let fd_info = current_process()
+        .inner_handler(move |proc| proc.fd_table.get_ref(fd).cloned())
+        .ok_or(SyscallErr::EBADF)?;
+    if !fd_info.flags.writable() {
+        return Err(SyscallErr::EBADF);
+    }
+
+    let iovec_size = core::mem::size_of::<Iovec>();
+    let iovec_bytes = iovec_size.checked_mul(iovcnt).ok_or(SyscallErr::EINVAL)?;
+    UserCheck::new().check_readable_slice(iov as *const u8, iovec_bytes)?;
+
+    let _sum_guard = SumGuard::new();
+    let mut total = 0;
+    for index in 0..iovcnt {
+        let current = iov + iovec_size * index;
+        let iovec = unsafe { &*(current as *const Iovec) };
+        if iovec.iov_len == 0 {
+            continue;
+        }
+
+        UserCheck::new().check_readable_slice(iovec.iov_base as *const u8, iovec.iov_len)?;
+        let buf =
+            unsafe { core::slice::from_raw_parts(iovec.iov_base as *const u8, iovec.iov_len) };
+        let written = fd_info.file.pwrite(buf, offset).await?;
+        total += written;
+        offset += written;
+        if written < iovec.iov_len {
+            break;
+        }
+    }
+    Ok(total)
 }
 
 pub fn sys_fchmodat() -> SyscallRet {

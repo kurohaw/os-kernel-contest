@@ -1,7 +1,8 @@
 # 下一轮 LTP 大批量候选
 
-本文是等待当前官方评测期间准备的下一轮 LTP 提分清单。当前不要立即把这些
-case 合入执行队列；等 `442e9ba1` 的线上结果出来后，再按结果选择批次。
+本文记录 LTP 提分清单和启用状态。2026-06-29 已在批次 A 主体之后继续启用
+批次 B 的 fd/pipe/vector-I/O 子集；后续不要重复加入这些 case，应根据官方
+结果决定回滚、拆分或继续推进 C/D 批。
 
 ## 当前基线
 
@@ -64,6 +65,10 @@ openat01 openat02 openat03 openat04 openat201 openat202 openat203
 
 目的：吃掉 pipe/readv/writev/fcntl 类分数。该批比 A 风险高，建议 A 在线上
 确认后再上。
+
+状态：2026-06-29 已启用其中的 `fcntl*`、`pipe*`、`pipe2_*`、`writev*`、
+`preadv*`、`pwritev*`、`pwrite02*`、`poll01/02`、`pselect*`、
+`select01-04`。仍未启用 `flock*`，也没有恢复禁止项 `readv02`。
 
 ```text
 fcntl01 fcntl01_64 fcntl02 fcntl02_64 fcntl03 fcntl03_64

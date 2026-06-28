@@ -27,6 +27,8 @@ const SYSCALL_READV: usize = 65;
 const SYSCALL_WRITEV: usize = 66;
 const SYSCALL_PREAD64: usize = 67;
 const SYSCALL_PWRITE64: usize = 68;
+const SYSCALL_PREADV: usize = 69;
+const SYSCALL_PWRITEV: usize = 70;
 const SYSCALL_SENDFILE: usize = 71;
 const SYSCALL_PSELECT6: usize = 72;
 const SYSCALL_PPOLL: usize = 73;
@@ -108,6 +110,8 @@ const SYSCALL_PRLIMIT64: usize = 261;
 const SYSCALL_REMANEAT2: usize = 276;
 const SYSCALL_GETRANDOM: usize = 278;
 const SYSCALL_MEMBARRIER: usize = 283;
+const SYSCALL_PREADV2: usize = 286;
+const SYSCALL_PWRITEV2: usize = 287;
 
 mod dev;
 mod fs;
@@ -239,6 +243,8 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         SYSCALL_WRITEV => sys_handler!(sys_writev, (args[0], args[1], args[2]), await),
         SYSCALL_PREAD64 => sys_handler!(sys_pread64, (args[0], args[1], args[2], args[3]), await),
         SYSCALL_PWRITE64 => sys_handler!(sys_pwrite64, (args[0], args[1], args[2], args[3]), await),
+        SYSCALL_PREADV => sys_handler!(sys_preadv, (args[0], args[1], args[2], args[3]), await),
+        SYSCALL_PWRITEV => sys_handler!(sys_pwritev, (args[0], args[1], args[2], args[3]), await),
         SYSCALL_SENDFILE => sys_handler!(
             sys_sendfile,
             (
@@ -509,6 +515,20 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         ),
         SYSCALL_GETRANDOM => sys_handler!(sys_getrandom, (args[0], args[1], args[2] as u32), await),
         SYSCALL_MEMBARRIER => sys_handler!(sys_membarrier, ()),
+        SYSCALL_PREADV2 => {
+            sys_handler!(
+                sys_preadv2,
+                (args[0], args[1], args[2], args[3], args[4] as u32),
+                await
+            )
+        }
+        SYSCALL_PWRITEV2 => {
+            sys_handler!(
+                sys_pwritev2,
+                (args[0], args[1], args[2], args[3], args[4] as u32),
+                await
+            )
+        }
         _ => {
             // panic!("Unsupported syscall_id: {}", syscall_id);
             error!("Unsupported syscall_id: {}", syscall_id);
