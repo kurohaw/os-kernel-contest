@@ -213,11 +213,16 @@ run_libctest_list() {
             continue
         fi
         case_name="$4"
+        echo "========== START $entry_name $case_name =========="
+        echo "RUN LIBCTEST CASE $case_name"
         /musl/busybox timeout 8 ./runtest.exe -w "$entry_name" "$case_name"
         status="$?"
-        if [ "$status" -ne 0 ]; then
+        if [ "$status" -eq 0 ]; then
+            echo "Pass!"
+        else
             echo "FAIL LIBCTEST CASE $case_name : $status"
         fi
+        echo "========== END $entry_name $case_name =========="
         count=$((count + 1))
         if [ "$count" -ge "$limit" ]; then
             break

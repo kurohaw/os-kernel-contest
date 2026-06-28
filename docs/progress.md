@@ -34,6 +34,10 @@
 - 本轮将 `SWTC-la/src/init.sh` 中的 glibc libcbench 从高优先级路径移除：它
   当前线上得分为 `0`，且会截断后面的高价值分区。保留已计分的 musl
   libcbench，并让 LA libctest、LTP、lmbench 先运行。
+- LA libctest 逐 case 输出对齐 RISC-V runner：补齐 per-case
+  `========== START ... ==========`、`RUN LIBCTEST CASE`、`Pass!` 或
+  `FAIL LIBCTEST CASE`、`========== END ... ==========`，降低到达 libctest 后
+  仍因解析格式不匹配而 0 分的风险。
 
 ## 2026-06-28 heapless path 依赖编译修复
 
