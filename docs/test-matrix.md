@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 607 基线已确认 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；basic=204、BusyBox=100、Lua=18、libcbench=55.565189668706445、libctest=217、LTP=70，LA=0 |
-| 最新稳定线上结果 | 607 基线稳定 | dynamic libctest 110/110 保持，第二批 musl LTP 已线上提升到 70 分 |
+| 官方页面最后可见结果 | 983 基线已确认 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
+| 最新稳定线上结果 | 983 基线稳定 | RISC-V basic/BusyBox/Lua/libcbench/libctest/LTP 保持，LoongArch basic/BusyBox/Lua/libcbench 已开始线上计分 |
 | 最新官方编译错误 | 已定位并修复 | 2026-06-25 14:28:22，`check-la-tools` 因官方缺少 `loongarch64-unknown-none` target 失败 |
 | 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
@@ -13,7 +13,7 @@
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
 | LoongArch QEMU 9.2.1 启动 | 本地通过 | 源码构建 `loongarch64-softmmu`，真实 `kernel-la` 从 x0 EXT4 启动并主动关机 |
 | LoongArch BusyBox | 本地 `55/55` | 官方 `pre-2025` 静态 musl BusyBox；补 `/bin/ls` 后零 fail、零 panic、零 unsupported syscall，约 135 秒主动退出 |
-| LoongArch 扩展 functional groups | 部分本地通过，待官方确认 | BusyBox 已通过；Lua、glibc/musl libcbench、musl libctest 和 42 个受限 LTP case 已接入，超时分别为 180/300/5 秒 |
+| LoongArch 扩展 functional groups | 继续推进 | BusyBox 已线上得分，Lua 和 libcbench 部分得分；本轮将 libctest 改为逐 case timeout，并让 LTP 每 case 输出官方收尾行 |
 | LoongArch `execve` | 本地通过 | 相对路径 `test_echo` 修正为 `./test_echo`，两组 execve 均输出 success |
 | LoongArch 测试结束关机 | 本地通过 | init 结束后直接调用平台 GED shutdown，QEMU 主动退出 |
 | LoongArch vendor | 本地离线通过 | 268 个依赖及 checksum 备份齐全，`axconfig-gen` 从 vendor 离线安装 |

@@ -4,20 +4,38 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-27 |
+| 当前日期 | 2026-06-28 |
 | 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | RISC-V LTP 已线上确认到 70 分；真实 LoongArch ELF 已在 QEMU 9.2.1 完成 BusyBox 55/55 本地回归 |
-| 当前提交 | `nightly-2025-05-20` 真实 LA ELF、LA libcbench/functional groups、BusyBox PATH 修复、RISC-V LTP 第三批 9 项 |
-| 最新可见线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；basic=204、BusyBox=100、Lua=18、libcbench=55.565189668706445、libctest=217、LTP=70，LA 四列仍为 0 |
-| 最新稳定线上结果 | 2026-06-27 16:06:27 提交，`Accepted / 607.8318219303549`；RISC-V 继续稳定，LoongArch 尚未产生线上得分 |
+| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；下一轮优先把 LA libctest/LTP 转为可计分输出 |
+| 当前提交 | LA libctest 改为逐 case timeout 执行，LTP 恢复官方每 case 收尾行，补 `/tmp` 运行目录 |
+| 最新可见线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
+| 最新稳定线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-28 983 分后的 LA functional 快速修复
+
+- 官网最新结果为 `983.2675500541894`：basic 四列均 `102`，BusyBox 四列合计
+  `208`，Lua 合计 `35`，libcbench 合计约 `86.91`，musl-rv libctest `217`，
+  musl-rv LTP `155`。LoongArch 已不再是 0 分，但 LA libctest 和 LTP 仍未计分。
+- 本轮不继续扩大 lmbench/iozone；优先修 LA 已接入但未计分的 functional 组。
+- `SWTC-la/src/init.sh` 新增 `/tmp`，避免 Lua、libctest、LTP 中依赖临时目录的
+  case 因目录不存在零散失败。
+- LA musl libctest 从整组 `timeout 300 /bin/sh libctest_testcode.sh` 改为逐 case
+  执行 `runtest.exe -w entry-*.exe case`，单项 timeout 后继续，并始终保留官方
+  `libctest-musl` START/END marker，避免某个 case 卡住导致 217 分整组归零。
+- LA LTP 子集恢复官方 `ltp_testcode.sh` 的每 case 收尾格式：即使退出码为 0，
+  也输出 `FAIL LTP CASE name : 0`。RISC-V runner 线上得分已证明该格式可被
+  计分器识别；此前 LA 只在非零退出时输出这行，可能导致 case 边界无法闭合。
+- 本地验证：`sh -n` 和 `bash -n` 均通过；RISC-V 使用本机可用
+  `nightly-2025-02-18` 完成 `make build-rv`，`kernel-rv` 仍为入口 `0x80200000`
+  的 RISC-V ELF。本机缺完整 `nightly-2025-05-20`，未完成 LA 真机构建。
 
 ## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
 

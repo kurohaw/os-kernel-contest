@@ -1,5 +1,19 @@
 # 2026-06-27 下一次评测路线
 
+## 983 分后的主线
+
+2026-06-28 08:12:33 提交的官方结果为 `Accepted / 983.2675500541894`：
+basic 四列满分 `408`，BusyBox 合计 `208`，Lua 合计 `35`，libcbench 合计
+约 `86.91`，musl-rv libctest `217`，musl-rv LTP `155`。真实 LoongArch
+已线上生效，当前最快增长点从“生成 LA ELF”切换为“把 LA 已接入的
+libctest/LTP 转成可计分输出”。
+
+本轮提交只做 LA functional 稳定化：`libctest-musl` 不再整组 300 秒执行官方
+脚本，改为逐 case 调用 `runtest.exe -w entry-*.exe case`，单项 timeout 后
+继续，并保留 START/END；LTP 子集每个 case 都输出官方 `FAIL LTP CASE name :
+status` 收尾行，包括 status 0；同时补 `/tmp`。目标是在不触碰 RISC-V 基线的
+前提下，让 LA libctest 和 LA LTP 从 0 产生增量。
+
 ## 607 分后的主线
 
 2026-06-27 16:06:27 提交的官方结果为 `Accepted / 607.8318219303549`：
