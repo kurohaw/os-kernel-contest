@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 |---|---|
 | 当前日期 | 2026-06-28 |
-| 当前开发分支 | `feat/ltp-single-case-on-gitlab`，跟踪 `gitlab/main` |
+| 当前开发分支 | `codex/swtc-architecture`，推送到 GitHub/GitLab `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；下一轮优先把 LA libctest/LTP 转为可计分输出 |
-| 当前提交 | LA libctest 改为逐 case timeout 执行，LTP 恢复官方每 case 收尾行，补 `/tmp` 运行目录 |
+| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；本轮转向 LA 大分区批量探测以快速突破 1000 |
+| 当前提交 | LA 侧批量接入 lmbench、iozone、iperf、netperf、cyclictest no-stress，并扩展 LTP allowlist；全部放在稳定组之后并加单项 timeout |
 | 最新可见线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
 | 最新稳定线上结果 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -17,14 +17,33 @@
 | 最新官方编译错误 | 2026-06-25 14:28:22，`Compile Error`；`check-la-tools` 缺少 `nightly-2025-02-18` 的 `loongarch64-unknown-none` target |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
-| 本地得分闭环 | 官方 basic 解析器 `102/102` |
+| 本地得分闭环 | 官方 basic 解析器 `102/102`；本轮脚本语法、测试盘资源路径和 RISC-V 构建回归通过 |
 
-## 2026-06-28 983 分后的 LA functional 快速修复
+## 2026-06-28 983 分后的 LA 大分区批量提分
+
+- 由于官方评测一次排队约 2-3 小时，本轮不再继续“小改一项就提交”的节奏，
+  改为一次提交覆盖多个当前为 0 的大分区。
+- `SWTC-la/src/init.sh` 在 basic、BusyBox、Lua、libcbench、libctest 和 LTP 之后，
+  批量执行 LA musl/glibc 的 `lmbench`、`iozone`、`iperf`、`netperf` 和
+  `cyclictest` no-stress 子集。
+- 每个 benchmark command 都用 `/musl/busybox timeout` 包住；网络 server 使用独立
+  端口并在组结束时 kill，避免单项卡死拖掉整轮评测。
+- LTP allowlist 继续扩展一批偏 syscall/file/time 的低风险项，包括
+  `fcntl`、`flock`、`getrandom`、`kill`、`pipe`、`preadv/pwrite`、
+  `statx`、`timerfd`、`truncate`、`utime` 和 `waitpid` 相关 case。
+- 本地验证：`sh -n`、`bash -n` 均通过；官方 LA 测试盘中 musl/glibc 两侧均确认
+  存在 `lmbench_all`、`iozone`、`iperf3`、`netserver`、`netperf` 和
+  `cyclictest`；RISC-V `make build-rv RV_TOOLCHAIN=nightly-2025-02-18`
+  通过，`kernel-rv` 仍为入口 `0x80200000` 的 RISC-V ELF。
+- 本机 `nightly-2025-05-20` 工具链存在但 manifest 损坏，无法作为 LA strict
+  构建门禁；本轮 LA 正式效果仍以官方环境为准。
+
+## 2026-06-28 983 分后的 LA functional 快速修复（已提交）
 
 - 官网最新结果为 `983.2675500541894`：basic 四列均 `102`，BusyBox 四列合计
   `208`，Lua 合计 `35`，libcbench 合计约 `86.91`，musl-rv libctest `217`，
   musl-rv LTP `155`。LoongArch 已不再是 0 分，但 LA libctest 和 LTP 仍未计分。
-- 本轮不继续扩大 lmbench/iozone；优先修 LA 已接入但未计分的 functional 组。
+- 上一轮没有继续扩大 lmbench/iozone；优先修 LA 已接入但未计分的 functional 组。
 - `SWTC-la/src/init.sh` 新增 `/tmp`，避免 Lua、libctest、LTP 中依赖临时目录的
   case 因目录不存在零散失败。
 - LA musl libctest 从整组 `timeout 300 /bin/sh libctest_testcode.sh` 改为逐 case
