@@ -50,8 +50,11 @@
 - `sys_sendfile` 改为 64 KiB 分块复制，避免 LTP `sendfile*` 大 `count`
   导致一次性分配过大缓冲；同时正确更新显式 offset 指针。
 - RV/LA 同步追加 `unlink*`、`rename*`、`renameat*`、`truncate*`、
-  `utimensat01` 和 `sendfile*` 子集。`creat/link/symlink/statx/utime/utimes`
+  `utimensat01`、`sendfile*` 和 `statx*` 子集。`creat/link/symlink/utime/utimes`
   暂缓，避免把尚未补齐的 syscall 直接变成确定失败项。
+- RISC-V 补齐 `statx=291`，支持普通路径和 `AT_EMPTY_PATH` 的 fd/cwd 路径，
+  填充 Linux `struct statx` 的 basic stats，并处理非法 flag 与
+  `STATX__RESERVED` 边界。
 - LA LTP 脚本继续对每个 case 输出 `FAIL LTP CASE name : status`，即使
   `status=0` 也作为收尾 marker，保持与 RISC-V `runtestcase` 已线上计分的
   LTP 协议一致。

@@ -114,6 +114,7 @@ const SYSCALL_GETRANDOM: usize = 278;
 const SYSCALL_MEMBARRIER: usize = 283;
 const SYSCALL_PREADV2: usize = 286;
 const SYSCALL_PWRITEV2: usize = 287;
+const SYSCALL_STATX: usize = 291;
 
 mod dev;
 mod fs;
@@ -542,6 +543,16 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
                 await
             )
         }
+        SYSCALL_STATX => sys_handler!(
+            sys_statx,
+            (
+                args[0] as isize,
+                args[1],
+                args[2] as u32,
+                args[3] as u32,
+                args[4],
+            )
+        ),
         _ => {
             // panic!("Unsupported syscall_id: {}", syscall_id);
             error!("Unsupported syscall_id: {}", syscall_id);

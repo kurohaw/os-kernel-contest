@@ -75,15 +75,15 @@ basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`
 在批次 C 后继续扩 LTP 文件系统 case，但只启用 RISC-V/LA 都已经有实现基础的
 子集：
 
-1. RISC-V 补 `renameat=38` 和 `truncate=45`，修 `utimensat(NULL)` 同步 mtime，
-   并把 `sendfile` 改为分块复制。
+1. RISC-V 补 `renameat=38`、`truncate=45` 和 `statx=291`，修
+   `utimensat(NULL)` 同步 mtime，并把 `sendfile` 改为分块复制。
 2. RV/LA 同步追加 `unlink05/07/08/09`、`unlinkat01`、`rename01/03-14`、
-   `renameat01/201/202`、`truncate02/02_64/03/03_64`、`utimensat01` 和
-   `sendfile02-09` 及 `_64` 变体。
+   `renameat01/201/202`、`truncate02/02_64/03/03_64`、`utimensat01`、
+   `sendfile02-09` 及 `_64` 变体，以及 `statx01-12`。
 3. LA LTP 每个 case 都打印 `FAIL LTP CASE name : status` 作为收尾 marker，
    与 RISC-V `runtestcase` 已线上计分的 LTP 协议保持一致。
-4. 暂不加入 `creat*`、`link*`、`symlink*`、`statx*`、`utime*`、`utimes01`；
-   下一步等这批官方结果后，再从这些剩余 D 批中挑 syscall 明确可补的一组。
+4. 暂不加入 `creat*`、`link*`、`symlink*`、`utime*`、`utimes01`；下一步等
+   这批官方结果后，再从这些剩余 D 批中挑 syscall 明确可补的一组。
 
 ## 838 回退后的主线
 

@@ -348,6 +348,18 @@ const LTP_ALLOWLIST: &[&str] = &[
     "sendfile08_64",
     "sendfile09",
     "sendfile09_64",
+    "statx01",
+    "statx02",
+    "statx03",
+    "statx04",
+    "statx05",
+    "statx06",
+    "statx07",
+    "statx08",
+    "statx09",
+    "statx10",
+    "statx11",
+    "statx12",
 ];
 const LIBCTEST_ALLOWLIST: &[&str] = &[
     "argv",

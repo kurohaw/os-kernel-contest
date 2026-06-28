@@ -15,8 +15,8 @@ use super::PollFd;
 use crate::config::fs::PIPE_BUF_CAPACITY;
 use crate::config::mm::PAGE_SIZE;
 use crate::fs::ffi::{
-    Dirent, FdSet, StatFlags, Statfs, Sysinfo, FD_SET_LEN, SEEK_CUR, SEEK_END, SEEK_SET, STAT,
-    STATFS_SIZE, STAT_SIZE, SYSINFO_SIZE,
+    Dirent, FdSet, StatFlags, Statfs, Statx, StatxTimestamp, Sysinfo, FD_SET_LEN, SEEK_CUR,
+    SEEK_END, SEEK_SET, STAT, STATFS_SIZE, STATX_SIZE, STAT_SIZE, SYSINFO_SIZE,
 };
 use crate::fs::file_system::FsDevice;
 use crate::fs::inode::INODE_CACHE;
@@ -44,6 +44,13 @@ use crate::utils::path::{self, is_relative_path};
 use crate::utils::string::c_str_to_string;
 
 const AT_REMOVEDIR: u32 = 0x200;
+const AT_EMPTY_PATH: u32 = 0x1000;
+const AT_STATX_FORCE_SYNC: u32 = 0x2000;
+const AT_STATX_DONT_SYNC: u32 = 0x4000;
+const AT_STATX_SYNC_TYPE: u32 = AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC;
+const STATX_BASIC_STATS: u32 = 0x07ff;
+const STATX_BTIME: u32 = 0x0800;
+const STATX_RESERVED: u32 = 0x8000_0000;
 const IOV_MAX: usize = 1024;
 
 /// get current working directory
@@ -554,6 +561,98 @@ pub fn sys_newfstatat(
     } else {
         debug!("[sys_newfstatat] cannot find target inode");
         return Err(SyscallErr::ENOENT);
+    }
+}
+
+pub fn sys_statx(
+    dirfd: isize,
+    pathname: usize,
+    flags: u32,
+    mask: u32,
+    statx_buf: usize,
+) -> SyscallRet {
+    stack_trace!();
+
+    let valid_flags = FcntlFlags::AT_SYMLINK_NOFOLLOW.bits()
+        | FcntlFlags::AT_NO_AUTOMOUNT.bits()
+        | AT_EMPTY_PATH
+        | AT_STATX_SYNC_TYPE;
+    if flags & !valid_flags != 0 || flags & AT_STATX_SYNC_TYPE == AT_STATX_SYNC_TYPE {
+        return Err(SyscallErr::EINVAL);
+    }
+    if mask & STATX_RESERVED != 0 {
+        return Err(SyscallErr::EINVAL);
+    }
+
+    UserCheck::new().check_writable_slice(statx_buf as *mut u8, STATX_SIZE)?;
+
+    if pathname == 0 {
+        if flags & AT_EMPTY_PATH == 0 {
+            return Err(SyscallErr::EFAULT);
+        }
+    } else {
+        UserCheck::new().check_c_str(pathname as *const u8)?;
+        let _sum_guard = SumGuard::new();
+        if c_str_to_string(pathname as *const u8).is_empty() && flags & AT_EMPTY_PATH == 0 {
+            return Err(SyscallErr::ENOENT);
+        }
+    }
+
+    let (inode, _, _) = path::path_to_inode_ffi(dirfd, pathname as *const u8)?;
+    let inode = inode.ok_or(SyscallErr::ENOENT)?;
+    _statx(inode, statx_buf, mask)
+}
+
+fn _statx(inode: Arc<dyn Inode>, statx_buf: usize, mask: u32) -> SyscallRet {
+    let inode_meta = inode.metadata();
+    let mut kstatx = Statx::new();
+    let mut inner_lock = inode_meta.inner.lock();
+
+    let size = if inode_meta.mode == InodeMode::FileDIR {
+        if inner_lock.data_len != 0 {
+            inner_lock.data_len
+        } else {
+            let children = inner_lock.children.clone();
+            let mut size = 0;
+            for child in children {
+                size += child.1.metadata().inner.lock().data_len;
+            }
+            inner_lock.data_len = size;
+            size
+        }
+    } else {
+        inner_lock.data_len
+    };
+
+    let requested_btime = mask & STATX_BTIME != 0;
+    kstatx.stx_mask = STATX_BASIC_STATS | if requested_btime { STATX_BTIME } else { 0 };
+    kstatx.stx_blksize = 512;
+    kstatx.stx_nlink = 1;
+    kstatx.stx_uid = 0;
+    kstatx.stx_gid = 0;
+    kstatx.stx_mode = inode_meta.mode as u16;
+    kstatx.stx_ino = inode_meta.ino as u64;
+    kstatx.stx_size = size as u64;
+    kstatx.stx_blocks = ((size as u64) + 511) / 512;
+    kstatx.stx_atime = statx_timestamp_from_timespec(inner_lock.st_atim);
+    kstatx.stx_mtime = statx_timestamp_from_timespec(inner_lock.st_mtim);
+    kstatx.stx_ctime = statx_timestamp_from_timespec(inner_lock.st_ctim);
+    if requested_btime {
+        kstatx.stx_btime = kstatx.stx_ctime;
+    }
+    kstatx.stx_dev_minor = 12138;
+
+    unsafe {
+        ptr::write(statx_buf as *mut Statx, kstatx);
+    }
+    Ok(0)
+}
+
+fn statx_timestamp_from_timespec(time: TimeSpec) -> StatxTimestamp {
+    StatxTimestamp {
+        tv_sec: time.sec as i64,
+        tv_nsec: time.nsec as u32,
+        __reserved: 0,
     }
 }
 

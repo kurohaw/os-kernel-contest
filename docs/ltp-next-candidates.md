@@ -147,10 +147,11 @@ sendfile08 sendfile08_64 sendfile09 sendfile09_64
 - `rename*`、`link*`、`symlink*` 若出现权限或路径失败，优先单独拆分调试。
 
 状态：2026-06-29 已启用 D 批中的 `unlink*`、`rename*`、`renameat*`、
-`truncate*`、`utimensat01` 和 `sendfile*` 子集。RISC-V 同步补齐
+`truncate*`、`utimensat01`、`sendfile*` 和 `statx*` 子集。RISC-V 同步补齐
 `renameat=38`、`truncate=45`，并修正 `utimensat(NULL)` 和 `sendfile`
-大块复制路径。`creat*`、`link*`、`symlink*`、`statx*`、`utime*` 和
-`utimes01` 暂缓，等 RISC-V 主线补齐对应 syscall 或单项验证后再加入。
+大块复制路径；随后补齐 `statx=291` 的 basic stats 兼容路径。`creat*`、
+`link*`、`symlink*`、`utime*` 和 `utimes01` 暂缓，等 RISC-V 主线补齐对应
+syscall 或单项验证后再加入。
 
 ## 如何启用
 

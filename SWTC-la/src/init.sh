@@ -176,7 +176,9 @@ run_ltp_subset() (
         sendfile02 sendfile02_64 sendfile03 sendfile03_64 \
         sendfile04 sendfile04_64 sendfile05 sendfile05_64 \
         sendfile06 sendfile06_64 sendfile07 sendfile07_64 \
-        sendfile08 sendfile08_64 sendfile09 sendfile09_64
+        sendfile08 sendfile08_64 sendfile09 sendfile09_64 \
+        statx01 statx02 statx03 statx04 statx05 statx06 \
+        statx07 statx08 statx09 statx10 statx11 statx12
     do
         if [ ! -f "./$case_name" ]; then
             continue
