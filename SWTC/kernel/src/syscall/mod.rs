@@ -306,7 +306,7 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         SYSCALL_GET_ROBUST_LIST => {
             sys_handler!(sys_get_robust_list, (args[0], args[1], args[2]))
         }
-        SYSCALL_NANOSLEEP => sys_handler!(sys_nanosleep, (args[0]), await),
+        SYSCALL_NANOSLEEP => sys_handler!(sys_nanosleep, (args[0], args[1]), await),
         SYSCALL_SETITIMER => sys_handler!(
             sys_setitimer,
             (

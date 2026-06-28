@@ -97,6 +97,10 @@ select01 select02 select03 select04
 目的：补进程控制和时间类 LTP。该批可能暴露 wait/signal/nanosleep 的边界，
 建议放在 A/B 后。
 
+状态：2026-06-29 已启用其中的 `alarm03/05/06/07`、`nanosleep01/02/04`、
+`kill02/03/05-13`、`waitpid01/03/04/06-13` 和 `fork04/09/13/14`。
+`timerfd*` 暂不启用，因为 RISC-V 主线尚未提供 timerfd fd 对象实现。
+
 ```text
 alarm03 alarm05 alarm06 alarm07
 nanosleep01 nanosleep02 nanosleep04

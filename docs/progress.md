@@ -9,7 +9,7 @@
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | 在批次 A 基础上继续推进 LTP 批次 B 子集；RISC-V 新接 `preadv/pwritev/preadv2/pwritev2`，RV/LA 队列追加 fd、pipe、writev、preadv/pwritev 和 poll/select 候选 |
+| 当前提交 | 在 LTP 批次 B 基础上继续启用批次 C 子集；修复 RISC-V `nanosleep(req, rem)`，RV/LA 队列追加 alarm、nanosleep、kill、waitpid、fork 候选 |
 | 最新可见线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；basic=408、BusyBox=208、Lua=36、libcbench=84.78489437045744、libctest=217、LTP=156 |
 | 最新稳定线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
@@ -104,6 +104,18 @@
 - LoongArch `SWTC-la/src/init.sh` 同步追加同一批 case，保持四列路线一致。
 - 本地验证：`cargo fmt`、`sh -n`、`bash -n` 和 `make build-rv` 通过；下一步
   仍需 `make all` 作为提交门禁。
+
+## 2026-06-29 LTP 批次 C 子集与 nanosleep 修复
+
+- 继续按图二推进 LTP 大分区，在批次 B 后追加进程、信号和时间类子集：
+  `alarm03/05/06/07`、`nanosleep01/02/04`、`kill02/03/05-13`、
+  `waitpid01/03/04/06-13`、`fork04/09/13/14`。
+- RISC-V `nanosleep` 原先只从 syscall 表传入 `req`，忽略 `rem`，且没有校验
+  `tv_nsec`。本轮改为 `nanosleep(req, rem)`，校验 `tv_nsec < 1e9`，被信号
+  打断时安全写回零剩余时间，避免 LTP 边界项因为坏参数或 rem 指针导致错误路径。
+- `clock_nanosleep` 同步补 `tv_nsec` 合法性检查。
+- `timerfd*` 仍不加入：LoongArch 有实现，但 RISC-V 主线还没有 timerfd fd
+  对象，直接加入会制造确定失败项。
 
 ## 2026-06-27 607 分后的 LA 严格构建与 LTP 第三批
 

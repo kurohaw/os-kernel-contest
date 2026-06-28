@@ -38,6 +38,19 @@ basic/BusyBox/Lua/libcbench 仍在计分，但 LA libctest 和 LA LTP 仍为 `0`
    串口日志拆 poll/select 或 fcntl；若总分回退，优先回滚本轮 B 子集而不是动
    basic/BusyBox/Lua/libctest。
 
+## 2026-06-29 批次 C 子集
+
+在批次 B 基础上继续推进进程/信号/时间类 LTP，但不打开 timerfd：
+
+1. 修复 RISC-V `nanosleep(req, rem)`：syscall 表传入第二参数，校验
+   `tv_nsec < 1e9`，被信号打断时可安全写回 `rem`。
+2. RV/LA 同步追加 `alarm03/05/06/07`、`nanosleep01/02/04`、
+   `kill02/03/05-13`、`waitpid01/03/04/06-13`、`fork04/09/13/14`。
+3. `timerfd_create/gettime/settime` 继续暂缓，原因是 RV 侧尚无 timerfd fd
+   对象；贸然加入只会增加确定失败项。
+4. 若这批导致 LTP 截断，优先拆回 `kill*` 和 `alarm*`，保留
+   `nanosleep/waitpid/fork` 观察。
+
 ## 838 回退后的主线
 
 `301e9717 feat: batch LoongArch big test probes` 的官方结果内嵌 JSON 显示

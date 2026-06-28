@@ -196,7 +196,11 @@ pub async fn sys_clock_nanosleep(
     let _sum_guard = SumGuard::new();
     let size = core::mem::size_of::<TimeSpec>();
     UserCheck::new().check_readable_slice(request as *const u8, size)?;
-    let request: Duration = unsafe { *(request as *const TimeSpec) }.into();
+    let request_time = unsafe { *(request as *const TimeSpec) };
+    if (request_time.sec as isize) < 0 || request_time.nsec >= 1_000_000_000 {
+        return Err(SyscallErr::EINVAL);
+    }
+    let request: Duration = request_time.into();
     let has_remain = if (remain as *mut TimeSpec).is_null() {
         false
     } else {
@@ -264,19 +268,22 @@ pub fn sys_times(buf: *mut Tms) -> SyscallRet {
     Ok(ticks)
 }
 
-pub async fn sys_nanosleep(time_val_ptr: usize) -> SyscallRet {
+pub async fn sys_nanosleep(request_ptr: usize, remain_ptr: usize) -> SyscallRet {
     stack_trace!();
-    let sleep_ms = {
+    let sleep_time = {
         UserCheck::new()
-            .check_readable_slice(time_val_ptr as *const u8, core::mem::size_of::<TimeVal>())?;
+            .check_readable_slice(request_ptr as *const u8, core::mem::size_of::<TimeSpec>())?;
         let _sum_guard = SumGuard::new();
 
-        let time_val_ptr = time_val_ptr as *const TimeSpec;
-        let time_val = unsafe { &(*time_val_ptr) };
-        time_val.sec * 1000 + time_val.nsec / 1000000
+        let request_ptr = request_ptr as *const TimeSpec;
+        unsafe { *request_ptr }
     };
+    if (sleep_time.sec as isize) < 0 || sleep_time.nsec >= 1_000_000_000 {
+        return Err(SyscallErr::EINVAL);
+    }
+    let sleep_duration = Duration::from(sleep_time);
     match Select2Futures::new(
-        ksleep(Duration::from_millis(sleep_ms as u64)),
+        ksleep(sleep_duration),
         current_task().wait_for_events(Event::all()),
     )
     .await
@@ -284,6 +291,16 @@ pub async fn sys_nanosleep(time_val_ptr: usize) -> SyscallRet {
         SelectOutput::Output1(_) => Ok(0),
         SelectOutput::Output2(intr) => {
             log::info!("[sys_nanosleep] interrupt by event {:?}", intr);
+            if remain_ptr != 0 {
+                UserCheck::new().check_writable_slice(
+                    remain_ptr as *mut u8,
+                    core::mem::size_of::<TimeSpec>(),
+                )?;
+                let _sum_guard = SumGuard::new();
+                unsafe {
+                    *(remain_ptr as *mut TimeSpec) = Duration::ZERO.into();
+                }
+            }
             Err(SyscallErr::EINTR)
         }
     }

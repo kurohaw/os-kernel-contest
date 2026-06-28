@@ -160,7 +160,13 @@ run_ltp_subset() (
         pwrite02 pwrite02_64 \
         poll01 poll02 \
         pselect01 pselect01_64 pselect02 pselect02_64 pselect03 pselect03_64 \
-        select01 select02 select03 select04
+        select01 select02 select03 select04 \
+        alarm03 alarm05 alarm06 alarm07 \
+        nanosleep01 nanosleep02 nanosleep04 \
+        kill02 kill03 kill05 kill06 kill07 kill08 kill09 kill10 kill11 kill12 kill13 \
+        waitpid01 waitpid03 waitpid04 waitpid06 waitpid07 waitpid08 \
+        waitpid09 waitpid10 waitpid11 waitpid12 waitpid13 \
+        fork04 fork09 fork13 fork14
     do
         if [ ! -f "./$case_name" ]; then
             continue
