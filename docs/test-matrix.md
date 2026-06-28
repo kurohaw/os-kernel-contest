@@ -4,10 +4,11 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | 983 基线已确认 | 2026-06-28 08:12:33 提交，`Accepted / 983.2675500541894`；basic=408、BusyBox=208、Lua=35、libcbench=86.91038529599213、libctest=217、LTP=155 |
+| 官方页面最后可见结果 | 983 基线已确认 | 2026-06-29 03:06:43 提交，内嵌 JSON `Accepted / 983.6805892892955`；页面 JSON 错误来自平台 gzip 异常污染输出 |
 | 最新稳定线上结果 | 983 基线稳定 | RISC-V basic/BusyBox/Lua/libcbench/libctest/LTP 保持，LoongArch basic/BusyBox/Lua/libcbench 已开始线上计分 |
 | 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
 | LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |
+| LA glibc libcbench trap | 已隔离 | 2026-06-29 日志在 `libcbench-glibc` 触发 LoongArch `MemoryAccessAddressError`，导致后置 libctest/LTP/lmbench 不执行；当前先跳过该 0 分项 |
 | LoongArch lmbench 后置探针 | 已接入，待线上确认 | 官方 lmbench 命令序列改为逐命令 timeout，并放在所有 functional 组之后；失败不应截断 basic/BusyBox/libcbench/libctest/LTP |
 | 最新官方编译错误 | 已本地复现并修复 | 2026-06-28 两次 Compile Error；`heapless` path patch 使其 `deny(warnings)` 接管 `unexpected_cfgs`，build script 补齐 `rustc-check-cfg` 后离线 `make all` 通过 |
 | 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |

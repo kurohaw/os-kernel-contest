@@ -4,20 +4,36 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-28 |
+| 当前日期 | 2026-06-29 |
 | 当前开发分支 | `codex/swtc-architecture`，推送到 GitHub/GitLab `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | 在 LTP 批次 B 基础上继续启用批次 C 子集；修复 RISC-V `nanosleep(req, rem)`，RV/LA 队列追加 alarm、nanosleep、kill、waitpid、fork 候选 |
-| 最新可见线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；basic=408、BusyBox=208、Lua=36、libcbench=84.78489437045744、libctest=217、LTP=156 |
-| 最新稳定线上结果 | 2026-06-28 22:55:36 提交，`Accepted / 982.3134986891687`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
+| 当前提交 | 根据 2026-06-29 03:06 官方日志，跳过会触发 LoongArch trap 的 glibc libcbench，让 LA libctest/LTP/lmbench 先运行 |
+| 最新可见线上结果 | 2026-06-29 03:06:43 提交，内嵌 JSON `Accepted / 983.6805892892955`；页面 `JSON格式错误` 来自平台 gzip 异常污染输出 |
+| 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-28 两次提交均为 `Compile Error`；本地同步 `b5b2d38c` 后复现为 path 依赖 `heapless` 的 31 个 `unexpected_cfgs` 硬错误，本轮已修复并完成离线 `make all` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-29 983 分 JSON 错误与 LA glibc libcbench 截断
+
+- 当前页面显示 `JSON格式错误`，但日志内嵌 JSON 的真实结果为
+  `Accepted / 983.6805892892955`。异常前缀仍是平台侧
+  `gzip: sdcard-rv.img already exists; not overwritten`，不是本仓库编译失败。
+- 分数结构：basic `408`、BusyBox `208`、Lua `36`、libcbench
+  `86.15198497058428`、musl-rv libctest `217`、musl-rv LTP `156`；
+  LA libctest 和 LA LTP 仍为 `0`。
+- 串口日志显示 LA 已经跑完 basic、BusyBox、Lua 和 `libcbench-musl`，随后在
+  `#### OS COMP TEST GROUP START libcbench-glibc ####` 后触发
+  `Unhandled trap Exception(MemoryAccessAddressError)`，因此后置的 LA libctest、
+  LTP 和 lmbench 没有执行机会。
+- 本轮将 `SWTC-la/src/init.sh` 中的 glibc libcbench 从高优先级路径移除：它
+  当前线上得分为 `0`，且会截断后面的高价值分区。保留已计分的 musl
+  libcbench，并让 LA libctest、LTP、lmbench 先运行。
 
 ## 2026-06-28 heapless path 依赖编译修复
 

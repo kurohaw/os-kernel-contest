@@ -7,6 +7,25 @@
 983 基线恢复，再从 [`ltp-next-candidates.md`](ltp-next-candidates.md) 选择
 下一批 LTP 候选。
 
+## 2026-06-29 983 分后的截断修复
+
+2026-06-29 03:06:43 官方日志内嵌 JSON 为 `Accepted / 983.6805892892955`。
+页面 `JSON格式错误` 仍由平台侧 `gzip: sdcard-rv.img already exists; not
+overwritten` 污染 JSON 输出导致，不代表本仓库编译失败。
+
+本轮真正阻塞提分的是 LoongArch 执行顺序：LA 已跑完 basic、BusyBox、Lua 和
+`libcbench-musl`，随后在 `libcbench-glibc` 触发
+`Unhandled trap Exception(MemoryAccessAddressError)`。由于 libctest、LTP 和
+lmbench 放在它后面，LA 侧大分区被截断，导致 `libctest-musl-la=0`、
+`ltp-musl-la=0`。
+
+下一次提交先跳过 LA `libcbench-glibc`：
+
+1. 保留已计分的 LA `libcbench-musl`。
+2. 先运行 LA libctest、LTP 和 lmbench，争取释放 `+217` libctest 和 LTP 增量。
+3. glibc libcbench 当前线上为 `0` 且会 panic，等定位 LoongArch
+   `MemoryAccessAddressError` 后再恢复。
+
 ## 2026-06-28 982 分后的本轮动作
 
 2026-06-28 22:55:36 开始的官方结果为 `Accepted / 982.3134986891687`：
