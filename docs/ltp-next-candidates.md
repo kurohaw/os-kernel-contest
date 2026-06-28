@@ -146,12 +146,11 @@ sendfile08 sendfile08_64 sendfile09 sendfile09_64
 - 这批对 VFS 语义更敏感，要在 A/B/C 稳定后加入。
 - `rename*`、`link*`、`symlink*` 若出现权限或路径失败，优先单独拆分调试。
 
-状态：2026-06-29 已启用 D 批中的 `unlink*`、`rename*`、`renameat*`、
-`truncate*`、`utimensat01`、`sendfile*` 和 `statx*` 子集。RISC-V 同步补齐
-`renameat=38`、`truncate=45`，并修正 `utimensat(NULL)` 和 `sendfile`
-大块复制路径；随后补齐 `statx=291` 的 basic stats 兼容路径。`creat*`、
-`link*`、`symlink*`、`utime*` 和 `utimes01` 暂缓，等 RISC-V 主线补齐对应
-syscall 或单项验证后再加入。
+状态：2026-06-29 已启用 D 批中的 `creat*`、`symlink*`、`unlink*`、
+`rename*`、`renameat*`、`truncate*`、`utime*`、`utimensat01`、`utimes01`、
+`sendfile*` 和 `statx*` 子集。RISC-V 同步补齐 `renameat=38`、`truncate=45`、
+`statx=291` 和 `symlinkat=36`，并修正 `utimensat(NULL)` 和 `sendfile`
+大块复制路径。`link*` 暂缓，等 RISC-V 主线解决硬链接多名字和删除语义后再加入。
 
 ## 如何启用
 

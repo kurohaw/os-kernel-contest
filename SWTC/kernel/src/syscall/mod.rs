@@ -10,6 +10,7 @@ const SYSCALL_MKNOD: usize = 33;
 const SYSCALL_MKDIR: usize = 34;
 const SYSCALL_UMOUNT: usize = 39;
 const SYSCALL_MOUNT: usize = 40;
+const SYSCALL_SYMLINKAT: usize = 36;
 const SYSCALL_RENAMEAT: usize = 38;
 const SYSCALL_STATFS: usize = 43;
 const SYSCALL_TRUNCATE: usize = 45;
@@ -193,6 +194,7 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             sys_mkdirat,
             (args[0] as isize, args[1] as *const u8, args[2])
         ),
+        SYSCALL_SYMLINKAT => sys_handler!(sys_symlinkat, (args[0], args[1] as isize, args[2])),
         SYSCALL_RENAMEAT => sys_handler!(
             sys_renameat2,
             (
@@ -275,7 +277,10 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             await
         ),
         SYSCALL_PPOLL => sys_handler!(sys_ppoll, (args[0], args[1], args[2], args[3]), await),
-        SYSCALL_READLINKAT => sys_handler!(sys_readlinkat, (args[0], args[1], args[2], args[3])),
+        SYSCALL_READLINKAT => sys_handler!(
+            sys_readlinkat,
+            (args[0] as isize, args[1], args[2], args[3])
+        ),
         SYSCALL_NEWFSTATAT => sys_handler!(
             sys_newfstatat,
             (

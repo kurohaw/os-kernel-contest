@@ -656,6 +656,35 @@ fn statx_timestamp_from_timespec(time: TimeSpec) -> StatxTimestamp {
     }
 }
 
+pub fn sys_symlinkat(target: usize, newdirfd: isize, linkpath: usize) -> SyscallRet {
+    stack_trace!();
+    UserCheck::new().check_c_str(target as *const u8)?;
+    UserCheck::new().check_c_str(linkpath as *const u8)?;
+
+    let target = {
+        let _sum_guard = SumGuard::new();
+        c_str_to_string(target as *const u8)
+    };
+    if target.is_empty() {
+        return Err(SyscallErr::ENOENT);
+    }
+
+    let (link_inode, link_path, parent) = path::path_to_inode_ffi(newdirfd, linkpath as *const u8)?;
+    if link_inode.is_some() {
+        return Err(SyscallErr::EEXIST);
+    }
+    let parent = parent.ok_or(SyscallErr::ENOENT)?;
+    if parent.metadata().mode != InodeMode::FileDIR {
+        return Err(SyscallErr::ENOTDIR);
+    }
+
+    let link_name = path::get_name(&link_path);
+    let link_inode = parent.mknod_v(link_name, InodeMode::FileLNK, None)?;
+    let file = link_inode.open(link_inode.clone())?;
+    file.sync_write(target.as_bytes())?;
+    Ok(0)
+}
+
 pub fn sys_lseek(fd: usize, offset: isize, whence: u8) -> SyscallRet {
     stack_trace!();
     let fd_info = current_process()
@@ -1253,7 +1282,7 @@ pub fn sys_renameat2(
     }
 }
 
-pub fn sys_readlinkat(dirfd: usize, path_name: usize, buf: usize, buf_size: usize) -> SyscallRet {
+pub fn sys_readlinkat(dirfd: isize, path_name: usize, buf: usize, buf_size: usize) -> SyscallRet {
     stack_trace!();
     let _sum_guard = SumGuard::new();
     UserCheck::new().check_c_str(path_name as *const u8)?;
@@ -1265,7 +1294,25 @@ pub fn sys_readlinkat(dirfd: usize, path_name: usize, buf: usize, buf_size: usiz
     UserCheck::new().check_writable_slice(buf as *mut u8, buf_size)?;
 
     // lmbench's multi-call binary asks /proc/self/exe to find the backing image.
-    let target = "/lmbench_all".as_bytes();
+    if path == "/proc/self/exe" {
+        let target = "/lmbench_all".as_bytes();
+        let copy_len = core::cmp::min(buf_size, target.len());
+        unsafe {
+            (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);
+        }
+        return Ok(copy_len);
+    }
+
+    let (inode, _, _) = path::path_to_inode_ffi(dirfd, path_name as *const u8)?;
+    let inode = inode.ok_or(SyscallErr::ENOENT)?;
+    if inode.metadata().mode != InodeMode::FileLNK {
+        return Err(SyscallErr::EINVAL);
+    }
+
+    let len = inode.metadata().inner.lock().data_len;
+    let file = inode.open(inode.clone())?;
+    let mut target = vec![0_u8; len];
+    file.sync_read(&mut target)?;
     let copy_len = core::cmp::min(buf_size, target.len());
     unsafe {
         (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);
