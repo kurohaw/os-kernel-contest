@@ -920,32 +920,72 @@ pub async fn sys_sendfile(
         return Err(SyscallErr::EBADF);
     }
 
-    let mut buf = vec![0 as u8; count];
-    let nbytes = match offset_ptr {
-        0 => input_file.file.read(&mut buf, input_file.flags).await?,
-        _ => {
-            UserCheck::new()
-                .check_readable_slice(offset_ptr as *const u8, core::mem::size_of::<usize>())?;
-            let _sum_guard = SumGuard::new();
-            let input_offset = unsafe { *(offset_ptr as *const usize) };
-            let nbytes = input_file.file.pread(&mut buf, input_offset).await?;
-            // let old_offset = input_file.offset()?;
-            // input_file.seek(input_offset)?;
-            // let nbytes = input_file.read(&mut buf).await?;
-            // input_file.seek(old_offset as usize)?;
-            unsafe {
-                *(offset_ptr as *mut usize) = *(offset_ptr as *mut usize) + nbytes as usize;
-            }
-            nbytes
+    if count == 0 {
+        return Ok(0);
+    }
+
+    const SENDFILE_CHUNK: usize = 64 * 1024;
+    let mut buf = vec![0_u8; core::cmp::min(count, SENDFILE_CHUNK)];
+    let mut total = 0usize;
+    let mut remaining = count;
+    let mut input_offset = 0usize;
+
+    if offset_ptr != 0 {
+        UserCheck::new()
+            .check_readable_slice(offset_ptr as *const u8, core::mem::size_of::<usize>())?;
+        UserCheck::new()
+            .check_writable_slice(offset_ptr as *mut u8, core::mem::size_of::<usize>())?;
+        let _sum_guard = SumGuard::new();
+        input_offset = unsafe { *(offset_ptr as *const usize) };
+    }
+
+    while remaining > 0 {
+        let request = core::cmp::min(remaining, SENDFILE_CHUNK);
+        if buf.len() != request {
+            buf.resize(request, 0);
         }
-    };
-    info!("[sys_sendfile]: read {} bytes from inputfile", nbytes);
-    let ret = output_file
-        .file
-        .write(&buf[0..nbytes as usize], output_file.flags)
-        .await;
+
+        let nbytes = if offset_ptr == 0 {
+            input_file
+                .file
+                .read(&mut buf[..request], input_file.flags)
+                .await?
+        } else {
+            let _sum_guard = SumGuard::new();
+            input_file
+                .file
+                .pread(&mut buf[..request], input_offset + total)
+                .await?
+        };
+
+        if nbytes == 0 {
+            break;
+        }
+
+        info!("[sys_sendfile]: read {} bytes from inputfile", nbytes);
+        let written = output_file
+            .file
+            .write(&buf[..nbytes], output_file.flags)
+            .await?;
+        if written == 0 {
+            break;
+        }
+
+        total += written;
+        remaining = remaining.saturating_sub(written);
+        if written < nbytes || nbytes < request {
+            break;
+        }
+    }
+
+    if offset_ptr != 0 {
+        let _sum_guard = SumGuard::new();
+        unsafe {
+            *(offset_ptr as *mut usize) = input_offset + total;
+        }
+    }
     debug!("[sys_sendfile]: finished");
-    ret
+    Ok(total)
 }
 /// If newpath already exists, replace it.
 /// If oldpath and newpath are existing hard links referring to the same inode, then return a success.
@@ -1160,7 +1200,10 @@ pub fn sys_utimensat(
         if times.is_null() {
             debug!("[sys_utimensat] times is null");
             // If times is null, then both timestamps are set to the current time.
-            inner_lock.st_atim = current_time_spec();
+            let now = current_time_spec();
+            inner_lock.st_atim = now;
+            inner_lock.st_mtim = now;
+            inner_lock.st_ctim = now;
         } else {
             // times[0] for atime, times[1] for mtime
             UserCheck::new()
@@ -1176,6 +1219,9 @@ pub fn sys_utimensat(
                 debug!("[sys_utimensat] atime nsec is UTIME_OMIT, unchanged");
             } else {
                 debug!("[sys_utimensat] atime normal nsec");
+                if atime.nsec >= 1_000_000_000 {
+                    return Err(SyscallErr::EINVAL);
+                }
                 inner_lock.st_atim = *atime;
             }
             debug!("[sys_utimensat] atime: {:?}", inner_lock.st_atim);
@@ -1187,6 +1233,9 @@ pub fn sys_utimensat(
                 debug!("[sys_utimensat] mtime nsec is UTIME_OMIT, unchanged");
             } else {
                 debug!("[sys_utimensat] mtime normal nsec");
+                if mtime.nsec >= 1_000_000_000 {
+                    return Err(SyscallErr::EINVAL);
+                }
                 inner_lock.st_mtim = *mtime;
             }
             debug!("[sys_utimensat] mtime: {:?}", inner_lock.st_mtim);
@@ -1195,6 +1244,18 @@ pub fn sys_utimensat(
         }
         return Ok(0);
     }
+}
+
+pub async fn sys_truncate(pathname: usize, len: usize) -> SyscallRet {
+    stack_trace!();
+    let (inode, _, _) = path::path_to_inode_ffi(AT_FDCWD, pathname as *const u8)?;
+    let inode = inode.ok_or(SyscallErr::ENOENT)?;
+    if inode.metadata().mode == InodeMode::FileDIR {
+        return Err(SyscallErr::EISDIR);
+    }
+    let file = inode.open(inode.clone())?;
+    file.truncate(len).await?;
+    Ok(0)
 }
 
 /// Checks whether the calling process can access the file pathname.

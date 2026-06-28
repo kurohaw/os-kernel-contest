@@ -1,8 +1,9 @@
 # 下一轮 LTP 大批量候选
 
 本文记录 LTP 提分清单和启用状态。2026-06-29 已在批次 A 主体之后继续启用
-批次 B 的 fd/pipe/vector-I/O 子集；后续不要重复加入这些 case，应根据官方
-结果决定回滚、拆分或继续推进 C/D 批。
+批次 B 的 fd/pipe/vector-I/O 子集、批次 C 的进程/信号/时间子集，以及批次
+D 中已有 syscall 支撑的文件操作子集；后续不要重复加入这些 case，应根据
+官方结果决定回滚、拆分或继续推进剩余 D 批。
 
 ## 当前基线
 
@@ -145,6 +146,12 @@ sendfile08 sendfile08_64 sendfile09 sendfile09_64
 - 这批对 VFS 语义更敏感，要在 A/B/C 稳定后加入。
 - `rename*`、`link*`、`symlink*` 若出现权限或路径失败，优先单独拆分调试。
 
+状态：2026-06-29 已启用 D 批中的 `unlink*`、`rename*`、`renameat*`、
+`truncate*`、`utimensat01` 和 `sendfile*` 子集。RISC-V 同步补齐
+`renameat=38`、`truncate=45`，并修正 `utimensat(NULL)` 和 `sendfile`
+大块复制路径。`creat*`、`link*`、`symlink*`、`statx*`、`utime*` 和
+`utimes01` 暂缓，等 RISC-V 主线补齐对应 syscall 或单项验证后再加入。
+
 ## 如何启用
 
 RISC-V 路径：
@@ -157,7 +164,8 @@ LoongArch 路径：
 
 1. 同步修改 `SWTC-la/src/init.sh` 的 `run_ltp_subset` case 列表。
 2. 保持每个 case 使用 `/musl/busybox timeout 5 "./$case_name"`。
-3. 无论退出码是否为 0，都输出 `FAIL LTP CASE name : status`。
+3. 无论退出码是否为 0，都输出 `FAIL LTP CASE name : status`，这和
+   RISC-V `runtestcase` 已线上计分的 LTP 收尾协议一致。
 
 本地日志分析：
 

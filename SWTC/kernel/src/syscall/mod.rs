@@ -10,7 +10,9 @@ const SYSCALL_MKNOD: usize = 33;
 const SYSCALL_MKDIR: usize = 34;
 const SYSCALL_UMOUNT: usize = 39;
 const SYSCALL_MOUNT: usize = 40;
+const SYSCALL_RENAMEAT: usize = 38;
 const SYSCALL_STATFS: usize = 43;
+const SYSCALL_TRUNCATE: usize = 45;
 const SYSCALL_FTRUNCATE: usize = 46;
 const SYSCALL_FACCESSAT: usize = 48;
 const SYSCALL_CHDIR: usize = 49;
@@ -190,6 +192,16 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             sys_mkdirat,
             (args[0] as isize, args[1] as *const u8, args[2])
         ),
+        SYSCALL_RENAMEAT => sys_handler!(
+            sys_renameat2,
+            (
+                args[0] as isize,
+                args[1] as *const u8,
+                args[2] as isize,
+                args[3] as *const u8,
+                0,
+            )
+        ),
         SYSCALL_UMOUNT => sys_handler!(sys_umount, (args[0], args[1] as u32), await),
         SYSCALL_MOUNT => sys_handler!(
             sys_mount,
@@ -202,6 +214,7 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             )
         ),
         SYSCALL_STATFS => sys_handler!(sys_statfs, (args[0] as *const u8, args[1] as *mut Statfs)),
+        SYSCALL_TRUNCATE => sys_handler!(sys_truncate, (args[0], args[1]), await),
         SYSCALL_FTRUNCATE => sys_handler!(sys_ftruncate, (args[0], args[1]), await),
         SYSCALL_FACCESSAT => sys_handler!(
             sys_faccessat,

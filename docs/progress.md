@@ -39,6 +39,23 @@
   `FAIL LIBCTEST CASE`、`========== END ... ==========`，降低到达 libctest 后
   仍因解析格式不匹配而 0 分的风险。
 
+## 2026-06-29 LTP 批次 D 文件操作子集
+
+- 继续按“先啃大分区”的策略推进 LTP，不再投入 lmbench 小幅波动项。
+- RISC-V syscall 表补齐 `renameat=38` 和 `truncate=45`：`renameat` 复用
+  已有 `renameat2(..., flags=0)`，`truncate` 通过路径解析后打开 inode 并调用
+  文件 truncate 路径。
+- `sys_utimensat` 修复 `times == NULL` 时只更新 atime 的问题，现在 atime、
+  mtime、ctime 同步设为当前时间；普通时间路径补充 `nsec < 1e9` 校验。
+- `sys_sendfile` 改为 64 KiB 分块复制，避免 LTP `sendfile*` 大 `count`
+  导致一次性分配过大缓冲；同时正确更新显式 offset 指针。
+- RV/LA 同步追加 `unlink*`、`rename*`、`renameat*`、`truncate*`、
+  `utimensat01` 和 `sendfile*` 子集。`creat/link/symlink/statx/utime/utimes`
+  暂缓，避免把尚未补齐的 syscall 直接变成确定失败项。
+- LA LTP 脚本继续对每个 case 输出 `FAIL LTP CASE name : status`，即使
+  `status=0` 也作为收尾 marker，保持与 RISC-V `runtestcase` 已线上计分的
+  LTP 协议一致。
+
 ## 2026-06-28 heapless path 依赖编译修复
 
 - 伙伴将 `heapless 0.7.17` 从 registry 依赖改为本地 path patch，以避免官方

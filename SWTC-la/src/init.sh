@@ -166,7 +166,17 @@ run_ltp_subset() (
         kill02 kill03 kill05 kill06 kill07 kill08 kill09 kill10 kill11 kill12 kill13 \
         waitpid01 waitpid03 waitpid04 waitpid06 waitpid07 waitpid08 \
         waitpid09 waitpid10 waitpid11 waitpid12 waitpid13 \
-        fork04 fork09 fork13 fork14
+        fork04 fork09 fork13 fork14 \
+        unlink05 unlink07 unlink08 unlink09 unlinkat01 \
+        rename01 rename03 rename04 rename05 rename06 rename07 rename08 \
+        rename09 rename10 rename11 rename12 rename13 rename14 \
+        renameat01 renameat201 renameat202 \
+        truncate02 truncate02_64 truncate03 truncate03_64 \
+        utimensat01 \
+        sendfile02 sendfile02_64 sendfile03 sendfile03_64 \
+        sendfile04 sendfile04_64 sendfile05 sendfile05_64 \
+        sendfile06 sendfile06_64 sendfile07 sendfile07_64 \
+        sendfile08 sendfile08_64 sendfile09 sendfile09_64
     do
         if [ ! -f "./$case_name" ]; then
             continue
