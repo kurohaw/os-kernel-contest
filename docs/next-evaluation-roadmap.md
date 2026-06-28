@@ -1,5 +1,8 @@
 # 2026-06-28 下一次评测路线
 
+2800 分分区缺口、三轮冲刺目标和评测结果分叉处理见
+[`score-2800-roadmap.md`](score-2800-roadmap.md)。
+
 ## 838 回退后的主线
 
 `301e9717 feat: batch LoongArch big test probes` 的官方结果内嵌 JSON 显示
