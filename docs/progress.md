@@ -77,6 +77,20 @@
   `timerfd01/02/04`。`readv02`、`link*`、iozone、cyclictest 和网络组仍不进入
   本轮。
 
+## 2026-06-29 根构建入口兜底
+
+- 2026-06-29 06:28 官方结果为 `Compile Error`，输出只有
+  `make: *** No rule to make target 'all'. Stop.`，说明评测机尚未进入 SWTC
+  编译阶段，不是 Rust、vendor 或本轮 LTP syscall 代码错误。
+- GitLab `main` 当前确认包含根目录 `Makefile` 且 `all: build` 存在；该错误更像
+  提交包根目录不对、平台导出包未保留 Makefile，或评测入口没有识别到标准文件名。
+- 为降低文件名识别风险，新增根目录 `GNUmakefile`，内容与 `Makefile` 保持一致。
+  GNU make 会优先读取 `GNUmakefile`；即使平台没有选择普通 `Makefile`，仍应能进入
+  同一套 `make all` 构建流程。
+- 若下一次仍是同一条 `No rule to make target 'all'`，优先检查提交方式：不要上传
+  “外层包着项目目录”的 GitLab/GitHub 自动源码包，应让仓库内容直接位于提交根目录，
+  或确认平台确实从 GitLab `main` 克隆。
+
 ## 2026-06-28 heapless path 依赖编译修复
 
 - 伙伴将 `heapless 0.7.17` 从 registry 依赖改为本地 path patch，以避免官方
