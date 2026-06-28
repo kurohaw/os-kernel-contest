@@ -67,3 +67,4 @@ directory = "vendor"
 
 [patch.crates-io]
 managed = { path = "../vendor/managed-0.8.0" }
+heapless = { path = "../vendor/heapless-0.7.17" }
