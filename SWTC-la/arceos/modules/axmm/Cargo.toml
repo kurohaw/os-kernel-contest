@@ -25,5 +25,5 @@ axerrno     = { workspace = true }
 lazyinit    = { workspace = true }
 memory_addr = { workspace = true }
 kspin       = { workspace = true }
-memory_set  = "0.4"
+memory_set  = { workspace = true }
 page_table_multiarch = { workspace = true }

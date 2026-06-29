@@ -25,7 +25,7 @@ LA_BUILD_STD = $(shell sysroot="$$(rustup run $(LA_TOOLCHAIN) rustc --print sysr
 		echo 1; \
 	fi)
 
-all: build
+all: sanitize-submit-workdir build sanitize-submit-workdir-post
 
 check-rv-tools:
 	@command -v rustc >/dev/null || { echo "error: rustc is required"; exit 1; }
@@ -71,6 +71,12 @@ prepare-la: check-la-tools restore-vendor-la
 	mkdir -p $(SWTC_LA)/.cargo
 	cp $(SWTC_LA)/cargo-config/config.toml $(SWTC_LA)/.cargo/config.toml
 
+sanitize-submit-workdir:
+	rm -f sdcard-rv.img sdcard-la.img
+
+sanitize-submit-workdir-post:
+	rm -f sdcard-rv.img sdcard-la.img
+
 build-rv: prepare-rv
 	RUSTUP_TOOLCHAIN=$(RV_TOOLCHAIN) $(MAKE) -C $(SWTC_USER) build PRELIMINARY=0
 	RUSTUP_TOOLCHAIN=$(RV_TOOLCHAIN) $(MAKE) -C $(SWTC_KERNEL) kernel TMPFS=1 SUBMIT=1
@@ -105,7 +111,8 @@ clean:
 	$(MAKE) -C $(SWTC_KERNEL) clean
 	$(MAKE) -C $(SWTC_USER) clean
 	$(MAKE) -C $(SWTC_LA) clean
-	rm -f $(KERNEL_RV) $(KERNEL_LA)
+	rm -f $(KERNEL_RV) $(KERNEL_LA) sdcard-rv.img sdcard-la.img
 
 .PHONY: all check-rv-tools check-la-tools restore-vendor-rv restore-vendor-la \
-	prepare-rv prepare-la build build-rv build-la build-la-strict clean
+	prepare-rv prepare-la sanitize-submit-workdir sanitize-submit-workdir-post \
+	build build-rv build-la build-la-strict clean

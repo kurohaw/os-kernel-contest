@@ -12,6 +12,10 @@ kernel-rv
 kernel-la
 disk.img
 disk-la.img
+/sdcard-rv.img
+/sdcard-la.img
+/sdcard-rv.img.gz
+/sdcard-la.img.gz
 SWTC-la/target-tools/
 SWTC-la/.axconfig.*.toml
 SWTC-la/arceos/crates/lwext4_rust/c/lwext4/build_musl-generic/
