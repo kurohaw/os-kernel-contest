@@ -15,8 +15,8 @@ use super::PollFd;
 use crate::config::fs::PIPE_BUF_CAPACITY;
 use crate::config::mm::PAGE_SIZE;
 use crate::fs::ffi::{
-    Dirent, FdSet, StatFlags, Statfs, Statx, StatxTimestamp, Sysinfo, FD_SET_LEN, SEEK_CUR,
-    SEEK_END, SEEK_SET, STAT, STATFS_SIZE, STATX_SIZE, STAT_SIZE, SYSINFO_SIZE,
+    Dirent, FdSet, StatFlags, Statfs, Sysinfo, FD_SET_LEN, SEEK_CUR, SEEK_END, SEEK_SET, STAT,
+    STATFS_SIZE, STAT_SIZE, SYSINFO_SIZE,
 };
 use crate::fs::file_system::FsDevice;
 use crate::fs::inode::INODE_CACHE;
@@ -44,13 +44,6 @@ use crate::utils::path::{self, is_relative_path};
 use crate::utils::string::c_str_to_string;
 
 const AT_REMOVEDIR: u32 = 0x200;
-const AT_EMPTY_PATH: u32 = 0x1000;
-const AT_STATX_FORCE_SYNC: u32 = 0x2000;
-const AT_STATX_DONT_SYNC: u32 = 0x4000;
-const AT_STATX_SYNC_TYPE: u32 = AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC;
-const STATX_BASIC_STATS: u32 = 0x07ff;
-const STATX_BTIME: u32 = 0x0800;
-const STATX_RESERVED: u32 = 0x8000_0000;
 const IOV_MAX: usize = 1024;
 
 /// get current working directory
@@ -564,127 +557,6 @@ pub fn sys_newfstatat(
     }
 }
 
-pub fn sys_statx(
-    dirfd: isize,
-    pathname: usize,
-    flags: u32,
-    mask: u32,
-    statx_buf: usize,
-) -> SyscallRet {
-    stack_trace!();
-
-    let valid_flags = FcntlFlags::AT_SYMLINK_NOFOLLOW.bits()
-        | FcntlFlags::AT_NO_AUTOMOUNT.bits()
-        | AT_EMPTY_PATH
-        | AT_STATX_SYNC_TYPE;
-    if flags & !valid_flags != 0 || flags & AT_STATX_SYNC_TYPE == AT_STATX_SYNC_TYPE {
-        return Err(SyscallErr::EINVAL);
-    }
-    if mask & STATX_RESERVED != 0 {
-        return Err(SyscallErr::EINVAL);
-    }
-
-    UserCheck::new().check_writable_slice(statx_buf as *mut u8, STATX_SIZE)?;
-
-    if pathname == 0 {
-        if flags & AT_EMPTY_PATH == 0 {
-            return Err(SyscallErr::EFAULT);
-        }
-    } else {
-        UserCheck::new().check_c_str(pathname as *const u8)?;
-        let _sum_guard = SumGuard::new();
-        if c_str_to_string(pathname as *const u8).is_empty() && flags & AT_EMPTY_PATH == 0 {
-            return Err(SyscallErr::ENOENT);
-        }
-    }
-
-    let (inode, _, _) = path::path_to_inode_ffi(dirfd, pathname as *const u8)?;
-    let inode = inode.ok_or(SyscallErr::ENOENT)?;
-    _statx(inode, statx_buf, mask)
-}
-
-fn _statx(inode: Arc<dyn Inode>, statx_buf: usize, mask: u32) -> SyscallRet {
-    let inode_meta = inode.metadata();
-    let mut kstatx = Statx::new();
-    let mut inner_lock = inode_meta.inner.lock();
-
-    let size = if inode_meta.mode == InodeMode::FileDIR {
-        if inner_lock.data_len != 0 {
-            inner_lock.data_len
-        } else {
-            let children = inner_lock.children.clone();
-            let mut size = 0;
-            for child in children {
-                size += child.1.metadata().inner.lock().data_len;
-            }
-            inner_lock.data_len = size;
-            size
-        }
-    } else {
-        inner_lock.data_len
-    };
-
-    let requested_btime = mask & STATX_BTIME != 0;
-    kstatx.stx_mask = STATX_BASIC_STATS | if requested_btime { STATX_BTIME } else { 0 };
-    kstatx.stx_blksize = 512;
-    kstatx.stx_nlink = 1;
-    kstatx.stx_uid = 0;
-    kstatx.stx_gid = 0;
-    kstatx.stx_mode = inode_meta.mode as u16;
-    kstatx.stx_ino = inode_meta.ino as u64;
-    kstatx.stx_size = size as u64;
-    kstatx.stx_blocks = ((size as u64) + 511) / 512;
-    kstatx.stx_atime = statx_timestamp_from_timespec(inner_lock.st_atim);
-    kstatx.stx_mtime = statx_timestamp_from_timespec(inner_lock.st_mtim);
-    kstatx.stx_ctime = statx_timestamp_from_timespec(inner_lock.st_ctim);
-    if requested_btime {
-        kstatx.stx_btime = kstatx.stx_ctime;
-    }
-    kstatx.stx_dev_minor = 12138;
-
-    unsafe {
-        ptr::write(statx_buf as *mut Statx, kstatx);
-    }
-    Ok(0)
-}
-
-fn statx_timestamp_from_timespec(time: TimeSpec) -> StatxTimestamp {
-    StatxTimestamp {
-        tv_sec: time.sec as i64,
-        tv_nsec: time.nsec as u32,
-        __reserved: 0,
-    }
-}
-
-pub fn sys_symlinkat(target: usize, newdirfd: isize, linkpath: usize) -> SyscallRet {
-    stack_trace!();
-    UserCheck::new().check_c_str(target as *const u8)?;
-    UserCheck::new().check_c_str(linkpath as *const u8)?;
-
-    let target = {
-        let _sum_guard = SumGuard::new();
-        c_str_to_string(target as *const u8)
-    };
-    if target.is_empty() {
-        return Err(SyscallErr::ENOENT);
-    }
-
-    let (link_inode, link_path, parent) = path::path_to_inode_ffi(newdirfd, linkpath as *const u8)?;
-    if link_inode.is_some() {
-        return Err(SyscallErr::EEXIST);
-    }
-    let parent = parent.ok_or(SyscallErr::ENOENT)?;
-    if parent.metadata().mode != InodeMode::FileDIR {
-        return Err(SyscallErr::ENOTDIR);
-    }
-
-    let link_name = path::get_name(&link_path);
-    let link_inode = parent.mknod_v(link_name, InodeMode::FileLNK, None)?;
-    let file = link_inode.open(link_inode.clone())?;
-    file.sync_write(target.as_bytes())?;
-    Ok(0)
-}
-
 pub fn sys_lseek(fd: usize, offset: isize, whence: u8) -> SyscallRet {
     stack_trace!();
     let fd_info = current_process()
@@ -935,22 +807,6 @@ const F_GETLK: i32 = 5;
 const F_SETLK: i32 = 6;
 const F_SETLKW: i32 = 7;
 const F_UNLCK: i16 = 2;
-const LOCK_SH: u32 = 1;
-const LOCK_EX: u32 = 2;
-const LOCK_NB: u32 = 4;
-const LOCK_UN: u32 = 8;
-
-pub fn sys_flock(fd: usize, operation: u32) -> SyscallRet {
-    stack_trace!();
-    current_process().inner_handler(|proc| {
-        proc.fd_table.get_ref(fd).ok_or(SyscallErr::EBADF)?;
-        Ok(())
-    })?;
-    match operation & !LOCK_NB {
-        LOCK_SH | LOCK_EX | LOCK_UN => Ok(0),
-        _ => Err(SyscallErr::EINVAL),
-    }
-}
 
 pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> SyscallRet {
     stack_trace!();
@@ -1064,72 +920,32 @@ pub async fn sys_sendfile(
         return Err(SyscallErr::EBADF);
     }
 
-    if count == 0 {
-        return Ok(0);
-    }
-
-    const SENDFILE_CHUNK: usize = 64 * 1024;
-    let mut buf = vec![0_u8; core::cmp::min(count, SENDFILE_CHUNK)];
-    let mut total = 0usize;
-    let mut remaining = count;
-    let mut input_offset = 0usize;
-
-    if offset_ptr != 0 {
-        UserCheck::new()
-            .check_readable_slice(offset_ptr as *const u8, core::mem::size_of::<usize>())?;
-        UserCheck::new()
-            .check_writable_slice(offset_ptr as *mut u8, core::mem::size_of::<usize>())?;
-        let _sum_guard = SumGuard::new();
-        input_offset = unsafe { *(offset_ptr as *const usize) };
-    }
-
-    while remaining > 0 {
-        let request = core::cmp::min(remaining, SENDFILE_CHUNK);
-        if buf.len() != request {
-            buf.resize(request, 0);
-        }
-
-        let nbytes = if offset_ptr == 0 {
-            input_file
-                .file
-                .read(&mut buf[..request], input_file.flags)
-                .await?
-        } else {
+    let mut buf = vec![0 as u8; count];
+    let nbytes = match offset_ptr {
+        0 => input_file.file.read(&mut buf, input_file.flags).await?,
+        _ => {
+            UserCheck::new()
+                .check_readable_slice(offset_ptr as *const u8, core::mem::size_of::<usize>())?;
             let _sum_guard = SumGuard::new();
-            input_file
-                .file
-                .pread(&mut buf[..request], input_offset + total)
-                .await?
-        };
-
-        if nbytes == 0 {
-            break;
+            let input_offset = unsafe { *(offset_ptr as *const usize) };
+            let nbytes = input_file.file.pread(&mut buf, input_offset).await?;
+            // let old_offset = input_file.offset()?;
+            // input_file.seek(input_offset)?;
+            // let nbytes = input_file.read(&mut buf).await?;
+            // input_file.seek(old_offset as usize)?;
+            unsafe {
+                *(offset_ptr as *mut usize) = *(offset_ptr as *mut usize) + nbytes as usize;
+            }
+            nbytes
         }
-
-        info!("[sys_sendfile]: read {} bytes from inputfile", nbytes);
-        let written = output_file
-            .file
-            .write(&buf[..nbytes], output_file.flags)
-            .await?;
-        if written == 0 {
-            break;
-        }
-
-        total += written;
-        remaining = remaining.saturating_sub(written);
-        if written < nbytes || nbytes < request {
-            break;
-        }
-    }
-
-    if offset_ptr != 0 {
-        let _sum_guard = SumGuard::new();
-        unsafe {
-            *(offset_ptr as *mut usize) = input_offset + total;
-        }
-    }
+    };
+    info!("[sys_sendfile]: read {} bytes from inputfile", nbytes);
+    let ret = output_file
+        .file
+        .write(&buf[0..nbytes as usize], output_file.flags)
+        .await;
     debug!("[sys_sendfile]: finished");
-    Ok(total)
+    ret
 }
 /// If newpath already exists, replace it.
 /// If oldpath and newpath are existing hard links referring to the same inode, then return a success.
@@ -1298,7 +1114,7 @@ pub fn sys_renameat2(
     }
 }
 
-pub fn sys_readlinkat(dirfd: isize, path_name: usize, buf: usize, buf_size: usize) -> SyscallRet {
+pub fn sys_readlinkat(dirfd: usize, path_name: usize, buf: usize, buf_size: usize) -> SyscallRet {
     stack_trace!();
     let _sum_guard = SumGuard::new();
     UserCheck::new().check_c_str(path_name as *const u8)?;
@@ -1310,25 +1126,7 @@ pub fn sys_readlinkat(dirfd: isize, path_name: usize, buf: usize, buf_size: usiz
     UserCheck::new().check_writable_slice(buf as *mut u8, buf_size)?;
 
     // lmbench's multi-call binary asks /proc/self/exe to find the backing image.
-    if path == "/proc/self/exe" {
-        let target = "/lmbench_all".as_bytes();
-        let copy_len = core::cmp::min(buf_size, target.len());
-        unsafe {
-            (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);
-        }
-        return Ok(copy_len);
-    }
-
-    let (inode, _, _) = path::path_to_inode_ffi(dirfd, path_name as *const u8)?;
-    let inode = inode.ok_or(SyscallErr::ENOENT)?;
-    if inode.metadata().mode != InodeMode::FileLNK {
-        return Err(SyscallErr::EINVAL);
-    }
-
-    let len = inode.metadata().inner.lock().data_len;
-    let file = inode.open(inode.clone())?;
-    let mut target = vec![0_u8; len];
-    file.sync_read(&mut target)?;
+    let target = "/lmbench_all".as_bytes();
     let copy_len = core::cmp::min(buf_size, target.len());
     unsafe {
         (buf as *mut u8).copy_from_nonoverlapping(target.as_ptr(), copy_len);
@@ -1362,10 +1160,7 @@ pub fn sys_utimensat(
         if times.is_null() {
             debug!("[sys_utimensat] times is null");
             // If times is null, then both timestamps are set to the current time.
-            let now = current_time_spec();
-            inner_lock.st_atim = now;
-            inner_lock.st_mtim = now;
-            inner_lock.st_ctim = now;
+            inner_lock.st_atim = current_time_spec();
         } else {
             // times[0] for atime, times[1] for mtime
             UserCheck::new()
@@ -1381,9 +1176,6 @@ pub fn sys_utimensat(
                 debug!("[sys_utimensat] atime nsec is UTIME_OMIT, unchanged");
             } else {
                 debug!("[sys_utimensat] atime normal nsec");
-                if atime.nsec >= 1_000_000_000 {
-                    return Err(SyscallErr::EINVAL);
-                }
                 inner_lock.st_atim = *atime;
             }
             debug!("[sys_utimensat] atime: {:?}", inner_lock.st_atim);
@@ -1395,9 +1187,6 @@ pub fn sys_utimensat(
                 debug!("[sys_utimensat] mtime nsec is UTIME_OMIT, unchanged");
             } else {
                 debug!("[sys_utimensat] mtime normal nsec");
-                if mtime.nsec >= 1_000_000_000 {
-                    return Err(SyscallErr::EINVAL);
-                }
                 inner_lock.st_mtim = *mtime;
             }
             debug!("[sys_utimensat] mtime: {:?}", inner_lock.st_mtim);
@@ -1406,18 +1195,6 @@ pub fn sys_utimensat(
         }
         return Ok(0);
     }
-}
-
-pub async fn sys_truncate(pathname: usize, len: usize) -> SyscallRet {
-    stack_trace!();
-    let (inode, _, _) = path::path_to_inode_ffi(AT_FDCWD, pathname as *const u8)?;
-    let inode = inode.ok_or(SyscallErr::ENOENT)?;
-    if inode.metadata().mode == InodeMode::FileDIR {
-        return Err(SyscallErr::EISDIR);
-    }
-    let file = inode.open(inode.clone())?;
-    file.truncate(len).await?;
-    Ok(0)
 }
 
 /// Checks whether the calling process can access the file pathname.

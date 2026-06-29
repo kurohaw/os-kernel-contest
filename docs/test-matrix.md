@@ -4,16 +4,16 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | Accepted 633，LA 回退为 0 | 2026-06-29 08:39:03 提交，`633.8849818370428`；RISC-V LTP=210，LA 全部为 0，页面同时有平台 gzip 残留镜像异常 |
-| 最新稳定线上结果 | 983 基线稳定 | RISC-V basic/BusyBox/Lua/libcbench/libctest/LTP 保持，LoongArch basic/BusyBox/Lua/libcbench 已开始线上计分 |
+| 官方页面最后可见结果 | Accepted 732，LA 大幅回退 | 2026-06-29 17:15:29 提交，`732.0160593482119`；RISC-V LTP=214，LA 仅 musl basic=98，其余 LA 组为 0 |
+| 最新稳定线上结果 | 983 基线待恢复 | `983.6805892892955` 对应 `fc950984`；本轮恢复其六个运行时文件，同时保留后续编译修复 |
 | 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
 | LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |
 | LA glibc libcbench trap | 已隔离 | 2026-06-29 日志在 `libcbench-glibc` 触发 LoongArch `MemoryAccessAddressError`，导致后置 libctest/LTP/lmbench 不执行；当前先跳过该 0 分项 |
 | LoongArch lmbench 后置探针 | 已接入，待线上确认 | 官方 lmbench 命令序列改为逐命令 timeout，并放在所有 functional 组之后；失败不应截断 basic/BusyBox/libcbench/libctest/LTP |
 | 最新官方编译错误 | 已切换依赖路径 | 2026-06-29 12:22:30 提交缺少 `SWTC/vendor/heapless-0.7.17/Cargo.toml`；新增无隐藏内容的 `SWTC/dependencies/heapless` 并改用该 path |
-| heapless 过滤兼容 | 待干净导出验证 | 新路径不含任何隐藏文件；原 vendor 副本保留，不改变 53 个 RV vendor manifest |
+| heapless 过滤兼容 | 干净导出通过 | 新路径不含任何隐藏文件；原 vendor 副本保留，不改变 53 个 RV vendor manifest |
 | `allocator-api2` vendor checksum | 已修复 | Git index 校验原有 22 个 mismatch；重建非隐藏 manifest 后 RV 53/0、LA 268/0 |
-| 根目录 `make all` | 本地通过 | 必须生成真实 RISC-V `kernel-rv`；真实 LA 构建失败时生成占位 `kernel-la`，不阻塞提交 |
+| 隐藏过滤候选构建 | RV 与 LA 严格构建通过 | 无隐藏路径导出中 RV 入口 `0x80200000`、LA 入口 `0x80000000`；保留 fallback，但本轮提交验证使用真实 LA ELF |
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
 | `kernel-la` 格式 | 通过 | `build-la-strict` 生成 LoongArch executable ELF，入口 `0x80000000`；默认 fallback 仍保留 |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |

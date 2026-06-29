@@ -146,15 +146,12 @@ run_ltp_subset() (
         getrusage01 getrusage02 getrusage03 getrusage04 \
         gettid01 gettid02 \
         getrandom01 getrandom02 getrandom03 getrandom04 getrandom05 \
-        eventfd01 eventfd02 eventfd03 eventfd04 eventfd05 eventfd06 \
-        eventfd2_01 eventfd2_02 eventfd2_03 \
         dup05 dup201 dup203 dup205 dup3_01 dup3_02 \
         openat01 openat02 openat03 openat04 openat201 openat202 openat203 \
         fcntl01 fcntl01_64 fcntl02 fcntl02_64 fcntl03 fcntl03_64 \
         fcntl04 fcntl04_64 fcntl05 fcntl05_64 fcntl07 fcntl07_64 \
         fcntl08 fcntl08_64 fcntl09 fcntl09_64 fcntl10 fcntl10_64 \
         fcntl11 fcntl11_64 fcntl12 fcntl12_64 fcntl13 fcntl13_64 \
-        flock01 flock02 flock03 flock04 flock06 \
         pipe02 pipe03 pipe04 pipe05 pipe07 pipe08 pipe09 pipe12 pipe13 pipe15 \
         pipe2_01 pipe2_02 pipe2_04 \
         writev01 writev02 writev03 writev05 writev06 writev07 \
@@ -166,27 +163,10 @@ run_ltp_subset() (
         select01 select02 select03 select04 \
         alarm03 alarm05 alarm06 alarm07 \
         nanosleep01 nanosleep02 nanosleep04 \
-        timerfd_create01 timerfd_gettime01 timerfd_settime01 timerfd_settime02 \
-        timerfd01 timerfd02 timerfd04 \
         kill02 kill03 kill05 kill06 kill07 kill08 kill09 kill10 kill11 kill12 kill13 \
         waitpid01 waitpid03 waitpid04 waitpid06 waitpid07 waitpid08 \
         waitpid09 waitpid10 waitpid11 waitpid12 waitpid13 \
-        fork04 fork09 fork13 fork14 \
-        creat01 creat03 creat04 creat05 creat06 creat07 creat08 creat09 \
-        symlink01 symlink02 symlink03 symlink04 symlinkat01 \
-        unlink05 unlink07 unlink08 unlink09 unlinkat01 \
-        rename01 rename03 rename04 rename05 rename06 rename07 rename08 \
-        rename09 rename10 rename11 rename12 rename13 rename14 \
-        renameat01 renameat201 renameat202 \
-        truncate02 truncate02_64 truncate03 truncate03_64 \
-        utime01 utime02 utime03 utime04 utime05 utime06 utime07 \
-        utimensat01 utimes01 \
-        sendfile02 sendfile02_64 sendfile03 sendfile03_64 \
-        sendfile04 sendfile04_64 sendfile05 sendfile05_64 \
-        sendfile06 sendfile06_64 sendfile07 sendfile07_64 \
-        sendfile08 sendfile08_64 sendfile09 sendfile09_64 \
-        statx01 statx02 statx03 statx04 statx05 statx06 \
-        statx07 statx08 statx09 statx10 statx11 statx12
+        fork04 fork09 fork13 fork14
     do
         if [ ! -f "./$case_name" ]; then
             continue
@@ -233,16 +213,11 @@ run_libctest_list() {
             continue
         fi
         case_name="$4"
-        echo "========== START $entry_name $case_name =========="
-        echo "RUN LIBCTEST CASE $case_name"
         /musl/busybox timeout 8 ./runtest.exe -w "$entry_name" "$case_name"
         status="$?"
-        if [ "$status" -eq 0 ]; then
-            echo "Pass!"
-        else
+        if [ "$status" -ne 0 ]; then
             echo "FAIL LIBCTEST CASE $case_name : $status"
         fi
-        echo "========== END $entry_name $case_name =========="
         count=$((count + 1))
         if [ "$count" -ge "$limit" ]; then
             break
@@ -260,10 +235,11 @@ run_busybox_script /glibc glibc
 run_script /musl lua_testcode.sh
 run_script /glibc lua_testcode.sh
 
-# Keep the LA musl libcbench path because it is already scoring.  Do not run
-# glibc libcbench before libctest/LTP: the 2026-06-29 official log traps in
-# libcbench-glibc and truncates every later LA group.
+# Keep performance tests isolated in their own official directories.  The
+# libcbench scripts are already part of the stable RISC-V score baseline and
+# require no global runtime files beyond the links prepared above.
 run_script_with_timeout /musl libcbench_testcode.sh 180
+run_script_with_timeout /glibc libcbench_testcode.sh 180
 
 # The official image has used both layouts across revisions.
 if [ -f /musl/libctest_testcode.sh ]; then
@@ -279,10 +255,5 @@ run_ltp_subset
 # still times out or fails to score.
 run_lmbench_subset /musl lmbench-musl
 run_lmbench_subset /glibc lmbench-glibc
-
-# Re-enable this only after the LoongArch memory access trap in glibc
-# libcbench is fixed.  It currently scores 0 and prevents LA libctest/LTP from
-# running when placed earlier.
-# run_script_with_timeout /glibc libcbench_testcode.sh 180
 
 /bin/sync

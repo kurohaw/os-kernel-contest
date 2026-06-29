@@ -1,21 +1,16 @@
 //! Implementation of syscalls
 
 const SYSCALL_GETCWD: usize = 17;
-const SYSCALL_EVENTFD2: usize = 19;
 const SYSCALL_DUP: usize = 23;
 const SYSCALL_DUP3: usize = 24;
 const SYSCALL_FCNTL: usize = 25;
 const SYSCALL_IOCTL: usize = 29;
-const SYSCALL_FLOCK: usize = 32;
 const SYSCALL_UNLINK: usize = 35;
 const SYSCALL_MKNOD: usize = 33;
 const SYSCALL_MKDIR: usize = 34;
 const SYSCALL_UMOUNT: usize = 39;
 const SYSCALL_MOUNT: usize = 40;
-const SYSCALL_SYMLINKAT: usize = 36;
-const SYSCALL_RENAMEAT: usize = 38;
 const SYSCALL_STATFS: usize = 43;
-const SYSCALL_TRUNCATE: usize = 45;
 const SYSCALL_FTRUNCATE: usize = 46;
 const SYSCALL_FACCESSAT: usize = 48;
 const SYSCALL_CHDIR: usize = 49;
@@ -42,9 +37,6 @@ const SYSCALL_NEWFSTATAT: usize = 79;
 const SYSCALL_FSTAT: usize = 80;
 const SYSCALL_SYNC: usize = 81;
 const SYSCALL_FSYNC: usize = 82;
-const SYSCALL_TIMERFD_CREATE: usize = 85;
-const SYSCALL_TIMERFD_SETTIME: usize = 86;
-const SYSCALL_TIMERFD_GETTIME: usize = 87;
 const SYSCALL_UTIMENSAT: usize = 88;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_EXIT_GROUP: usize = 94;
@@ -120,7 +112,6 @@ const SYSCALL_GETRANDOM: usize = 278;
 const SYSCALL_MEMBARRIER: usize = 283;
 const SYSCALL_PREADV2: usize = 286;
 const SYSCALL_PWRITEV2: usize = 287;
-const SYSCALL_STATX: usize = 291;
 
 mod dev;
 mod fs;
@@ -183,12 +174,10 @@ macro_rules! sys_handler {
 pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
     match syscall_id {
         SYSCALL_GETCWD => sys_handler!(sys_getcwd, (args[0], args[1])),
-        SYSCALL_EVENTFD2 => sys_handler!(sys_eventfd2, (args[0] as u64, args[1] as u32)),
         SYSCALL_DUP => sys_handler!(sys_dup, (args[0])),
         SYSCALL_DUP3 => sys_handler!(sys_dup3, (args[0], args[1], args[2] as u32)),
         SYSCALL_FCNTL => sys_handler!(sys_fcntl, (args[0], args[1] as i32, args[2] as usize)),
         SYSCALL_IOCTL => sys_handler!(sys_ioctl, (args[0], args[1], args[2])),
-        SYSCALL_FLOCK => sys_handler!(sys_flock, (args[0], args[1] as u32)),
         SYSCALL_UNLINK => sys_handler!(
             sys_unlinkat,
             (args[0] as isize, args[1] as *const u8, args[2] as u32)
@@ -200,17 +189,6 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         SYSCALL_MKDIR => sys_handler!(
             sys_mkdirat,
             (args[0] as isize, args[1] as *const u8, args[2])
-        ),
-        SYSCALL_SYMLINKAT => sys_handler!(sys_symlinkat, (args[0], args[1] as isize, args[2])),
-        SYSCALL_RENAMEAT => sys_handler!(
-            sys_renameat2,
-            (
-                args[0] as isize,
-                args[1] as *const u8,
-                args[2] as isize,
-                args[3] as *const u8,
-                0,
-            )
         ),
         SYSCALL_UMOUNT => sys_handler!(sys_umount, (args[0], args[1] as u32), await),
         SYSCALL_MOUNT => sys_handler!(
@@ -224,7 +202,6 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             )
         ),
         SYSCALL_STATFS => sys_handler!(sys_statfs, (args[0] as *const u8, args[1] as *mut Statfs)),
-        SYSCALL_TRUNCATE => sys_handler!(sys_truncate, (args[0], args[1]), await),
         SYSCALL_FTRUNCATE => sys_handler!(sys_ftruncate, (args[0], args[1]), await),
         SYSCALL_FACCESSAT => sys_handler!(
             sys_faccessat,
@@ -284,10 +261,7 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
             await
         ),
         SYSCALL_PPOLL => sys_handler!(sys_ppoll, (args[0], args[1], args[2], args[3]), await),
-        SYSCALL_READLINKAT => sys_handler!(
-            sys_readlinkat,
-            (args[0] as isize, args[1], args[2], args[3])
-        ),
+        SYSCALL_READLINKAT => sys_handler!(sys_readlinkat, (args[0], args[1], args[2], args[3])),
         SYSCALL_NEWFSTATAT => sys_handler!(
             sys_newfstatat,
             (
@@ -300,14 +274,6 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
         SYSCALL_FSTAT => sys_handler!(sys_fstat, (args[0], args[1])),
         SYSCALL_SYNC => sys_handler!(sys_sync, (), await),
         SYSCALL_FSYNC => sys_handler!(sys_fsync, (args[0]), await),
-        SYSCALL_TIMERFD_CREATE => {
-            sys_handler!(sys_timerfd_create, (args[0], args[1] as u32))
-        }
-        SYSCALL_TIMERFD_SETTIME => sys_handler!(
-            sys_timerfd_settime,
-            (args[0], args[1] as u32, args[2], args[3])
-        ),
-        SYSCALL_TIMERFD_GETTIME => sys_handler!(sys_timerfd_gettime, (args[0], args[1])),
         SYSCALL_UTIMENSAT => sys_handler!(
             sys_utimensat,
             (
@@ -563,16 +529,6 @@ pub async fn syscall(syscall_id: usize, args: [usize; 6]) -> SyscallRet {
                 await
             )
         }
-        SYSCALL_STATX => sys_handler!(
-            sys_statx,
-            (
-                args[0] as isize,
-                args[1],
-                args[2] as u32,
-                args[3] as u32,
-                args[4],
-            )
-        ),
         _ => {
             // panic!("Unsupported syscall_id: {}", syscall_id);
             error!("Unsupported syscall_id: {}", syscall_id);

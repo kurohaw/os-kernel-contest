@@ -8,16 +8,34 @@
 | 当前开发分支 | `codex/swtc-architecture`，推送到 GitHub/GitLab `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | 将 RISC-V `heapless` path 依赖复制到无隐藏内容的 `SWTC/dependencies/heapless`，绕过官方源码过滤后 vendor 子目录缺失 |
-| 最新可见线上结果 | 2026-06-29 08:39:03 提交，实际 `Accepted / 633.8849818370428`；页面同时出现平台 `sdcard-rv.img already exists` 异常，LA 全部为 0 |
+| 当前里程碑 | 截止前保分回退：恢复 `983.6805892892955` 对应的运行时行为，同时保留后续官方编译兼容修复 |
+| 当前提交 | 六个计分相关运行时文件恢复到 `fc950984`，保留 `GNUmakefile`、LA vendor、checksum 和 `SWTC/dependencies/heapless` |
+| 最新可见线上结果 | 2026-06-29 17:15:29 提交，`Accepted / 732.0160593482119`；RISC-V 保持主要得分，LoongArch 仅 musl basic=98，其余 LA 组为 0 |
 | 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
-| 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
+| 最新高分线上结果 | 2026-06-29 03:06:43，`Accepted / 983.6805892892955`；对应源码基线为 `fc950984` |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
 | 最新官方编译错误 | 2026-06-29 12:22:30 提交在 14:04 编译，`SWTC/vendor/heapless-0.7.17/Cargo.toml` 在官方提交目录中缺失；本轮改用 `SWTC/dependencies/heapless` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-29 732 分回退与 983 行为恢复
+
+- 17:15:29 提交的最新结果为 `Accepted / 732.0160593482119`：basic=302、
+  BusyBox=100、Lua=18、libcbench=56.76865684335159、musl-rv libctest=217、
+  musl-rv LTP=214。LoongArch 仅 musl basic=98，glibc basic、BusyBox、Lua、
+  libcbench、libctest 和 LTP 均为 0，是相对 983 基线的主要损失。
+- `33e7185d` 是记录 `983.6805892892955` 结果后的第一条修复，其父提交
+  `fc950984` 因而是该轮评测对应的最后运行时基线。
+- 本轮将 `SWTC-la/src/init.sh` 以及 RISC-V 的 `fs/ffi.rs`、`oscomp.rs`、
+  `syscall/fs.rs`、`syscall/mod.rs`、`syscall/time.rs` 精确恢复为
+  `fc950984` 内容，撤回尚未证明有净收益的后续 LTP D/E 批次和执行顺序调整。
+- 不整体 reset 到旧提交：继续保留根 `GNUmakefile`、真实 LA 离线 vendor、
+  allocator checksum 修复和无隐藏内容的 heapless 路径，避免恢复分数时重新引入
+  已确认的官方 Compile Error。
+- 隐藏路径过滤后的全新候选中，RISC-V 和 LoongArch 严格构建均通过，ELF 入口
+  分别为 `0x80200000` 和 `0x80000000`；RISC-V 无盘主动退出，LoongArch
+  BusyBox 回归为 `55/55`、0 fail、START/END 完整。
 
 ## 2026-06-29 heapless 官方源码过滤修复
 
