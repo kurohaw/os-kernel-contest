@@ -4,13 +4,13 @@
 
 | 项目 | 内容 |
 |---|---|
-| 当前日期 | 2026-06-29 |
-| 当前开发分支 | `codex/swtc-architecture`，推送到 GitHub/GitLab `main` |
+| 当前日期 | 2026-06-30 |
+| 当前开发分支 | `feat/ltp-single-case-on-gitlab`，推送到 GitLab `main` |
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
-| 当前里程碑 | 截止前保分回退：恢复 `983.6805892892955` 对应的运行时行为，同时保留后续官方编译兼容修复 |
-| 当前提交 | 六个计分相关运行时文件恢复到 `fc950984`，保留 `GNUmakefile`、LA vendor、checksum 和 `SWTC/dependencies/heapless` |
-| 最新可见线上结果 | 2026-06-29 17:15:29 提交，`Accepted / 732.0160593482119`；RISC-V 保持主要得分，LoongArch 仅 musl basic=98，其余 LA 组为 0 |
+| 当前里程碑 | 截止前恢复真实 LoongArch 构建，避免 `kernel-rv` 冒充 `kernel-la` |
+| 当前提交 | `xapi` 主构建路径迁移到 `SWTC-la/dependencies/xapi`；根构建增加 LA 源树完整性检查；默认必须生成真实 LoongArch ELF，仅本地显式 `ALLOW_LA_FALLBACK=1` 时允许占位 |
+| 最新可见线上结果 | 2026-06-29 22:37:51 提交，`Accepted / 646.4945242317908`；RV LTP 升至 318，但 LA 构建缺 `SWTC-la/xapi/Cargo.toml` 后生成无效 `kernel-la`，LA 全列为 0 |
 | 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-29 03:06:43，`Accepted / 983.6805892892955`；对应源码基线为 `fc950984` |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
@@ -18,6 +18,29 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-30 646 分 LA ELF 加载失败根因
+
+- 22:37:51 提交的官方结果为 `Accepted / 646.4945242317908`。RV 侧仍可得分：
+  basic=201、BusyBox=100、Lua=18、libcbench=55.840271608416316、
+  musl-rv libctest=217、musl-rv LTP=318；LoongArch 四列总计为 0。
+- LA 执行日志为 `qemu-system-loongarch64: could not load kernel 'kernel-la':
+  Failed to load ELF`，说明没有进入 LA init/syscall 路径。
+- 编译输出显示真实失败点是
+  `/coursegrader/submit/SWTC-la/xapi/Cargo.toml` 缺失；旧根构建随后把
+  `kernel-rv` 复制为 `kernel-la`，导致官方 LoongArch QEMU 加载 RISC-V ELF。
+- 本地 `bf7d1baf` 与 `gitlab/main` 的 Git tree 均包含 `SWTC-la/xapi` 43 个文件。
+  下一步必须以干净导出包验证源树完整性和真实 `kernel-la`，不能只在带本地生成物
+  的工作区里验证。
+- 参照 `heapless` 的处理方式，新增 `SWTC-la/dependencies/xapi` 并将 LA workspace
+  中的 `xapi` 依赖切到该路径，绕开官方源包对 `SWTC-la/xapi` 的异常遗漏。
+- 根 `Makefile` 与 `GNUmakefile` 已加入 `check-la-source`，检查
+  `SWTC-la/dependencies/xapi`、
+  `xcore`、关键 `xmodules` 与 `src/main.rs`；默认拒绝生成无效 LA placeholder。
+- 验证：从 staged index 生成 `xapi-candidate.tar`，解压到干净目录后根 `make all`
+  通过；`kernel-rv` 为 RISC-V ELF、入口 `0x80200000`，`kernel-la` 为
+  LoongArch ELF、入口 `0x80000000`。RISC-V 无盘 QEMU `QEMU_STATUS=0`，
+  输出 `!TEST FINISH!` 和 `kernel will shutdown`。
 
 ## 2026-06-29 732 分回退与 983 行为恢复
 

@@ -4,8 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | Accepted 732，LA 大幅回退 | 2026-06-29 17:15:29 提交，`732.0160593482119`；RISC-V LTP=214，LA 仅 musl basic=98，其余 LA 组为 0 |
-| 最新稳定线上结果 | 983 基线待恢复 | `983.6805892892955` 对应 `fc950984`；本轮恢复其六个运行时文件，同时保留后续编译修复 |
+| 官方页面最后可见结果 | Accepted 646，LA ELF 加载失败 | 2026-06-29 22:37:51 提交，`646.4945242317908`；RV LTP=318，LA 因 `kernel-la` 非 LoongArch ELF 全列为 0 |
+| 最新稳定线上结果 | 983 基线待恢复 | `983.6805892892955` 对应 `fc950984`；当前优先恢复真实 LA 构建，再评估是否继续扩 LTP |
 | 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
 | LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |
 | LA glibc libcbench trap | 已隔离 | 2026-06-29 日志在 `libcbench-glibc` 触发 LoongArch `MemoryAccessAddressError`，导致后置 libctest/LTP/lmbench 不执行；当前先跳过该 0 分项 |
@@ -13,9 +13,11 @@
 | 最新官方编译错误 | 已切换依赖路径 | 2026-06-29 12:22:30 提交缺少 `SWTC/vendor/heapless-0.7.17/Cargo.toml`；新增无隐藏内容的 `SWTC/dependencies/heapless` 并改用该 path |
 | heapless 过滤兼容 | 干净导出通过 | 新路径不含任何隐藏文件；原 vendor 副本保留，不改变 53 个 RV vendor manifest |
 | `allocator-api2` vendor checksum | 已修复 | Git index 校验原有 22 个 mismatch；重建非隐藏 manifest 后 RV 53/0、LA 268/0 |
-| 隐藏过滤候选构建 | RV 与 LA 严格构建通过 | 无隐藏路径导出中 RV 入口 `0x80200000`、LA 入口 `0x80000000`；保留 fallback，但本轮提交验证使用真实 LA ELF |
+| LA `xapi` 源码路径 | 已迁移 | 主构建路径改为 `SWTC-la/dependencies/xapi`，保留原 `SWTC-la/xapi`；用于规避官方源包异常漏掉根 `xapi` 目录 |
+| LA 源树完整性门禁 | 已加入 | 根 `Makefile/GNUmakefile` 检查 `SWTC-la/dependencies/xapi`、`xcore`、关键 `xmodules` 和 `src/main.rs`，缺失时拒绝生成无效 placeholder |
+| 隐藏过滤候选构建 | 通过 | staged index 导出 `xapi-candidate.tar`，干净目录根 `make all` 通过；RV 入口 `0x80200000`、LA 入口 `0x80000000` |
 | LoongArch 官方工具链构建 | 本地严格通过 | `nightly-2025-05-20` 预编译 LA target + GCC 13.2 musl；带 lwext4/virtio/net/fp_simd 完整构建 |
-| `kernel-la` 格式 | 通过 | `build-la-strict` 生成 LoongArch executable ELF，入口 `0x80000000`；默认 fallback 仍保留 |
+| `kernel-la` 格式 | 通过 | `build-la-strict` 与干净候选 `make all` 均生成 LoongArch executable ELF，入口 `0x80000000`；默认不再允许 RISC-V 占位 |
 | LoongArch 官方 basic 镜像 | 本地 `64/64` | musl 32 项 + glibc 32 项，START/END 全匹配，无 panic/loader error |
 | LoongArch QEMU 9.2.1 启动 | 本地通过 | 源码构建 `loongarch64-softmmu`，真实 `kernel-la` 从 x0 EXT4 启动并主动关机 |
 | LoongArch BusyBox | 本地 `55/55` | 官方 `pre-2025` 静态 musl BusyBox；补 `/bin/ls` 后零 fail、零 panic、零 unsupported syscall，约 135 秒主动退出 |

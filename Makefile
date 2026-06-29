@@ -6,6 +6,7 @@ TARGET_RV := riscv64gc-unknown-none-elf
 TARGET_LA := loongarch64-unknown-none
 RV_TOOLCHAIN ?= nightly-2025-02-01
 LA_TOOLCHAIN ?= nightly-2025-05-20
+ALLOW_LA_FALLBACK ?= 0
 MODE := release
 SWTC_ELF := $(SWTC_KERNEL)/target/$(TARGET_RV)/$(MODE)/kernel
 SWTC_BIN := $(SWTC_ELF).bin
@@ -38,6 +39,25 @@ check-rv-tools:
 	@test -x "$(RV_RUST_LLD)" || { \
 		echo "error: rust-lld is not installed for $(RV_TOOLCHAIN)"; exit 1; }
 
+check-la-source:
+	@missing=0; \
+	for path in \
+		$(SWTC_LA)/Cargo.toml \
+		$(SWTC_LA)/dependencies/xapi/Cargo.toml \
+		$(SWTC_LA)/xcore/Cargo.toml \
+		$(SWTC_LA)/xmodules/xprocess/Cargo.toml \
+		$(SWTC_LA)/xmodules/xuspace/Cargo.toml \
+		$(SWTC_LA)/src/main.rs; do \
+		if ! test -f "$$path"; then \
+			echo "error: missing LoongArch source file: $$path"; \
+			missing=1; \
+		fi; \
+	done; \
+	if test "$$missing" -ne 0; then \
+		echo "error: refusing to build invalid kernel-la placeholder"; \
+		exit 1; \
+	fi
+
 check-la-tools:
 	@command -v rustup >/dev/null || { echo "error: rustup is required for kernel-la"; exit 1; }
 	@command -v rustc >/dev/null || { echo "error: rustc is required"; exit 1; }
@@ -67,7 +87,7 @@ prepare-rv: check-rv-tools restore-vendor-rv
 	cp $(SWTC_KERNEL)/cargo-config/config.toml $(SWTC_KERNEL)/.cargo/config.toml
 	cp $(SWTC_USER)/cargo-config/config.toml $(SWTC_USER)/.cargo/config.toml
 
-prepare-la: check-la-tools restore-vendor-la
+prepare-la: check-la-source check-la-tools restore-vendor-la
 	mkdir -p $(SWTC_LA)/.cargo
 	cp $(SWTC_LA)/cargo-config/config.toml $(SWTC_LA)/.cargo/config.toml
 
@@ -96,13 +116,19 @@ build-la-strict: prepare-la
 		BLK=y NET=y FEATURES=fp_simd,lwext4_rs,driver-virtio-blk build
 	cp $(SWTC_LA_ELF) $(KERNEL_LA)
 
-build-la: build-rv
-	@if $(MAKE) --no-print-directory check-la-tools >/dev/null 2>&1 \
-		&& $(MAKE) --no-print-directory build-la-strict; then \
+build-la:
+	@if $(MAKE) --no-print-directory build-la-strict; then \
 		:; \
 	else \
-		echo "warning: kernel-la placeholder generated because the real LoongArch build is unavailable."; \
-		cp $(KERNEL_RV) $(KERNEL_LA); \
+		if test "$(ALLOW_LA_FALLBACK)" = "1"; then \
+			echo "warning: ALLOW_LA_FALLBACK=1; copying kernel-rv to kernel-la for local-only smoke builds."; \
+			test -f $(KERNEL_RV) || { echo "error: kernel-rv is required for fallback"; exit 1; }; \
+			cp $(KERNEL_RV) $(KERNEL_LA); \
+		else \
+			echo "error: real LoongArch build failed; refusing to generate an invalid kernel-la placeholder."; \
+			echo "hint: set ALLOW_LA_FALLBACK=1 only for local smoke builds that do not submit to the grader."; \
+			exit 1; \
+		fi; \
 	fi
 
 build: build-rv build-la
@@ -113,6 +139,6 @@ clean:
 	$(MAKE) -C $(SWTC_LA) clean
 	rm -f $(KERNEL_RV) $(KERNEL_LA) sdcard-rv.img sdcard-la.img
 
-.PHONY: all check-rv-tools check-la-tools restore-vendor-rv restore-vendor-la \
+.PHONY: all check-rv-tools check-la-source check-la-tools restore-vendor-rv restore-vendor-la \
 	prepare-rv prepare-la sanitize-submit-workdir sanitize-submit-workdir-post \
 	build build-rv build-la build-la-strict clean

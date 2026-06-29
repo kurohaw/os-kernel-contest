@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "xapi",
+    "dependencies/xapi",
     "xcore",
     "xmodules/*",
     "arceos/modules/*",
@@ -78,7 +78,7 @@ smoltcp              = { path = "arceos/crates/smoltcp", default-features = fals
 weak-map             = { path = "arceos/crates/weak-map" }
 
 # ----- SWTC LoongArch modules --------------------------------------------------
-xapi     = { path = "xapi" }
+xapi     = { path = "dependencies/xapi" }
 xcore    = { path = "xcore" }
 xcache   = { path = "xmodules/xcache" }
 xprocess = { path = "xmodules/xprocess" }
