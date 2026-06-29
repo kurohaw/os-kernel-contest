@@ -9,8 +9,8 @@
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | 根据 2026-06-29 03:06 官方日志，跳过会触发 LoongArch trap 的 glibc libcbench，让 LA libctest/LTP/lmbench 先运行 |
-| 最新可见线上结果 | 2026-06-29 03:06:43 提交，内嵌 JSON `Accepted / 983.6805892892955`；页面 `JSON格式错误` 来自平台 gzip 异常污染输出 |
+| 当前提交 | 修复 Git index 与 `allocator-api2` 非隐藏 vendor checksum 的 22 处不匹配；保留 LA `memory_set/axerrno` 本地 vendoring 和提交目录镜像清理 |
+| 最新可见线上结果 | 2026-06-29 08:39:03 提交，实际 `Accepted / 633.8849818370428`；页面同时出现平台 `sdcard-rv.img already exists` 异常，LA 全部为 0 |
 | 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
@@ -18,6 +18,21 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-29 633 分回退与 allocator-api2 checksum 修复
+
+- 10:33 导出的官网页面显示，08:39:03 提交在 09:32:33–09:33:45 完成，真实结果
+  为 `Accepted / 633.8849818370428`，不是 Compile Error。页面同时出现平台侧
+  `gzip: sdcard-rv.img already exists; not overwritten`。
+- 该轮 RISC-V basic=204、BusyBox=100、Lua=18、libcbench 约 57.29、
+  libctest=217、LTP=210；LA 所有分区为 0，说明 RISC-V 构建和执行正常，但
+  `kernel-la` 很可能在官方构建中回退为 RISC-V 占位。
+- 同步远端 `6d2fc7be` 后，本地完整离线 `make all` 可生成真实 LoongArch ELF；
+  该提交已把 LA `memory_set` 和 `axerrno` 改为本地路径，并在构建前后清理
+  `sdcard-rv.img/sdcard-la.img`。
+- 隐藏文件过滤门禁进一步发现 `SWTC/vendor/allocator-api2-0.2.21` 的非隐藏
+  checksum 与 Git index 有 22 处不匹配。本轮按 Git index 重建 manifest，
+  RV 53 个和 LA 268 个 vendor manifest 均恢复为 0 issue。
 
 ## 2026-06-29 983 分 JSON 错误与 LA glibc libcbench 截断
 
