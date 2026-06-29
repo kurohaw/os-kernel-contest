@@ -9,15 +9,28 @@
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 真实 LoongArch 已线上得分，basic 四列满分；当前进入 LTP 大批量和 LA libctest 补分路线 |
-| 当前提交 | 修复 Git index 与 `allocator-api2` 非隐藏 vendor checksum 的 22 处不匹配；保留 LA `memory_set/axerrno` 本地 vendoring 和提交目录镜像清理 |
+| 当前提交 | 将 RISC-V `heapless` path 依赖复制到无隐藏内容的 `SWTC/dependencies/heapless`，绕过官方源码过滤后 vendor 子目录缺失 |
 | 最新可见线上结果 | 2026-06-29 08:39:03 提交，实际 `Accepted / 633.8849818370428`；页面同时出现平台 `sdcard-rv.img already exists` 异常，LA 全部为 0 |
 | 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-21 13:15:41，`Accepted / 484.26735406790885`；已确认撤回 iozone-lite 后恢复 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
-| 最新官方编译错误 | 2026-06-28 两次提交均为 `Compile Error`；本地同步 `b5b2d38c` 后复现为 path 依赖 `heapless` 的 31 个 `unexpected_cfgs` 硬错误，本轮已修复并完成离线 `make all` |
+| 最新官方编译错误 | 2026-06-29 12:22:30 提交在 14:04 编译，`SWTC/vendor/heapless-0.7.17/Cargo.toml` 在官方提交目录中缺失；本轮改用 `SWTC/dependencies/heapless` |
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-29 heapless 官方源码过滤修复
+
+- 12:22:30 提交已正确进入根 `GNUmakefile`、完成 RISC-V 用户程序构建，内核
+  Cargo 解析阶段失败：官方 `/coursegrader/submit` 中缺少
+  `SWTC/vendor/heapless-0.7.17/Cargo.toml`。
+- GitLab main 中原目录的 41 个文件均已跟踪，因此该错误属于官方源码导出/过滤
+  后的目录缺失，不是 Cargo.toml 未提交，也不是 Rust 编译错误。
+- 新增 `SWTC/dependencies/heapless`：只保留 Cargo manifest、build script、源码、
+  测试、README 和许可证，不包含 `.github`、`.gitignore`、
+  `.cargo_vcs_info.json` 或 checksum 隐藏文件。
+- 内核 heapless path patch 改为 `../dependencies/heapless`；原 vendor 副本保留，
+  避免改变 Cargo directory source 和现有 vendor 校验数量。
 
 ## 2026-06-29 633 分回退与 allocator-api2 checksum 修复
 
