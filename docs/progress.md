@@ -10,13 +10,10 @@
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 巩固 1009.8903911255481 分双架构基线，继续扩展 LoongArch libctest/LTP 与高价值 functional 覆盖 |
 | 当前提交 | `xapi` 主构建路径迁移到 `SWTC-la/dependencies/xapi`；根构建增加 LA 源树完整性检查；默认必须生成真实 LoongArch ELF，仅本地显式 `ALLOW_LA_FALLBACK=1` 时允许占位；根 `all` 入口加入官网工作目录诊断输出 |
-| 最新可见线上结果 | 2026-06-30 09:17:33 提交，`Accepted / 1009.8903911255481`；basic=408、BusyBox=208、Lua=36、libcbench=86.84477333493804、musl-rv libctest=217、musl-rv LTP=314 |
-| 最新稳定线上结果 | 2026-06-30 09:17:33，`1009.8903911255481`；四列 basic 与 BusyBox、Lua 均计分，三列 libcbench 计分，musl-rv libctest/LTP 继续贡献主要增量 |
-| 最新高分线上结果 | 2026-06-30 09:17:33，`Accepted / 1009.8903911255481` |
+| 最新线上结果 | 2026-06-30 09:17:33，`Accepted / 1009.8903911255481`；basic=408、BusyBox=208、Lua=36、libcbench=86.84477333493804、musl-rv libctest=217、musl-rv LTP=314 |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
-| 最新官方编译错误 | 2026-06-30 08:31:57 提交，`No rule to make target 'all'`；同日 09:17:33 提交已 Accepted / 1009.8903911255481，确认该问题未持续阻断构建 |
+| 最近已关闭编译错误 | 2026-06-30 08:31:57 提交，`No rule to make target 'all'`；同日 09:17:33 提交已 Accepted / 1009.8903911255481，确认该问题未持续阻断构建 |
 | 上一条编译错误 | 2026-06-29 12:22:30 提交，官方源包缺失 `SWTC/vendor/heapless-0.7.17/Cargo.toml`；已改用 `SWTC/dependencies/heapless` |
-| 上一条高分结果 | 2026-06-29 03:06:43，`Accepted / 983.6805892892955` |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
 
 ## 2026-06-30 1009.8903911255481 分新高
@@ -44,6 +41,8 @@
   `[submit] reached repository root Makefile: 2026-06-30 no-makefile-retry`。
   如果官网日志出现该标记，说明已进入正确根 Makefile；如果仍只报
   `No rule to make target 'all'`，需要下载/核对官网实际源包结构或检查提交方式。
+- 2026-06-29 同类 `No rule to make target 'all'` 记录已被本节覆盖：当时的处理是
+  新增根目录 `GNUmakefile` 与普通 `Makefile` 保持一致，避免重复展开同一平台入口问题。
 
 ## 2026-06-30 646 分 LA ELF 加载失败根因
 
@@ -103,7 +102,7 @@
 
 - 10:33 导出的官网页面显示，08:39:03 提交在 09:32:33–09:33:45 完成，真实结果
   为 `Accepted / 633.8849818370428`，不是 Compile Error。页面同时出现平台侧
-  `gzip: sdcard-rv.img already exists; not overwritten`。
+  sdcard 压缩残留提示，后续统一按 JSON/gzip 平台异常处理。
 - 该轮 RISC-V basic=204、BusyBox=100、Lua=18、libcbench 约 57.29、
   libctest=217、LTP=210；LA 所有分区为 0，说明 RISC-V 构建和执行正常，但
   `kernel-la` 很可能在官方构建中回退为 RISC-V 占位。
@@ -172,20 +171,6 @@
   `timerfd01/02/04`。`readv02`、`link*`、iozone、cyclictest 和网络组仍不进入
   本轮。
 
-## 2026-06-29 根构建入口兜底
-
-- 2026-06-29 06:28 官方结果为 `Compile Error`，输出只有
-  `make: *** No rule to make target 'all'. Stop.`，说明评测机尚未进入 SWTC
-  编译阶段，不是 Rust、vendor 或本轮 LTP syscall 代码错误。
-- GitLab `main` 当前确认包含根目录 `Makefile` 且 `all: build` 存在；该错误更像
-  提交包根目录不对、平台导出包未保留 Makefile，或评测入口没有识别到标准文件名。
-- 为降低文件名识别风险，新增根目录 `GNUmakefile`，内容与 `Makefile` 保持一致。
-  GNU make 会优先读取 `GNUmakefile`；即使平台没有选择普通 `Makefile`，仍应能进入
-  同一套 `make all` 构建流程。
-- 若下一次仍是同一条 `No rule to make target 'all'`，优先检查提交方式：不要上传
-  “外层包着项目目录”的 GitLab/GitHub 自动源码包，应让仓库内容直接位于提交根目录，
-  或确认平台确实从 GitLab `main` 克隆。
-
 ## 2026-06-28 heapless path 依赖编译修复
 
 - 伙伴将 `heapless 0.7.17` 从 registry 依赖改为本地 path patch，以避免官方
@@ -201,9 +186,8 @@
 ## 2026-06-28 838 回退与 BusyBox 沙箱止血
 
 - `301e9717 feat: batch LoongArch big test probes` 的官方结果实际得分为
-  `838.5995587579628`，但页面提示 `JSON格式错误`。原因是评测脚本输出 JSON
-  前混入了平台侧异常：`gzip: sdcard-rv.img already exists; not overwritten`，
-  导致前端解析失败；不是内核编译失败。
+  `838.5995587579628`，页面上的 `JSON格式错误` 与 983 分记录中的平台
+  sdcard 压缩残留提示同类，不是内核编译失败。
 - 该轮真正的代码回退是 LA 侧：basic 四列仍为 `408`，但 LA BusyBox 从约
   `108` 掉到 `10`，LA Lua/libcbench 归零。日志显示 `busybox-musl` 执行
   `du` 时递归进入 `/musl/ltp/testcases/...` 大目录，随后在 LoongArch 内核中
@@ -556,26 +540,6 @@
   变为有分，若仍为 0，再根据串口日志确认是否出现
   `Simple syscall:`、`Select on 100 fd` 或 `Signal handler installation:`。
 
-## 2026-06-21 13:50 稳定基线复测
-
-- 最新官方结果为 2026-06-21 13:50:12，`Accepted / 483.52722370911204`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.527223709112、
-  libctest=107；iozone、lmbench 等仍为 0。
-- 与 13:36 的 `483.16564668235225` 相比略有回升，仍属于 libcbench 性能分波动；
-  basic、BusyBox、Lua 和 libctest 都没有回退。
-- 继续保持“不新增测试组”：没有完整串口日志或真实 `lmbench_all` 本地复现前，
-  不再改 lmbench/iozone staging。
-
-## 2026-06-21 13:36 稳定基线复测
-
-- 最新官方结果为 2026-06-21 13:36:45，`Accepted / 483.16564668235225`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.165646682352225、
-  libctest=107；iozone、lmbench 等仍为 0。
-- 与 13:15 的 `484.26735406790885` 相比少约 1.10 分，来源是 libcbench 性能波动；
-  basic、BusyBox、Lua 和 libctest 都没有回退。
-- 当前继续保持“不新增测试组”：没有完整串口日志或真实 `lmbench_all` 本地复现前，
-  不再改 lmbench/iozone staging。
-
 ## 2026-06-21 13:15 iozone-lite 撤回后恢复
 
 - 最新官方结果为 2026-06-21 13:15:41，`Accepted / 484.26735406790885`。
@@ -583,6 +547,8 @@
   libctest=107；iozone、lmbench 等仍为 0。
 - 这确认 `64fe8b4 Revert "feat: add minimal iozone probe"` 已恢复 484 基线；
   13:04 的 `320.0` 回退就是 iozone-lite 造成的。
+- 后续 13:36 与 13:50 两次复测只体现 libcbench 性能分小幅波动，basic、
+  BusyBox、Lua 和 libctest 均未回退，因此不再单独展开重复记录。
 - 当前不要再用线上评测盲试新组。下一步需要先拿到 lmbench 串口日志，或在本地构造
   真实 `lmbench_all` 镜像复现，再决定是否修 syscall/VFS 小缺口。
 
@@ -667,52 +633,17 @@
 - 验收标准是总分不低于当前 400 基线，且 libctest 从 24 明显上升或至少提供
   明确失败日志；若回退，优先退回本轮 12-case 探针。
 
-## 2026-06-20 21:09 基线恢复与 4-case libctest 探针
+## 2026-06-20 libctest 4-case 递增批次
 
-- 最新官方结果为 2026-06-20 21:09:40，`Accepted / 397.32511382265227`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.325113822652256、
-  libctest=20；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
-- 这说明上一轮新增的 `strtod_simple`、`strtof`、`udiv`、`wcsstr`
-  四个 case 已稳定进分，且没有引发 libcbench 或退出路径回退。
-- 本轮继续沿同一策略，只新增 `search_hsearch`、`search_insque`、
-  `search_lsearch`、`search_tsearch` 四个低风险静态 case。验收标准是总分不低于
-  当前 397 基线，且 libctest 从 20 小幅上升或至少提供明确失败日志。
-
-## 2026-06-20 17:52 基线恢复与 4-case libctest 探针
-
-- 最新官方结果为 2026-06-20 17:52:16，`Accepted / 392.9002806839883`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.9002806839883、
-  libctest=16；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
-- 这说明上一轮新增的 `string_memmem`、`string_strcspn`、`strtol`、
-  `strverscmp` 四个 case 已稳定进分，且没有引发 libcbench 或退出路径回退。
-- 本轮继续沿同一策略，只新增 `strtod_simple`、`strtof`、`udiv`、`wcsstr`
-  四个低风险静态 case。验收标准是总分不低于当前 392 基线，且 libctest
-  从 16 小幅上升或至少提供明确失败日志。
-
-## 2026-06-20 16:16 基线恢复与 4-case libctest 探针
-
-- 最新官方结果为 2026-06-20 16:16:33，`Accepted / 389.00362218124934`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=57.00362218124933、
-  libctest=12；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
-- 这说明上一轮新增的 `string_memcpy`、`string_memset`、`string_strchr`、
-  `string_strstr` 四个 case 已稳定进分，且没有引发 libcbench 或退出路径回退。
-- 本轮继续沿同一策略，只新增 `string_memmem`、`string_strcspn`、`strtol`、
-  `strverscmp` 四个低风险静态 case。验收标准是总分不低于当前 389 基线，
-  且 libctest 从 12 小幅上升或至少提供明确失败日志。
-
-## 2026-06-20 14:43 基线恢复与 4-case libctest 探针
-
-- 最新官方结果为 2026-06-20 14:43:29，`Accepted / 384.8411392883504`。
-- 得分构成：basic=204、BusyBox=98、Lua=18、libcbench=56.84113928835043、
-  libctest=8；cyclictest、iozone、iperf、lmbench、ltp、netperf 仍为 0。
-- 串口日志显示启动时暂存 11 个测试组、90 条命令，basic、BusyBox、Lua、
-  libcbench、libctest、lmbench 两个 ABI 组均到达 END，最终主动关机。
-- `libctest-musl` 的 8 个稳定 case 仍输出 `Pass!`；此前 `4602678` 一次扩到
-  64 个 case 的回退已通过 revert 和 `exit.rs:74` 修复止血。
-- 本轮不恢复 64-case 扩容，只新增
-  `string_memcpy`、`string_memset`、`string_strchr`、`string_strstr` 四个纯字符串
-  静态 case。验收标准是总分不低于当前 384 基线，且 libctest 从 8 分小幅上升或
-  至少提供明确失败日志。
+- 14:43、16:16、17:52、21:09 四次提交都是同一策略：在 384 分基线上每轮只追加
+  4 个低风险 musl static libctest case，线上确认不影响 basic、BusyBox、Lua、
+  libcbench 和退出路径。
+- 递增结果依次为 libctest `8 -> 12 -> 16 -> 20`；新增 case 覆盖
+  `string_memcpy/string_memset/string_strchr/string_strstr`、
+  `string_memmem/string_strcspn/strtol/strverscmp`、
+  `strtod_simple/strtof/udiv/wcsstr`、
+  `search_hsearch/search_insque/search_lsearch/search_tsearch`。
+- 这些重复的小批量记录已压缩为本节；后续 21:34 提交继续扩到 12-case 批次。
 
 ## 2026-06-20 14:24 libctest 扩容回退
 
@@ -1318,9 +1249,3 @@
 - 2026-06-09：路线切换为 SWTC 主线，并完成启动与 basic 入口。
 - 2026-06-11：SWTC 执行 `basic/brk`，本地官方解析器得到 `3/3`。
 - 2026-06-12：修复官方离线工具链选择和 vendor 隐藏文件校验问题。
-
-## 下一里程碑
-
-先提交当前 loader 与双组修复，确认 glibc-rv basic 得分非零、musl-rv 至少开始
-执行真实测试且全程无 `Panicked`。稳定线上基线后，再按首个 musl 失败日志补 ABI；
-`getdents`、`mount/umount` 与 LoongArch 暂不混入本轮。
