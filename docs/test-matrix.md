@@ -4,7 +4,8 @@
 
 | 项目 | 状态 | 结果 |
 |---|---|---|
-| 官方页面最后可见结果 | Accepted 646，LA ELF 加载失败 | 2026-06-29 22:37:51 提交，`646.4945242317908`；RV LTP=318，LA 因 `kernel-la` 非 LoongArch ELF 全列为 0 |
+| 官方页面最后可见结果 | Compile Error，未进入根 Makefile | 2026-06-30 08:31:57 提交，`make: *** No rule to make target 'all'. Stop.`；GitLab main 根目录含 `Makefile/GNUmakefile` 且干净导出 `make all` 通过，判断为官网本次源包/工作目录异常 |
+| 官网根 Makefile 诊断 | 已加入，待线上确认 | 根 `all` 入口输出 `[submit] reached repository root Makefile: 2026-06-30 no-makefile-retry`；若下次日志无该标记且仍报 no rule，说明官网未在仓库根目录执行 |
 | 最新稳定线上结果 | 983 基线待恢复 | `983.6805892892955` 对应 `fc950984`；当前优先恢复真实 LA 构建，再评估是否继续扩 LTP |
 | 最新回退评测 | 已定位，撤回激进入口 | 2026-06-28 16:47:31 结果内嵌 JSON 得分 `838.5995587579628`；页面 `JSON格式错误` 来自平台 gzip 异常污染 JSON 输出 |
 | LA BusyBox panic | 已止血 | `busybox-musl du` 从 `/musl` 扫入 `/musl/ltp/testcases` 大树后触发 LoongArch page fault；当前改为 `/tmp/swtc-busybox-*` 沙箱运行 |

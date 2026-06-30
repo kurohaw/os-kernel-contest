@@ -9,8 +9,8 @@
 | 当前内核主体 | RISC-V `SWTC/`，LoongArch `SWTC-la/` |
 | 历史保分基线 | 旧自建内核曾取得官方 basic=102 |
 | 当前里程碑 | 截止前恢复真实 LoongArch 构建，避免 `kernel-rv` 冒充 `kernel-la` |
-| 当前提交 | `xapi` 主构建路径迁移到 `SWTC-la/dependencies/xapi`；根构建增加 LA 源树完整性检查；默认必须生成真实 LoongArch ELF，仅本地显式 `ALLOW_LA_FALLBACK=1` 时允许占位 |
-| 最新可见线上结果 | 2026-06-29 22:37:51 提交，`Accepted / 646.4945242317908`；RV LTP 升至 318，但 LA 构建缺 `SWTC-la/xapi/Cargo.toml` 后生成无效 `kernel-la`，LA 全列为 0 |
+| 当前提交 | `xapi` 主构建路径迁移到 `SWTC-la/dependencies/xapi`；根构建增加 LA 源树完整性检查；默认必须生成真实 LoongArch ELF，仅本地显式 `ALLOW_LA_FALLBACK=1` 时允许占位；根 `all` 入口加入官网工作目录诊断输出 |
+| 最新可见线上结果 | 2026-06-30 08:31:57 提交，`Compile Error`；编译输出为 `make: *** No rule to make target 'all'. Stop.`，与 GitLab `main` 根目录含 `Makefile/GNUmakefile` 且干净导出 `make all` 通过相矛盾，判断为官网本次未在仓库根目录构建或未取到 GitLab 根目录源码 |
 | 最新稳定线上结果 | 2026-06-29 03:06:43 提交，`983.6805892892955`；RISC-V 保持稳定，LoongArch basic/BusyBox/Lua/libcbench 已开始计分，LA libctest/LTP 仍为 0 |
 | 最新高分线上结果 | 2026-06-29 03:06:43，`Accepted / 983.6805892892955`；对应源码基线为 `fc950984` |
 | 上一条通过基线 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；basic=204、BusyBox=98、Lua=18、libcbench=57.255157002759375、libctest=107 |
@@ -18,6 +18,21 @@
 | 上一条编译错误 | 2026-06-19 19:09:49，`Compile Error / 0.00`；`no matching package found: ahash`，本轮通过移除 `hashbrown` 依赖链修复 |
 | 上一条高分结果 | 2026-06-21 12:05:08，`Accepted / 484.2551570027594`；libcbench glibc/musl 合计 57.255157002759375、libctest-musl=107 |
 | 本地得分闭环 | 官方 basic 解析器 `102/102` |
+
+## 2026-06-30 官网 `No rule to make target all` 编译错误
+
+- 08:31:57 提交的官方结果为 `Compile Error`，编译输出只有：
+  `make: *** No rule to make target 'all'. Stop.`
+- GitLab 远端 `HEAD` 与 `refs/heads/main` 均指向
+  `6069140d16cfa0f0ef3d56eb60a2583bd297e1b2`，远端根目录包含
+  `Makefile` 与 `GNUmakefile`，二者均有 `all` 目标。
+- 从 `gitlab/main` 直接 `git archive` 导出的干净源码包，本地 WSL 根目录
+  `make all` 通过，生成 `kernel-rv` 与真实 LoongArch `kernel-la`。因此本次错误
+  暂不按 Rust/LA 构建回归处理。
+- 为下一次官网复测加入根 `all` 入口诊断输出：
+  `[submit] reached repository root Makefile: 2026-06-30 no-makefile-retry`。
+  如果官网日志出现该标记，说明已进入正确根 Makefile；如果仍只报
+  `No rule to make target 'all'`，需要下载/核对官网实际源包结构或检查提交方式。
 
 ## 2026-06-30 646 分 LA ELF 加载失败根因
 

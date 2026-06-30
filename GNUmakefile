@@ -26,7 +26,11 @@ LA_BUILD_STD = $(shell sysroot="$$(rustup run $(LA_TOOLCHAIN) rustc --print sysr
 		echo 1; \
 	fi)
 
-all: sanitize-submit-workdir build sanitize-submit-workdir-post
+all: submission-info sanitize-submit-workdir build sanitize-submit-workdir-post
+
+submission-info:
+	@echo "[submit] reached repository root Makefile: 2026-06-30 no-makefile-retry"
+	@echo "[submit] pwd=$$(pwd)"
 
 check-rv-tools:
 	@command -v rustc >/dev/null || { echo "error: rustc is required"; exit 1; }
@@ -139,6 +143,6 @@ clean:
 	$(MAKE) -C $(SWTC_LA) clean
 	rm -f $(KERNEL_RV) $(KERNEL_LA) sdcard-rv.img sdcard-la.img
 
-.PHONY: all check-rv-tools check-la-source check-la-tools restore-vendor-rv restore-vendor-la \
+.PHONY: all submission-info check-rv-tools check-la-source check-la-tools restore-vendor-rv restore-vendor-la \
 	prepare-rv prepare-la sanitize-submit-workdir sanitize-submit-workdir-post \
 	build build-rv build-la build-la-strict clean
