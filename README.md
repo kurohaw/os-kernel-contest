@@ -26,7 +26,7 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 | 官方产物 | `kernel-rv`、`kernel-la` |
 | 构建方式 | 根目录 `make all`，离线 vendor 构建 |
 | 详细初赛文档 | [docs/preliminary-report.md](docs/preliminary-report.md) |
-| 初赛文档（PDF） | [SWTC-preliminary-report.pdf](output/pdf/SWTC-preliminary-report.pdf) |
+| 初赛文档（PDF） | [SWTC-preliminary-report.pdf](SWTC-preliminary-report.pdf) |
 | 开发进度 | [docs/progress.md](docs/progress.md) |
 
 ## 项目人员

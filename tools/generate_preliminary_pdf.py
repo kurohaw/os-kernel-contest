@@ -24,16 +24,17 @@ from reportlab.platypus import (
     PageBreak,
     PageTemplate,
     Paragraph,
+    Preformatted,
     Spacer,
     Table,
     TableStyle,
 )
+from reportlab.platypus.tableofcontents import TableOfContents
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = REPO_ROOT / "docs" / "assets"
-OUTPUT_DIR = REPO_ROOT / "output" / "pdf"
-OUTPUT_PDF = OUTPUT_DIR / "SWTC-preliminary-report.pdf"
+OUTPUT_PDF = REPO_ROOT / "SWTC-preliminary-report.pdf"
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 MARGIN_X = 1.8 * cm
@@ -100,6 +101,16 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=20,
             alignment=TA_CENTER,
             textColor=MID_GRAY,
+        ),
+        "front_title": ParagraphStyle(
+            "FrontTitle",
+            parent=base["Title"],
+            fontName="SWTCCN-Bold",
+            fontSize=21,
+            leading=30,
+            alignment=TA_CENTER,
+            textColor=TEXT,
+            spaceAfter=18,
         ),
         "h1": ParagraphStyle(
             "H1",
@@ -205,11 +216,62 @@ def build_styles() -> dict[str, ParagraphStyle]:
             textColor=TEXT,
             spaceAfter=4,
         ),
+        "code": ParagraphStyle(
+            "Code",
+            parent=base["Code"],
+            fontName="Courier",
+            fontSize=7.8,
+            leading=11.2,
+            leftIndent=0,
+            rightIndent=0,
+            textColor=colors.HexColor("#D8E2EC"),
+            backColor=colors.HexColor("#202A35"),
+            borderPadding=9,
+            spaceBefore=5,
+            spaceAfter=8,
+        ),
+        "toc_level0": ParagraphStyle(
+            "TOCLevel0",
+            fontName="SWTCCN-Bold",
+            fontSize=11,
+            leading=17,
+            leftIndent=0,
+            firstLineIndent=0,
+            textColor=NAVY,
+            spaceBefore=4,
+        ),
+        "toc_level1": ParagraphStyle(
+            "TOCLevel1",
+            fontName="SWTCCN",
+            fontSize=9.2,
+            leading=14,
+            leftIndent=18,
+            firstLineIndent=0,
+            textColor=TEXT,
+        ),
     }
 
 
 def p(text: str, style: ParagraphStyle) -> Paragraph:
     return Paragraph(text, style)
+
+
+def code_block(text: str, styles: dict[str, ParagraphStyle]) -> Table:
+    block = Preformatted(text.strip("\n"), styles["code"])
+    container = Table([[block]], colWidths=[16.8 * cm], hAlign="LEFT")
+    container.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#202A35")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("BOX", (0, 0), (-1, -1), 0.5, NAVY),
+            ]
+        )
+    )
+    return container
 
 
 def table_cell(text: str, styles: dict[str, ParagraphStyle], center: bool = False) -> Paragraph:
@@ -331,6 +393,60 @@ def architecture_diagram() -> Drawing:
     return d
 
 
+def pipeline_diagram(title: str, steps: list[tuple[str, str]], accent: colors.Color = BLUE) -> Drawing:
+    width = 17.2 * cm
+    height = 4.4 * cm
+    d = Drawing(width, height)
+    d.add(String(8, height - 17, title, fontName="SWTCCN-Bold", fontSize=10, fillColor=DEEP_RED))
+    gap = 16
+    box_w = (width - 24 - gap * (len(steps) - 1)) / len(steps)
+    box_h = 60
+    y = 28
+    for index, (heading, detail) in enumerate(steps):
+        x = 12 + index * (box_w + gap)
+        fill = PALE_RED if index == len(steps) - 1 else PALE_BLUE
+        d.add(Rect(x, y, box_w, box_h, rx=7, ry=7, fillColor=fill, strokeColor=LIGHT_LINE, strokeWidth=0.8))
+        d.add(String(x + box_w / 2, y + 37, heading, fontName="SWTCCN-Bold", fontSize=8.2, fillColor=TEXT, textAnchor="middle"))
+        d.add(String(x + box_w / 2, y + 19, detail, fontName="SWTCCN", fontSize=7.1, fillColor=MID_GRAY, textAnchor="middle"))
+        if index < len(steps) - 1:
+            start_x = x + box_w
+            end_x = start_x + gap
+            line_y = y + box_h / 2
+            d.add(Line(start_x, line_y, end_x, line_y, strokeColor=accent, strokeWidth=1.2))
+            d.add(Polygon([end_x, line_y, end_x - 5, line_y + 3, end_x - 5, line_y - 3], fillColor=accent, strokeColor=accent))
+    return d
+
+
+def score_breakdown_diagram() -> Drawing:
+    width = 17.2 * cm
+    height = 7.0 * cm
+    d = Drawing(width, height)
+    d.add(String(8, height - 18, "官网分项原始计分", fontName="SWTCCN-Bold", fontSize=10, fillColor=DEEP_RED))
+    values = [
+        ("basic", 408.0, RED),
+        ("BusyBox", 208.0, BLUE),
+        ("Lua", 36.0, TEAL),
+        ("libcbench", 86.84477333493804, colors.HexColor("#D08C32")),
+        ("libctest", 217.0, colors.HexColor("#7B61A8")),
+        ("LTP", 314.0, colors.HexColor("#4C8B63")),
+    ]
+    max_value = max(value for _, value, _ in values)
+    left = 75
+    max_bar = width - left - 70
+    top = height - 48
+    row_h = 25
+    for index, (name, value, color) in enumerate(values):
+        y = top - index * row_h
+        d.add(String(left - 8, y + 3, name, fontName="SWTCCN", fontSize=8.2, fillColor=TEXT, textAnchor="end"))
+        bar_w = max_bar * value / max_value
+        d.add(Rect(left, y - 4, max_bar, 12, fillColor=PALE_GRAY, strokeColor=None))
+        d.add(Rect(left, y - 4, bar_w, 12, fillColor=color, strokeColor=None))
+        label = f"{value:.6f}" if value % 1 else f"{int(value)}"
+        d.add(String(left + bar_w + 7, y + 1, label, fontName="SWTCCN", fontSize=7.5, fillColor=MID_GRAY))
+    d.add(String(8, 11, "注：图中为官网各测试组原始分项；平台总分按官方计分规则显示为 1009.8903911255481。", fontName="SWTCCN", fontSize=7.3, fillColor=MID_GRAY))
+    return d
+
+
 def image_for_width(path: Path, width: float, max_height: float | None = None) -> Image:
     with PILImage.open(path) as image:
         px_w, px_h = image.size
@@ -362,9 +478,31 @@ def add_page_number(canvas, doc) -> None:
     page_header_footer(canvas, doc)
 
 
+class SWTCDocTemplate(BaseDocTemplate):
+    """Document template with PDF outline and generated table of contents."""
+
+    def beforeDocument(self) -> None:
+        super().beforeDocument()
+        self._heading_index = 0
+
+    def afterFlowable(self, flowable) -> None:
+        if not isinstance(flowable, Paragraph):
+            return
+        if flowable.style.name not in {"H1", "H2"}:
+            return
+        level = 0 if flowable.style.name == "H1" else 1
+        text = flowable.getPlainText()
+        key = f"heading-{self._heading_index}"
+        self._heading_index += 1
+        self.canv.bookmarkPage(key)
+        self.canv.addOutlineEntry(text, key, level=level, closed=False)
+        self.notify("TOCEntry", (level, text, self.page, key))
+
+
 def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     logo_path = ASSET_DIR / "shanghai-university-of-electric-power-logo.png"
     evaluation_path = ASSET_DIR / "official-evaluation-2026-06-30.png"
+    architecture_path = ASSET_DIR / "swtc-system-architecture.png"
 
     story: list[object] = []
 
@@ -404,6 +542,64 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     story.append(cover_table)
     story.append(Spacer(1, 1.2 * cm))
     story.append(p("初赛提交版", styles["cover_subtitle"]))
+    story.append(PageBreak())
+
+    # Front matter: abstract
+    story.append(p("摘 要", styles["front_title"]))
+    story.append(
+        p(
+            "SWTC 是一款面向 2026 全国大学生计算机系统能力大赛操作系统设计赛官方评测环境开发的双架构内核。项目在同一仓库维护 RISC-V64 与 LoongArch64 两条实现主线，通过统一的根构建入口生成 kernel-rv 与 kernel-la，并直接执行官方无分区 EXT4 测试盘中的预编译 ELF、动态运行时和测试脚本。",
+            styles["body"],
+        )
+    )
+    story.append(
+        p(
+            "初赛工作的核心不是构造单独演示程序，而是打通从离线源码构建、架构正确性检查、块设备发现、脚本解析、资源暂存、ELF 装载、进程执行、Linux syscall 兼容、结果输出到主动关机的完整闭环。RISC-V 主线以 Titanix 开源架构为基础完成比赛适配；LoongArch 主线基于 StarryX/ArceOS 组件体系完成真实架构支持。本队新增工作集中于双架构统一提交、官方评测入口、Linux ABI 修复、故障隔离、离线依赖和验证门禁。",
+            styles["body"],
+        )
+    )
+    story.append(
+        p(
+            "截至 2026 年 6 月 30 日，SWTC 当前最高且最新可见官网成绩为 1009.8903911255481。四列 basic 均为 102，BusyBox 与 Lua 四列均已计分，三列 libcbench 已计分，musl-rv libctest 为 217、LTP 为 314。该结果证明双架构构建、主要应用入口及 RISC-V functional 路径已经形成有效计分能力。",
+            styles["body"],
+        )
+    )
+    story.append(p("关键词：Rust；操作系统内核；RISC-V64；LoongArch64；Linux ABI；EXT4；官方评测", styles["quote"]))
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(image_for_width(evaluation_path, 13.8 * cm, 10.2 * cm))
+    story.append(p("图 0-1  sudo_win_the_cscc 官网评测列表记录", styles["caption"]))
+    story.append(PageBreak())
+
+    # Front matter: module completion
+    story.append(p("模块完成情况", styles["front_title"]))
+    module_rows = [
+        [table_cell("模块", styles, True), table_cell("完成情况", styles, True), table_cell("验证证据", styles, True)],
+        [table_cell("统一构建", styles, True), table_cell("根目录 make all 生成双架构 ELF；工具链、离线依赖与源树门禁已接入", styles), table_cell("干净导出构建通过", styles)],
+        [table_cell("RISC-V64", styles, True), table_cell("启动、trap、进程、内存、文件系统、网络、信号及 Linux syscall 基线已接入", styles), table_cell("官方多个测试组线上计分", styles)],
+        [table_cell("LoongArch64", styles, True), table_cell("真实 kernel-la、平台配置、用户空间、VFS、EXT4 与官方脚本入口已接入", styles), table_cell("basic/BusyBox/Lua/libcbench 线上计分", styles)],
+        [table_cell("测试盘入口", styles, True), table_cell("识别无分区 EXT4，支持固定路径、目录遍历、脚本和 ELF 读取", styles), table_cell("glibc/musl 双目录回归", styles)],
+        [table_cell("ELF 与运行时", styles, True), table_cell("静态/动态 ELF、PT_INTERP、argv/envp/auxv 与动态解释器暂存", styles), table_cell("basic 与 libctest 动态路径计分", styles)],
+        [table_cell("应用测试", styles, True), table_cell("basic、BusyBox、Lua、libcbench、libctest、LTP 已形成分组执行路径", styles), table_cell("官网总分 1009.8903911255481", styles)],
+        [table_cell("故障隔离", styles, True), table_cell("组私有工作目录、逐项 timeout、START/END 收尾与主动关机", styles), table_cell("长队列失败后仍保留前序得分", styles)],
+        [table_cell("验证体系", styles, True), table_cell("源码完整性、vendor checksum、ELF 架构、无盘 QEMU 与官方镜像回归", styles), table_cell("提交前多层门禁", styles)],
+        [table_cell("待完善项", styles, True), table_cell("LoongArch libctest/LTP、性能测试与更完整的跨架构行为一致性", styles), table_cell("后续按 case 扩展", styles)],
+    ]
+    story.append(make_table(module_rows, [3.0 * cm, 9.2 * cm, 4.6 * cm], compact=True))
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(
+        p(
+            "完成情况采用“源码实现 - 本地回归 - 线上计分”三层证据描述。没有线上证据的能力不会写成已经完成，基础项目自带能力与本队比赛适配也在后续章节分别说明。",
+            styles["quote"],
+        )
+    )
+    story.append(PageBreak())
+
+    # Front matter: generated table of contents
+    story.append(p("目 录", styles["front_title"]))
+    toc = TableOfContents()
+    toc.levelStyles = [styles["toc_level0"], styles["toc_level1"]]
+    toc.dotsMinLevel = 0
+    story.append(toc)
     story.append(PageBreak())
 
     # 1. Basic information
@@ -455,7 +651,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
         )
     )
     story.append(Spacer(1, 0.2 * cm))
-    story.append(architecture_diagram())
+    story.append(image_for_width(architecture_path, 17.2 * cm, 9.5 * cm))
     story.append(p("图 1  SWTC 统一构建、官方运行环境与内核运行路径", styles["caption"]))
     story.append(p("2.1 双架构组织", styles["h2"]))
     story.append(
@@ -477,6 +673,39 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
         [table_cell("收尾", styles, True), table_cell("case 状态", styles), table_cell("官方 START/END 格式、超时隔离", styles), table_cell("计分日志与主动关机", styles)],
     ]
     story.append(make_table(flow_rows, [2.2 * cm, 3.3 * cm, 7.1 * cm, 4.2 * cm], compact=True))
+    story.append(PageBreak())
+
+    story.append(p("2.3 代码组织与模块边界", styles["h2"]))
+    story.append(
+        p(
+            "SWTC 保留两套能够独立构建的内核主体，并在仓库根目录建立统一交付层。这样的组织方式允许两条主线根据架构差异选择不同内核基础，同时用相同的提交规范、测试命名和输出协议约束最终行为。",
+            styles["body"],
+        )
+    )
+    layout_rows = [
+        [table_cell("路径", styles, True), table_cell("职责", styles, True), table_cell("主要内容", styles, True)],
+        [table_cell("Makefile / GNUmakefile", styles), table_cell("统一交付层", styles), table_cell("工具链检查、隐藏配置恢复、双架构构建、产物门禁", styles)],
+        [table_cell("SWTC/kernel", styles), table_cell("RISC-V64 内核", styles), table_cell("启动、trap、进程、内存、文件系统、网络、信号、syscall 与 oscomp", styles)],
+        [table_cell("SWTC/user", styles), table_cell("RISC-V 用户态", styles), table_cell("init/runtestcase、测试队列消费与官方输出协议", styles)],
+        [table_cell("SWTC-la/src", styles), table_cell("LoongArch 入口", styles), table_cell("平台启动、用户应用执行、syscall 接口与 init.sh", styles)],
+        [table_cell("SWTC-la/xcore", styles), table_cell("LoongArch 核心服务", styles), table_cell("VFS、fd、syscall、调度与运行时基础", styles)],
+        [table_cell("SWTC-la/xmodules", styles), table_cell("组件化能力", styles), table_cell("xprocess、xsignal、xuspace、xvma、xcache、xapi", styles)],
+        [table_cell("docs / tools", styles), table_cell("验证与文档", styles), table_cell("进度证据、架构图、PDF 生成与 vendor 校验脚本", styles)],
+    ]
+    story.append(make_table(layout_rows, [4.0 * cm, 3.2 * cm, 9.6 * cm]))
+    story.append(Spacer(1, 0.45 * cm))
+    story.append(p("2.4 双架构职责划分", styles["h2"]))
+    story.append(
+        bullets(
+            [
+                "统一部分：官方构建入口、产物名称、测试盘约定、glibc/musl 测试组、START/END 输出和主动退出。",
+                "RISC-V 特有部分：高地址内核二进制 wrapper、oscomp 内核态测试资产 staging、runtestcase 队列执行器。",
+                "LoongArch 特有部分：DMW/高地址映射、LoongArch 平台配置、ArceOS/StarryX 组件组合和 BusyBox init.sh 调度。",
+                "一致性目标：相同测试组在两条主线上使用相同资源、超时原则和结果格式，降低架构间行为偏差。",
+            ],
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # 3. Work content
@@ -523,6 +752,132 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
         story.append(KeepTogether([p(heading, styles["h2"]), bullets(items, styles)]))
     story.append(PageBreak())
 
+    story.append(p("3.5 双工具链构建系统", styles["h2"]))
+    story.append(
+        p(
+            "官方评测只执行仓库根目录的 make all，因此根构建既是交付入口，也是第一道质量门禁。SWTC 不让两个架构共享一个模糊的默认工具链，而是显式固定 RISC-V nightly-2025-02-01 与 LoongArch nightly-2025-05-20，并分别检查 target、rust-lld、rust-objcopy、CMake 和 loongarch64-linux-musl-gcc。",
+            styles["body"],
+        )
+    )
+    story.append(
+        pipeline_diagram(
+            "构建与交付流水线",
+            [
+                ("源码检查", "关键路径完整"),
+                ("配置恢复", "Cargo/checksum"),
+                ("RISC-V", "wrapper ELF"),
+                ("LoongArch", "真实架构 ELF"),
+                ("产物门禁", "kernel-rv/la"),
+            ],
+        )
+    )
+    build_rows = [
+        [table_cell("构建项", styles, True), table_cell("RISC-V64", styles, True), table_cell("LoongArch64", styles, True)],
+        [table_cell("Rust 工具链", styles), table_cell("nightly-2025-02-01", styles), table_cell("nightly-2025-05-20", styles)],
+        [table_cell("目标三元组", styles), table_cell("riscv64gc-unknown-none-elf", styles), table_cell("loongarch64-unknown-none", styles)],
+        [table_cell("最终入口", styles), table_cell("0x80200000", styles), table_cell("0x80000000", styles)],
+        [table_cell("关键转换", styles), table_cell("raw binary + wrapper object + rust-lld", styles), table_cell("直接复制真实 LoongArch ELF", styles)],
+        [table_cell("失败策略", styles), table_cell("缺 target/tool 立即失败", styles), table_cell("默认拒绝跨架构 placeholder", styles)],
+    ]
+    story.append(make_table(build_rows, [3.4 * cm, 6.7 * cm, 6.7 * cm], compact=True))
+    story.append(code_block("""
+all: submission-info sanitize-submit-workdir build
+build: build-rv build-la
+build-rv: prepare-rv -> user -> kernel -> wrapper ELF
+build-la: prepare-la -> strict LoongArch build -> kernel-la
+""", styles))
+    story.append(
+        p(
+            "官方会过滤隐藏文件，因此 Cargo 配置和 vendor checksum 的可恢复副本存放在非隐藏路径。构建阶段再恢复 .cargo/config.toml 与 .cargo-checksum.json；该设计不要求评测机联网，也不依赖工作区中的历史缓存。",
+            styles["quote"],
+        )
+    )
+    story.append(PageBreak())
+
+    story.append(p("3.6 官方测试资产发现与受控执行", styles["h2"]))
+    story.append(
+        p(
+            "RISC-V 的 oscomp 模块直接从 virtio-blk 读取 EXT4 元数据，支持 extent tree、传统块映射、目录项和多级路径解析。测试组首先按固定路径发现 glibc/ 与 musl/ 下的脚本，再读取脚本、ELF、动态解释器和数据文件，并将其安装到 tmpfs 组私有目录。",
+            styles["body"],
+        )
+    )
+    story.append(
+        pipeline_diagram(
+            "官方测试执行闭环",
+            [
+                ("发现", "EXT4 固定路径"),
+                ("解析", "脚本/ELF/interp"),
+                ("暂存", "tmpfs 私有目录"),
+                ("执行", "fork/exec/wait"),
+                ("收尾", "日志与关机"),
+            ],
+            accent=TEAL,
+        )
+    )
+    queue_rows = [
+        [table_cell("记录", styles, True), table_cell("含义", styles, True), table_cell("执行行为", styles, True)],
+        [table_cell("G", styles, True), table_cell("进入测试组", styles), table_cell("切换组私有工作目录并输出 START", styles)],
+        [table_cell("X", styles, True), table_cell("基础可执行文件", styles), table_cell("执行单个 ELF 并等待退出", styles)],
+        [table_cell("A", styles, True), table_cell("argv + timeout", styles), table_cell("携带参数执行 BusyBox、Lua、bench 等", styles)],
+        [table_cell("C", styles, True), table_cell("libctest case", styles), table_cell("按 case 输出 RUN/Pass/FAIL", styles)],
+        [table_cell("L", styles, True), table_cell("LTP case", styles), table_cell("逐项限时并保留 case 收尾状态", styles)],
+        [table_cell("E", styles, True), table_cell("结束标记", styles), table_cell("无论前序成败都输出组 END", styles)],
+    ]
+    story.append(make_table(queue_rows, [2.0 * cm, 4.2 * cm, 10.6 * cm], compact=True))
+    story.append(p("执行队列采用 NUL 分隔记录，避免脚本中的空格和换行破坏边界。libctest、LTP 与 lmbench 分别设置独立 timeout；超时只终止当前项，不应吞掉整个测试组。", styles["quote"]))
+    story.append(PageBreak())
+
+    story.append(p("3.7 RISC-V64 内核主线", styles["h2"]))
+    story.append(
+        p(
+            "RISC-V64 主线位于 SWTC/kernel。其基础架构来自 Titanix GPLv3 开源项目，本队在保留许可证和来源说明的前提下，将工作重点放在 2026 官方测试资产入口、离线构建、动态运行时、结果协议及 Linux ABI 差异修复。",
+            styles["body"],
+        )
+    )
+    rv_rows = [
+        [table_cell("子系统", styles, True), table_cell("当前结构", styles, True), table_cell("比赛相关工作", styles, True)],
+        [table_cell("启动与 trap", styles), table_cell("entry.S、trap.S、用户/内核 trap 分离", styles), table_cell("官方 QEMU 入口、主动退出与异常诊断", styles)],
+        [table_cell("进程", styles), table_cell("Process/Thread、资源对象、调度与 wait", styles), table_cell("fork/clone/execve/wait4 与测试超时链路", styles)],
+        [table_cell("内存", styles), table_cell("页表、VMA、COW、共享内存与用户指针检查", styles), table_cell("ELF PT_LOAD/PT_INTERP、brk/mmap 与边界语义", styles)],
+        [table_cell("文件系统", styles), table_cell("VFS、fd table、FAT32/tmpfs/procfs/devfs、页缓存", styles), table_cell("EXT4 测试盘只读导入与组资源 staging", styles)],
+        [table_cell("同步/时间", styles), table_cell("futex、mutex、poll、timeout 与定时任务", styles), table_cell("libcbench/LTP 所需等待和时间语义", styles)],
+        [table_cell("网络/信号", styles), table_cell("TCP/UDP/Unix socket、标准信号路径", styles), table_cell("保留基础能力，初赛优先 functional 计分", styles)],
+        [table_cell("oscomp", styles), table_cell("约 2200 行评测适配模块", styles), table_cell("EXT4、脚本、ELF、队列、运行时与测试组编排", styles)],
+    ]
+    story.append(make_table(rv_rows, [2.7 * cm, 6.5 * cm, 7.6 * cm], compact=True))
+    story.append(Spacer(1, 0.35 * cm))
+    story.append(p("RISC-V 主线的关键价值在于把已有内核能力转化为官方可观察、可计分的行为。许多问题并非缺少一个 syscall 编号，而是 argv、结构体布局、errno、阻塞/超时、动态解释器路径和输出边界中的细小语义偏差。", styles["quote"]))
+    story.append(PageBreak())
+
+    story.append(p("3.8 LoongArch64 内核主线", styles["h2"]))
+    story.append(
+        p(
+            "LoongArch64 主线位于 SWTC-la，以 StarryX/ArceOS 组件化体系为基础。入口程序初始化进程、挂载 VFS、建立标准输入输出，并以 /musl/busybox sh -c 执行内嵌 init.sh。xcore 提供核心服务，xprocess、xsignal、xuspace、xvma、xcache 等模块分别承载进程、信号、用户空间、虚拟内存和缓存能力。",
+            styles["body"],
+        )
+    )
+    la_rows = [
+        [table_cell("层次", styles, True), table_cell("实现", styles, True), table_cell("比赛适配", styles, True)],
+        [table_cell("平台", styles), table_cell("loongarch64-qemu-virt，物理入口 0x80000000", styles), table_cell("UART、GED、PCI、virtio-blk 与时钟配置", styles)],
+        [table_cell("地址空间", styles), table_cell("DMW 启动窗口 + 高地址内核映射", styles), table_cell("分页开启前后保持启动代码连续执行", styles)],
+        [table_cell("运行时", styles), table_cell("ArceOS axruntime/axtask/axmm/axfs-ng", styles), table_cell("真实 kernel-la 与用户态 ELF 执行", styles)],
+        [table_cell("文件系统", styles), table_cell("VFS + lwext4_rust + fd/stdio", styles), table_cell("直接挂载官方测试盘并访问 glibc/musl 目录", styles)],
+        [table_cell("测试编排", styles), table_cell("BusyBox init.sh", styles), table_cell("动态库链接、工作目录沙箱、逐项 timeout", styles)],
+        [table_cell("离线依赖", styles), table_cell("vendor + 本地 xapi/xcore/xmodules", styles), table_cell("规避官方源包遗漏与 crates.io 网络依赖", styles)],
+    ]
+    story.append(make_table(la_rows, [2.6 * cm, 6.2 * cm, 8.0 * cm], compact=True))
+    story.append(code_block("""
+fn main() {
+    Process::new_init(current_task_id).build();
+    vfs::init_root();
+    fd::init_stdio();
+    run_user_app(["/musl/busybox", "sh", "-c", init_script]);
+    terminate();
+}
+""", styles))
+    story.append(p("LoongArch 线上已获得 basic、BusyBox、Lua 与 musl libcbench 分数；libctest/LTP 尚未形成分数，是后续最明确的增长方向。", styles["quote"]))
+    story.append(PageBreak())
+
     # 4. Completion
     story.append(p("4. 完成度与验证状态", styles["h1"]))
     story.append(
@@ -561,6 +916,61 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     story.append(p("当前最高且最新可见官网成绩：1009.8903911255481（提交时间 2026-06-30 09:17:33，Accepted）。", styles["quote"]))
     story.append(PageBreak())
 
+    story.append(p("4.2 线上分项结果", styles["h2"]))
+    story.append(
+        p(
+            "官网结果显示四列 basic 全部为 102，BusyBox 四列为 54、50、54、50，Lua 四列均为 9。libcbench 已在 glibc-rv、musl-la 与 musl-rv 三列计分；musl-rv 的 libctest 与 LTP 分别为 217 和 314。",
+            styles["body"],
+        )
+    )
+    story.append(score_breakdown_diagram())
+    score_rows = [
+        [table_cell("测试组", styles, True), table_cell("glibc-la", styles, True), table_cell("glibc-rv", styles, True), table_cell("musl-la", styles, True), table_cell("musl-rv", styles, True), table_cell("分项", styles, True)],
+        [table_cell("basic", styles), table_cell("102", styles, True), table_cell("102", styles, True), table_cell("102", styles, True), table_cell("102", styles, True), table_cell("408", styles, True)],
+        [table_cell("BusyBox", styles), table_cell("54", styles, True), table_cell("50", styles, True), table_cell("54", styles, True), table_cell("50", styles, True), table_cell("208", styles, True)],
+        [table_cell("Lua", styles), table_cell("9", styles, True), table_cell("9", styles, True), table_cell("9", styles, True), table_cell("9", styles, True), table_cell("36", styles, True)],
+        [table_cell("libcbench", styles), table_cell("0", styles, True), table_cell("30.3442", styles, True), table_cell("29.3344", styles, True), table_cell("27.1661", styles, True), table_cell("86.8448", styles, True)],
+        [table_cell("libctest", styles), table_cell("-", styles, True), table_cell("-", styles, True), table_cell("0", styles, True), table_cell("217", styles, True), table_cell("217", styles, True)],
+        [table_cell("LTP", styles), table_cell("0", styles, True), table_cell("0", styles, True), table_cell("0", styles, True), table_cell("314", styles, True), table_cell("314", styles, True)],
+    ]
+    story.append(make_table(score_rows, [2.4 * cm, 2.7 * cm, 2.7 * cm, 2.7 * cm, 2.7 * cm, 3.6 * cm], compact=True))
+    story.append(p("表内数值按官网得分详情原样记录；官网最终总分显示为 1009.8903911255481。", styles["caption"]))
+    story.append(PageBreak())
+
+    story.append(p("4.3 分层验证矩阵", styles["h2"]))
+    story.append(
+        p(
+            "排队时间可能达到数小时，因此每次提交前需要尽量在本地消除可以确定的问题。SWTC 将验证分为源码、构建、产物、启动、功能、协议和线上七层；后一层不替代前一层。",
+            styles["body"],
+        )
+    )
+    verify_rows = [
+        [table_cell("层级", styles, True), table_cell("检查内容", styles, True), table_cell("失败时含义", styles, True), table_cell("提交门禁", styles, True)],
+        [table_cell("源码", styles, True), table_cell("关键目录、Cargo.toml、vendor checksum", styles), table_cell("官方导出后可能缺文件", styles), table_cell("必须通过", styles, True)],
+        [table_cell("构建", styles, True), table_cell("离线 make all，不访问网络", styles), table_cell("工具链或隐藏配置依赖", styles), table_cell("必须通过", styles, True)],
+        [table_cell("产物", styles, True), table_cell("ELF 架构与入口地址", styles), table_cell("kernel-la placeholder 或链接错误", styles), table_cell("必须通过", styles, True)],
+        [table_cell("启动", styles, True), table_cell("官方 QEMU 命令、无盘主动退出", styles), table_cell("启动栈、地址、设备或关机错误", styles), table_cell("必须通过", styles, True)],
+        [table_cell("功能", styles, True), table_cell("官方 EXT4 镜像与分组 case", styles), table_cell("脚本、ELF、syscall 或运行时语义错误", styles), table_cell("目标组通过", styles, True)],
+        [table_cell("协议", styles, True), table_cell("START/END、RUN、Pass/FAIL 与 !TEST FINISH!", styles), table_cell("程序运行但计分器无法识别", styles), table_cell("必须通过", styles, True)],
+        [table_cell("线上", styles, True), table_cell("总分、四列分项与串口日志", styles), table_cell("环境差异或未覆盖 ABI", styles), table_cell("形成新证据", styles, True)],
+    ]
+    story.append(make_table(verify_rows, [2.1 * cm, 5.7 * cm, 5.5 * cm, 3.5 * cm], compact=True))
+    story.append(Spacer(1, 0.45 * cm))
+    story.append(p("4.4 回归原则", styles["h2"]))
+    story.append(
+        bullets(
+            [
+                "先验证无盘启动和主动退出，避免测试盘逻辑掩盖基础启动回归。",
+                "再验证 basic、BusyBox、Lua 等稳定组，确认保分路径未被新功能破坏。",
+                "新 LTP case 只有在 syscall 行为和错误路径明确时才加入 allowlist。",
+                "高风险性能项后置运行，不能截断前面已经可计分的 functional 组。",
+                "线上结果与对应提交建立关联，不能把后一次页面误认为前一次代码结果。",
+            ],
+            styles,
+        )
+    )
+    story.append(PageBreak())
+
     # 5. Innovations
     story.append(p("5. 项目特点与创新点", styles["h1"]))
     innovation_rows = [
@@ -582,6 +992,62 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
         )
     )
     story.append(p("创新重点不在堆叠功能数量，而在双架构、真实测试资产和受限评测环境下建立稳定、可解释、可复现的内核运行链路。", styles["quote"]))
+    story.append(PageBreak())
+
+    story.append(p("5.2 关键工程决策", styles["h2"]))
+    decision_rows = [
+        [table_cell("决策", styles, True), table_cell("问题背景", styles, True), table_cell("采用方案", styles, True), table_cell("结果", styles, True)],
+        [table_cell("统一根入口", styles), table_cell("评测固定执行 make all", styles), table_cell("根 Makefile/GNUmakefile 编排双架构", styles), table_cell("交付行为单一明确", styles)],
+        [table_cell("离线依赖", styles), table_cell("评测环境不能访问 crates.io", styles), table_cell("vendor + 非隐藏 checksum/config 备份", styles), table_cell("干净导出可离线构建", styles)],
+        [table_cell("严格 kernel-la", styles), table_cell("占位产物会在运行期静默丢分", styles), table_cell("默认构建失败而非复制 kernel-rv", styles), table_cell("架构错误提前暴露", styles)],
+        [table_cell("固定路径优先", styles), table_cell("大镜像递归扫描成本高", styles), table_cell("优先 glibc/musl 固定脚本路径", styles), table_cell("缩短启动与发现时间", styles)],
+        [table_cell("队列执行器", styles), table_cell("RISC-V 不依赖完整 shell", styles), table_cell("内核 staging + 用户态记录消费", styles), table_cell("参数、超时和边界可控", styles)],
+        [table_cell("组级沙箱", styles), table_cell("BusyBox find/du 会递归大目录", styles), table_cell("复制必要资源到 /tmp 私有目录", styles), table_cell("避免扫描 LTP 树导致 trap", styles)],
+        [table_cell("高风险后置", styles), table_cell("性能测试可能 panic 或超时", styles), table_cell("functional 优先，bench 后置限时", styles), table_cell("保留已经获得的分数", styles)],
+    ]
+    story.append(make_table(decision_rows, [2.7 * cm, 4.5 * cm, 5.6 * cm, 4.0 * cm], compact=True))
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(p("5.2.1 为什么不是完全统一内核源码", styles["h2"]))
+    story.append(
+        p(
+            "RISC-V 与 LoongArch 主线的开源基础不同，短期强行合并会引入大范围回归，且无法直接提高初赛得分。项目选择统一交付接口、测试协议和验证标准，而允许底层实现保持架构适配所需差异。这是一种面向截止时间与风险的工程取舍。",
+            styles["body"],
+        )
+    )
+    story.append(p("统一的对象是可观察行为与提交质量，而不是为了目录形式一致去重写已经能工作的内核。", styles["quote"]))
+    story.append(PageBreak())
+
+    story.append(p("5.3 调试方法与经验总结", styles["h2"]))
+    story.append(
+        p(
+            "内核比赛问题往往跨越构建机、QEMU、文件系统、动态链接器、用户程序和计分器。SWTC 将故障定位拆为连续证据链，每一步只回答一个问题，避免根据最终 0 分直接猜测 syscall。",
+            styles["body"],
+        )
+    )
+    debug_rows = [
+        [table_cell("现象", styles, True), table_cell("优先证据", styles, True), table_cell("典型结论", styles, True)],
+        [table_cell("Compile Error", styles), table_cell("根 Makefile 标记、缺失路径、Cargo checksum", styles), table_cell("入口/源包/离线依赖问题，不是运行时 ABI", styles)],
+        [table_cell("QEMU 无输出", styles), table_cell("ELF 架构、入口地址、串口和启动栈", styles), table_cell("产物或平台初始化错误", styles)],
+        [table_cell("找到脚本但 0 分", styles), table_cell("START/END、真实 case 输出、计分格式", styles), table_cell("协议或执行器未真正运行 ELF", styles)],
+        [table_cell("execve 返回 ENOENT", styles), table_cell("PT_INTERP 与动态库实际路径", styles), table_cell("动态解释器缺失，而非主 ELF 不存在", styles)],
+        [table_cell("某组后全部归零", styles), table_cell("最后一条串口日志与 trap 类型", styles), table_cell("当前组截断后续，应先隔离/后置", styles)],
+        [table_cell("本地通过线上失败", styles), table_cell("干净导出、隐藏文件过滤、工具链版本", styles), table_cell("本机缓存或未提交文件依赖", styles)],
+    ]
+    story.append(make_table(debug_rows, [3.2 * cm, 6.2 * cm, 7.4 * cm], compact=True))
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(
+        bullets(
+            [
+                "建立最小复现：先用单个 ELF、单个脚本和最小测试盘确认入口。",
+                "同时记录正向证据和负向证据：不仅记录通过项，也记录为什么暂不打开某组。",
+                "分数回退时优先比较测试组执行顺序与最后有效日志，不以总分单点判断根因。",
+                "将平台异常与代码错误分开：源包工作目录、重复压缩文件等平台现象需要独立记录。",
+                "文档与代码同步：新增 syscall、构建门禁和测试组都应留下验证方式与已知限制。",
+            ],
+            styles,
+        )
+    )
+    story.append(p("高质量调试的目标不是快速给出一个猜测，而是让下一次昂贵的线上提交携带更高的信息增益。", styles["quote"]))
     story.append(PageBreak())
 
     # 6. Evaluation evidence
@@ -656,6 +1122,78 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     story.append(make_table(roadmap_rows, [2.0 * cm, 6.2 * cm, 8.6 * cm]))
     story.append(PageBreak())
 
+    story.append(p("7.4 Linux ABI 覆盖结构", styles["h2"]))
+    story.append(
+        p(
+            "RISC-V syscall 入口按文件、内存、进程、资源、信号、同步、时间、网络和设备拆分。初赛适配不仅增加 syscall 编号，也处理结构体布局、flag、errno、短读写、阻塞与超时等语义。下表列出当前对官方测试最关键的能力类别。",
+            styles["body"],
+        )
+    )
+    abi_rows = [
+        [table_cell("类别", styles, True), table_cell("代表能力", styles, True), table_cell("关联测试", styles, True), table_cell("注意事项", styles, True)],
+        [table_cell("文件与路径", styles), table_cell("openat/read/write/stat/getdents/rename/truncate/link", styles), table_cell("basic、BusyBox、LTP", styles), table_cell("dirfd、flag、软链接与错误码", styles)],
+        [table_cell("向量与复制", styles), table_cell("readv/writev/preadv/pwritev/sendfile", styles), table_cell("LTP、libcbench", styles), table_cell("IOV_MAX、短读写与 offset 更新", styles)],
+        [table_cell("内存", styles), table_cell("brk/mmap/munmap/mprotect/shm", styles), table_cell("basic、libctest", styles), table_cell("页对齐、权限、COW 与用户指针", styles)],
+        [table_cell("进程", styles), table_cell("clone/fork/execve/wait4/exit", styles), table_cell("basic、lmbench、LTP", styles), table_cell("父子资源、退出状态与动态加载", styles)],
+        [table_cell("时间", styles), table_cell("clock_gettime/nanosleep/timerfd/gettimeofday", styles), table_cell("libcbench、LTP", styles), table_cell("tv_nsec 校验与超时中断", styles)],
+        [table_cell("同步与复用", styles), table_cell("futex/poll/select/pselect/eventfd/flock", styles), table_cell("libcbench、LTP", styles), table_cell("等待队列、nonblock 与 wake 语义", styles)],
+        [table_cell("信号", styles), table_cell("sigaction/sigprocmask/kill/sigreturn", styles), table_cell("libctest、LTP", styles), table_cell("mask、handler 与 trap 上下文", styles)],
+        [table_cell("网络", styles), table_cell("socket/bind/connect/send/recv/poll", styles), table_cell("后续网络与应用", styles), table_cell("初赛 functional 优先级较低", styles)],
+    ]
+    story.append(make_table(abi_rows, [2.4 * cm, 6.0 * cm, 4.0 * cm, 4.4 * cm], compact=True))
+    story.append(Spacer(1, 0.35 * cm))
+    story.append(p("syscall 实现存在不代表所有边界 case 已兼容。LTP allowlist 只选择已经理解其前置条件、失败影响和验证方法的 case。", styles["quote"]))
+    story.append(PageBreak())
+
+    story.append(p("7.5 测试组推进策略", styles["h2"]))
+    strategy_rows = [
+        [table_cell("测试组", styles, True), table_cell("价值", styles, True), table_cell("当前策略", styles, True), table_cell("下一验收点", styles, True)],
+        [table_cell("basic", styles), table_cell("启动、基础 syscall 与双 libc 基线", styles), table_cell("四列 102，作为每次回归门禁", styles), table_cell("保持满分且不增加耗时", styles)],
+        [table_cell("BusyBox", styles), table_cell("文件系统与常用命令组合", styles), table_cell("私有工作目录，避免递归大树", styles), table_cell("四列稳定不回退", styles)],
+        [table_cell("Lua", styles), table_cell("解释器、文件与内存综合场景", styles), table_cell("完整资源 staging 后运行脚本", styles), table_cell("四列 9 保持", styles)],
+        [table_cell("libcbench", styles), table_cell("malloc、线程、futex 与性能路径", styles), table_cell("保留三列已计分，危险项后置", styles), table_cell("恢复 glibc-la 且不截断", styles)],
+        [table_cell("libctest", styles), table_cell("libc 语义密集、单项价值高", styles), table_cell("逐 case、静态/动态分开、独立 timeout", styles), table_cell("LoongArch 首批可识别 case", styles)],
+        [table_cell("LTP", styles), table_cell("大规模 Linux ABI 验证", styles), table_cell("allowlist 分批扩展，失败继续", styles), table_cell("LoongArch 非零并提高 RV 稳定项", styles)],
+        [table_cell("lmbench/iozone", styles), table_cell("性能与复杂文件路径", styles), table_cell("全部 functional 后置，严格限时", styles), table_cell("不影响前序分数后再扩大", styles)],
+        [table_cell("网络/实时", styles), table_cell("应用与实时能力扩展", styles), table_cell("初赛末期不作为主攻方向", styles), table_cell("核心 ABI 稳定后再进入", styles)],
+    ]
+    story.append(make_table(strategy_rows, [2.3 * cm, 4.6 * cm, 5.7 * cm, 4.2 * cm], compact=True))
+    story.append(Spacer(1, 0.45 * cm))
+    story.append(p("7.5.1 提交批次原则", styles["h2"]))
+    story.append(
+        bullets(
+            [
+                "一次提交必须有清晰的目标测试组和可解释的预期增量。",
+                "涉及构建、文件系统、执行顺序和 ABI 的改动分开提交，便于回退与归因。",
+                "新增大批 case 前先确认 runner 格式与一个代表 case，避免整组无效。",
+                "任何可能 panic 或长时间阻塞的测试必须有独立 timeout 和 END 收尾。",
+            ],
+            styles,
+        )
+    )
+    story.append(PageBreak())
+
+    story.append(p("7.6 后续里程碑与预期成果", styles["h2"]))
+    milestone_rows = [
+        [table_cell("阶段", styles, True), table_cell("重点工作", styles, True), table_cell("预期成果", styles, True)],
+        [table_cell("M1 保分", styles), table_cell("冻结 1009.8903911255481 对应稳定执行顺序；保持双架构构建门禁", styles), table_cell("每次提交 basic/BusyBox/Lua 不回退", styles)],
+        [table_cell("M2 LA functional", styles), table_cell("从首个 LoongArch libctest/LTP 日志补齐 syscall 与运行时", styles), table_cell("LA libctest/LTP 由 0 变为可持续增长", styles)],
+        [table_cell("M3 资源语义", styles), table_cell("收敛 fd、fork/exec/wait、signal 与超时的跨架构差异", styles), table_cell("多进程和动态 libc case 更稳定", styles)],
+        [table_cell("M4 性能路径", styles), table_cell("在 functional 完成后恢复 lmbench/iozone 小子集", styles), table_cell("性能组不再截断前序测试", styles)],
+        [table_cell("M5 文档归档", styles), table_cell("整理来源、架构、验证矩阵和已知限制", styles), table_cell("提交材料与代码证据一致", styles)],
+    ]
+    story.append(make_table(milestone_rows, [3.0 * cm, 8.0 * cm, 5.8 * cm]))
+    story.append(Spacer(1, 0.55 * cm))
+    story.append(p("7.7 阶段性结论", styles["h2"]))
+    story.append(
+        p(
+            "SWTC 已完成从“能够启动的两套内核”到“能够在同一官方提交中构建、发现测试资产、执行真实 Linux 用户程序并获得四列分项”的关键跨越。1009.8903911255481 分不是终点，而是一条具有工程证据的高分基线。后续工作的核心是提高 LoongArch functional 覆盖，并在不牺牲已有稳定性的前提下逐步扩大 Linux ABI 兼容范围。",
+            styles["body"],
+        )
+    )
+    story.append(p("项目现阶段最重要的资产，是已经建立的双架构交付链、可重复验证流程以及能够从真实日志解释得分变化的工程方法。", styles["quote"]))
+    story.append(PageBreak())
+
     # 8. References
     story.append(p("8. 参考、开源基础与致谢", styles["h1"]))
     story.append(
@@ -694,9 +1232,8 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
 def generate() -> Path:
     register_fonts()
     styles = build_styles()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    doc = BaseDocTemplate(
+    doc = SWTCDocTemplate(
         str(OUTPUT_PDF),
         pagesize=A4,
         leftMargin=MARGIN_X,
@@ -720,7 +1257,7 @@ def generate() -> Path:
         bottomPadding=0,
     )
     doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=add_page_number)])
-    doc.build(build_story(styles))
+    doc.multiBuild(build_story(styles))
     return OUTPUT_PDF
 
 
