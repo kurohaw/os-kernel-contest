@@ -34,7 +34,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = REPO_ROOT / "docs" / "assets"
-OUTPUT_PDF = REPO_ROOT / "SWTC-preliminary-report.pdf"
+OUTPUT_PDF = REPO_ROOT / "SWTC-初赛文档.pdf"
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 MARGIN_X = 1.8 * cm
@@ -554,7 +554,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     )
     story.append(
         p(
-            "初赛工作的核心不是构造单独演示程序，而是打通从离线源码构建、架构正确性检查、块设备发现、脚本解析、资源暂存、ELF 装载、进程执行、Linux syscall 兼容、结果输出到主动关机的完整闭环。RISC-V 主线以 Titanix 开源架构为基础完成比赛适配；LoongArch 主线基于 StarryX/ArceOS 组件体系完成真实架构支持。本队新增工作集中于双架构统一提交、官方评测入口、Linux ABI 修复、故障隔离、离线依赖和验证门禁。",
+            "初赛阶段，SWTC 重点建设从离线源码构建、架构正确性检查、块设备发现、脚本解析、资源暂存、ELF 装载、进程执行、Linux syscall 兼容、结果输出到主动关机的完整评测闭环。RISC-V 主线以 Titanix 开源架构为基础完成比赛适配；LoongArch 主线基于 StarryX/ArceOS 组件体系完成真实架构支持。本队新增工作集中于双架构统一提交、官方评测入口、Linux ABI 兼容、故障隔离、离线依赖和验证门禁。",
             styles["body"],
         )
     )
@@ -588,7 +588,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     story.append(Spacer(1, 0.5 * cm))
     story.append(
         p(
-            "完成情况采用“源码实现 - 本地回归 - 线上计分”三层证据描述。没有线上证据的能力不会写成已经完成，基础项目自带能力与本队比赛适配也在后续章节分别说明。",
+            "完成情况采用“源码实现 - 本地回归 - 线上计分”三层证据描述。对于尚未获得线上证据的能力，文档按当前验证状态如实标注；基础开源项目能力与本队比赛适配工作在后续章节分别说明。",
             styles["quote"],
         )
     )
@@ -846,7 +846,7 @@ build-la: prepare-la -> strict LoongArch build -> kernel-la
     ]
     story.append(make_table(rv_rows, [2.7 * cm, 6.5 * cm, 7.6 * cm], compact=True))
     story.append(Spacer(1, 0.35 * cm))
-    story.append(p("RISC-V 主线的关键价值在于把已有内核能力转化为官方可观察、可计分的行为。许多问题并非缺少一个 syscall 编号，而是 argv、结构体布局、errno、阻塞/超时、动态解释器路径和输出边界中的细小语义偏差。", styles["quote"]))
+    story.append(p("RISC-V 主线的关键价值在于将已有内核能力转化为官方可观察、可计分的行为。实际适配中，很多问题并非单纯缺少一个 syscall 编号，而是 argv、结构体布局、errno、阻塞/超时、动态解释器路径和输出边界等 Linux ABI 语义细节存在偏差。", styles["quote"]))
     story.append(PageBreak())
 
     story.append(p("3.8 LoongArch64 内核主线", styles["h2"]))
@@ -956,7 +956,7 @@ fn main() {
     ]
     story.append(make_table(verify_rows, [2.1 * cm, 5.7 * cm, 5.5 * cm, 3.5 * cm], compact=True))
     story.append(Spacer(1, 0.45 * cm))
-    story.append(p("4.4 回归原则", styles["h2"]))
+    story.append(p("4.4 提交前验证原则", styles["h2"]))
     story.append(
         bullets(
             [
@@ -964,7 +964,7 @@ fn main() {
                 "再验证 basic、BusyBox、Lua 等稳定组，确认保分路径未被新功能破坏。",
                 "新 LTP case 只有在 syscall 行为和错误路径明确时才加入 allowlist。",
                 "高风险性能项后置运行，不能截断前面已经可计分的 functional 组。",
-                "线上结果与对应提交建立关联，不能把后一次页面误认为前一次代码结果。",
+                "线上结果与对应提交建立关联，避免不同提交批次的页面结果混淆。",
             ],
             styles,
         )
@@ -987,7 +987,7 @@ fn main() {
     story.append(p("5.1 工程取舍", styles["h2"]))
     story.append(
         p(
-            "初赛阶段优先保证官方入口、Linux ABI 和 functional 测试链路，不将网络、图形界面等展示性功能置于计分闭环之前。对于尚未稳定的 iozone、lmbench 和大规模 LTP，采用后置、分批和可回滚策略，避免一次改动破坏已验证基线。",
+            "初赛阶段优先保证官方入口、Linux ABI 和 functional 测试链路，不将网络、图形界面等展示性功能置于计分闭环之前。对于尚未稳定的 iozone、lmbench 和大规模 LTP，采用后置、分批和可回滚策略，以维护已验证基线的稳定性。",
             styles["body"],
         )
     )
@@ -1003,7 +1003,7 @@ fn main() {
         [table_cell("固定路径优先", styles), table_cell("大镜像递归扫描成本高", styles), table_cell("优先 glibc/musl 固定脚本路径", styles), table_cell("缩短启动与发现时间", styles)],
         [table_cell("队列执行器", styles), table_cell("RISC-V 不依赖完整 shell", styles), table_cell("内核 staging + 用户态记录消费", styles), table_cell("参数、超时和边界可控", styles)],
         [table_cell("组级沙箱", styles), table_cell("BusyBox find/du 会递归大目录", styles), table_cell("复制必要资源到 /tmp 私有目录", styles), table_cell("避免扫描 LTP 树导致 trap", styles)],
-        [table_cell("高风险后置", styles), table_cell("性能测试可能 panic 或超时", styles), table_cell("functional 优先，bench 后置限时", styles), table_cell("保留已经获得的分数", styles)],
+        [table_cell("高风险后置", styles), table_cell("性能测试可能异常退出或超时", styles), table_cell("functional 优先，bench 后置限时", styles), table_cell("保留已经获得的分数", styles)],
     ]
     story.append(make_table(decision_rows, [2.7 * cm, 4.5 * cm, 5.6 * cm, 4.0 * cm], compact=True))
     story.append(Spacer(1, 0.4 * cm))
@@ -1017,15 +1017,15 @@ fn main() {
     story.append(p("统一的对象是可观察行为与提交质量，而不是为了目录形式一致去重写已经能工作的内核。", styles["quote"]))
     story.append(PageBreak())
 
-    story.append(p("5.3 调试方法与经验总结", styles["h2"]))
+    story.append(p("5.3 问题定位方法与经验总结", styles["h2"]))
     story.append(
         p(
-            "内核比赛问题往往跨越构建机、QEMU、文件系统、动态链接器、用户程序和计分器。SWTC 将故障定位拆为连续证据链，每一步只回答一个问题，避免根据最终 0 分直接猜测 syscall。",
+            "内核评测问题往往跨越构建环境、QEMU、文件系统、动态链接器、用户程序和计分器。SWTC 将问题定位拆解为连续证据链，每一步只验证一个假设，避免仅根据最终分数推断底层原因。",
             styles["body"],
         )
     )
     debug_rows = [
-        [table_cell("现象", styles, True), table_cell("优先证据", styles, True), table_cell("典型结论", styles, True)],
+        [table_cell("现象", styles, True), table_cell("优先核查证据", styles, True), table_cell("判断方向", styles, True)],
         [table_cell("Compile Error", styles), table_cell("根 Makefile 标记、缺失路径、Cargo checksum", styles), table_cell("入口/源包/离线依赖问题，不是运行时 ABI", styles)],
         [table_cell("QEMU 无输出", styles), table_cell("ELF 架构、入口地址、串口和启动栈", styles), table_cell("产物或平台初始化错误", styles)],
         [table_cell("找到脚本但 0 分", styles), table_cell("START/END、真实 case 输出、计分格式", styles), table_cell("协议或执行器未真正运行 ELF", styles)],
@@ -1039,15 +1039,15 @@ fn main() {
         bullets(
             [
                 "建立最小复现：先用单个 ELF、单个脚本和最小测试盘确认入口。",
-                "同时记录正向证据和负向证据：不仅记录通过项，也记录为什么暂不打开某组。",
+                "同时记录正向证据和负向证据：不仅记录通过项，也记录暂缓打开某组测试的工程依据。",
                 "分数回退时优先比较测试组执行顺序与最后有效日志，不以总分单点判断根因。",
-                "将平台异常与代码错误分开：源包工作目录、重复压缩文件等平台现象需要独立记录。",
+                "将平台异常与代码问题分开：源包工作目录、重复压缩文件等平台现象需要独立记录。",
                 "文档与代码同步：新增 syscall、构建门禁和测试组都应留下验证方式与已知限制。",
             ],
             styles,
         )
     )
-    story.append(p("高质量调试的目标不是快速给出一个猜测，而是让下一次昂贵的线上提交携带更高的信息增益。", styles["quote"]))
+    story.append(p("该定位方法的目标，是让每次线上提交都建立在明确证据与可回归验证之上。", styles["quote"]))
     story.append(PageBreak())
 
     # 6. Evaluation evidence
@@ -1063,7 +1063,7 @@ fn main() {
     story.append(p("图 2  sudo_win_the_cscc 官网评测列表记录（2026-06-30）", styles["caption"]))
     story.append(
         p(
-            "评测成绩是阶段性工程证据，不等同于完整 Linux 兼容度。项目仍通过本地官方镜像回归和线上分项日志交叉验证每项能力。",
+            "评测成绩是阶段性工程证据，不等同于完整 Linux 兼容度。项目后续仍将通过本地官方镜像回归和线上分项日志交叉验证各项能力。",
             styles["quote"],
         )
     )
@@ -1115,7 +1115,7 @@ fn main() {
     roadmap_rows = [
         [table_cell("优先级", styles, True), table_cell("工作项", styles, True), table_cell("验收标准", styles, True)],
         [table_cell("P0", styles, True), table_cell("稳定双架构官方构建与启动", styles), table_cell("两个 ELF 架构正确，QEMU 可进入内核并主动退出", styles)],
-        [table_cell("P1", styles, True), table_cell("恢复并巩固已验证高分路径", styles), table_cell("basic/BusyBox/Lua/libcbench 分项不回退", styles)],
+        [table_cell("P1", styles, True), table_cell("巩固已验证高分路径", styles), table_cell("basic/BusyBox/Lua/libcbench 分项保持稳定", styles)],
         [table_cell("P2", styles, True), table_cell("扩展 LA libctest 与 LTP", styles), table_cell("逐 case 可解释，新增 syscall 有本地和线上证据", styles)],
         [table_cell("P3", styles, True), table_cell("完善进程与文件描述符模型", styles), table_cell("fork/exec/wait 与多程序资源隔离回归通过", styles)],
     ]
@@ -1151,7 +1151,7 @@ fn main() {
         [table_cell("basic", styles), table_cell("启动、基础 syscall 与双 libc 基线", styles), table_cell("四列 102，作为每次回归门禁", styles), table_cell("保持满分且不增加耗时", styles)],
         [table_cell("BusyBox", styles), table_cell("文件系统与常用命令组合", styles), table_cell("私有工作目录，避免递归大树", styles), table_cell("四列稳定不回退", styles)],
         [table_cell("Lua", styles), table_cell("解释器、文件与内存综合场景", styles), table_cell("完整资源 staging 后运行脚本", styles), table_cell("四列 9 保持", styles)],
-        [table_cell("libcbench", styles), table_cell("malloc、线程、futex 与性能路径", styles), table_cell("保留三列已计分，危险项后置", styles), table_cell("恢复 glibc-la 且不截断", styles)],
+        [table_cell("libcbench", styles), table_cell("malloc、线程、futex 与性能路径", styles), table_cell("保留三列已计分，高风险项后置", styles), table_cell("补齐 glibc-la 且不截断", styles)],
         [table_cell("libctest", styles), table_cell("libc 语义密集、单项价值高", styles), table_cell("逐 case、静态/动态分开、独立 timeout", styles), table_cell("LoongArch 首批可识别 case", styles)],
         [table_cell("LTP", styles), table_cell("大规模 Linux ABI 验证", styles), table_cell("allowlist 分批扩展，失败继续", styles), table_cell("LoongArch 非零并提高 RV 稳定项", styles)],
         [table_cell("lmbench/iozone", styles), table_cell("性能与复杂文件路径", styles), table_cell("全部 functional 后置，严格限时", styles), table_cell("不影响前序分数后再扩大", styles)],
@@ -1166,7 +1166,7 @@ fn main() {
                 "一次提交必须有清晰的目标测试组和可解释的预期增量。",
                 "涉及构建、文件系统、执行顺序和 ABI 的改动分开提交，便于回退与归因。",
                 "新增大批 case 前先确认 runner 格式与一个代表 case，避免整组无效。",
-                "任何可能 panic 或长时间阻塞的测试必须有独立 timeout 和 END 收尾。",
+                "任何可能异常退出或长时间阻塞的测试必须有独立 timeout 和 END 收尾。",
             ],
             styles,
         )
