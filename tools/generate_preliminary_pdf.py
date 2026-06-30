@@ -51,7 +51,8 @@ PALE_RED = colors.HexColor("#F9ECEE")
 PALE_GRAY = colors.HexColor("#F4F6F8")
 MID_GRAY = colors.HexColor("#66717F")
 LIGHT_LINE = colors.HexColor("#D6DCE4")
-TEXT = colors.HexColor("#20242A")
+BLACK = colors.black
+TEXT = BLACK
 
 
 def register_fonts() -> None:
@@ -82,7 +83,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=15,
             leading=23,
             alignment=TA_CENTER,
-            textColor=NAVY,
+            textColor=BLACK,
         ),
         "cover_title": ParagraphStyle(
             "CoverTitle",
@@ -91,7 +92,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=29,
             leading=38,
             alignment=TA_CENTER,
-            textColor=DEEP_RED,
+            textColor=BLACK,
         ),
         "cover_subtitle": ParagraphStyle(
             "CoverSubtitle",
@@ -100,7 +101,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=13,
             leading=20,
             alignment=TA_CENTER,
-            textColor=MID_GRAY,
+            textColor=BLACK,
         ),
         "front_title": ParagraphStyle(
             "FrontTitle",
@@ -109,7 +110,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=21,
             leading=30,
             alignment=TA_CENTER,
-            textColor=TEXT,
+            textColor=BLACK,
             spaceAfter=18,
         ),
         "h1": ParagraphStyle(
@@ -120,7 +121,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=25,
             spaceBefore=0,
             spaceAfter=13,
-            textColor=DEEP_RED,
+            textColor=BLACK,
         ),
         "h2": ParagraphStyle(
             "H2",
@@ -130,7 +131,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=19,
             spaceBefore=8,
             spaceAfter=7,
-            textColor=NAVY,
+            textColor=BLACK,
         ),
         "body": ParagraphStyle(
             "Body",
@@ -140,7 +141,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=17,
             alignment=TA_LEFT,
             firstLineIndent=2 * 10.2,
-            textColor=TEXT,
+            textColor=BLACK,
             spaceAfter=6,
         ),
         "body_no_indent": ParagraphStyle(
@@ -150,7 +151,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=10.2,
             leading=16,
             alignment=TA_LEFT,
-            textColor=TEXT,
+            textColor=BLACK,
             spaceAfter=5,
         ),
         "small": ParagraphStyle(
@@ -159,7 +160,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontName="SWTCCN",
             fontSize=8.6,
             leading=13,
-            textColor=MID_GRAY,
+            textColor=BLACK,
         ),
         "table": ParagraphStyle(
             "TableText",
@@ -167,7 +168,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontName="SWTCCN",
             fontSize=8.6,
             leading=12.5,
-            textColor=TEXT,
+            textColor=BLACK,
         ),
         "table_center": ParagraphStyle(
             "TableCenter",
@@ -176,7 +177,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=8.6,
             leading=12.5,
             alignment=TA_CENTER,
-            textColor=TEXT,
+            textColor=BLACK,
         ),
         "caption": ParagraphStyle(
             "Caption",
@@ -185,7 +186,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             fontSize=8.8,
             leading=13,
             alignment=TA_CENTER,
-            textColor=MID_GRAY,
+            textColor=BLACK,
             spaceBefore=5,
             spaceAfter=8,
         ),
@@ -201,7 +202,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             borderWidth=0,
             borderPadding=9,
             backColor=PALE_RED,
-            textColor=TEXT,
+            textColor=BLACK,
             spaceBefore=7,
             spaceAfter=8,
         ),
@@ -213,7 +214,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=13,
             leftIndent=12,
             firstLineIndent=-12,
-            textColor=TEXT,
+            textColor=BLACK,
             spaceAfter=4,
         ),
         "code": ParagraphStyle(
@@ -224,8 +225,8 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=11.2,
             leftIndent=0,
             rightIndent=0,
-            textColor=colors.HexColor("#D8E2EC"),
-            backColor=colors.HexColor("#202A35"),
+            textColor=BLACK,
+            backColor=colors.white,
             borderPadding=9,
             spaceBefore=5,
             spaceAfter=8,
@@ -237,7 +238,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=17,
             leftIndent=0,
             firstLineIndent=0,
-            textColor=NAVY,
+            textColor=BLACK,
             spaceBefore=4,
         ),
         "toc_level1": ParagraphStyle(
@@ -247,7 +248,7 @@ def build_styles() -> dict[str, ParagraphStyle]:
             leading=14,
             leftIndent=18,
             firstLineIndent=0,
-            textColor=TEXT,
+            textColor=BLACK,
         ),
     }
 
@@ -262,7 +263,7 @@ def code_block(text: str, styles: dict[str, ParagraphStyle]) -> Table:
     container.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#202A35")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
                 ("LEFTPADDING", (0, 0), (-1, -1), 10),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                 ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -298,8 +299,8 @@ def make_table(
     if header:
         commands.extend(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("BACKGROUND", (0, 0), (-1, 0), PALE_GRAY),
+                ("TEXTCOLOR", (0, 0), (-1, 0), BLACK),
                 ("FONTNAME", (0, 0), (-1, 0), "SWTCCN-Bold"),
                 ("ALIGN", (0, 0), (-1, 0), "CENTER"),
             ]
@@ -333,7 +334,7 @@ def add_box(d: Drawing, x: float, y: float, w: float, h: float, lines: list[str]
                 line,
                 fontName="SWTCCN-Bold" if index == 0 else "SWTCCN",
                 fontSize=8.2,
-                fillColor=TEXT,
+                fillColor=BLACK,
                 textAnchor="middle",
             )
         )
@@ -351,7 +352,7 @@ def add_arrow(d: Drawing, x1: float, y1: float, x2: float, y2: float, color: col
 
 def architecture_diagram() -> Drawing:
     d = Drawing(17.2 * cm, 8.7 * cm)
-    d.add(String(8, 237, "统一构建层", fontName="SWTCCN-Bold", fontSize=9, fillColor=DEEP_RED))
+    d.add(String(8, 237, "统一构建层", fontName="SWTCCN-Bold", fontSize=9, fillColor=BLACK))
     add_box(d, 20, 190, 105, 38, ["GitLab main", "统一源码入口"], PALE_BLUE)
     add_box(d, 176, 190, 105, 38, ["根目录 make all", "离线构建与门禁"], PALE_RED)
     add_box(d, 330, 211, 108, 34, ["kernel-rv", "RISC-V64 ELF"], colors.HexColor("#E8F3EE"))
@@ -362,7 +363,7 @@ def architecture_diagram() -> Drawing:
     add_arrow(d, 305, 228, 330, 228)
     add_arrow(d, 305, 183, 330, 183)
 
-    d.add(String(8, 145, "官方运行层", fontName="SWTCCN-Bold", fontSize=9, fillColor=DEEP_RED))
+    d.add(String(8, 145, "官方运行层", fontName="SWTCCN-Bold", fontSize=9, fillColor=BLACK))
     add_box(d, 20, 98, 92, 35, ["QEMU", "双架构启动"], PALE_BLUE)
     add_box(d, 141, 98, 92, 35, ["virtio-blk", "EXT4 测试盘"], PALE_BLUE)
     add_box(d, 262, 98, 92, 35, ["测试资产", "脚本与 ELF"], PALE_BLUE)
@@ -374,7 +375,7 @@ def architecture_diagram() -> Drawing:
     d.add(Line(66, 151, 384, 151, strokeColor=MID_GRAY, strokeWidth=1.2))
     add_arrow(d, 66, 151, 66, 133)
 
-    d.add(String(8, 75, "内核运行路径", fontName="SWTCCN-Bold", fontSize=9, fillColor=DEEP_RED))
+    d.add(String(8, 75, "内核运行路径", fontName="SWTCCN-Bold", fontSize=9, fillColor=BLACK))
     labels = [
         ["启动", "平台初始化"],
         ["存储", "EXT4 读取"],
@@ -397,7 +398,7 @@ def pipeline_diagram(title: str, steps: list[tuple[str, str]], accent: colors.Co
     width = 17.2 * cm
     height = 4.4 * cm
     d = Drawing(width, height)
-    d.add(String(8, height - 17, title, fontName="SWTCCN-Bold", fontSize=10, fillColor=DEEP_RED))
+    d.add(String(8, height - 17, title, fontName="SWTCCN-Bold", fontSize=10, fillColor=BLACK))
     gap = 16
     box_w = (width - 24 - gap * (len(steps) - 1)) / len(steps)
     box_h = 60
@@ -406,8 +407,8 @@ def pipeline_diagram(title: str, steps: list[tuple[str, str]], accent: colors.Co
         x = 12 + index * (box_w + gap)
         fill = PALE_RED if index == len(steps) - 1 else PALE_BLUE
         d.add(Rect(x, y, box_w, box_h, rx=7, ry=7, fillColor=fill, strokeColor=LIGHT_LINE, strokeWidth=0.8))
-        d.add(String(x + box_w / 2, y + 37, heading, fontName="SWTCCN-Bold", fontSize=8.2, fillColor=TEXT, textAnchor="middle"))
-        d.add(String(x + box_w / 2, y + 19, detail, fontName="SWTCCN", fontSize=7.1, fillColor=MID_GRAY, textAnchor="middle"))
+        d.add(String(x + box_w / 2, y + 37, heading, fontName="SWTCCN-Bold", fontSize=8.2, fillColor=BLACK, textAnchor="middle"))
+        d.add(String(x + box_w / 2, y + 19, detail, fontName="SWTCCN", fontSize=7.1, fillColor=BLACK, textAnchor="middle"))
         if index < len(steps) - 1:
             start_x = x + box_w
             end_x = start_x + gap
@@ -421,7 +422,7 @@ def score_breakdown_diagram() -> Drawing:
     width = 17.2 * cm
     height = 7.0 * cm
     d = Drawing(width, height)
-    d.add(String(8, height - 18, "官网分项原始计分", fontName="SWTCCN-Bold", fontSize=10, fillColor=DEEP_RED))
+    d.add(String(8, height - 18, "官网分项原始计分", fontName="SWTCCN-Bold", fontSize=10, fillColor=BLACK))
     values = [
         ("basic", 408.0, RED),
         ("BusyBox", 208.0, BLUE),
@@ -437,13 +438,13 @@ def score_breakdown_diagram() -> Drawing:
     row_h = 25
     for index, (name, value, color) in enumerate(values):
         y = top - index * row_h
-        d.add(String(left - 8, y + 3, name, fontName="SWTCCN", fontSize=8.2, fillColor=TEXT, textAnchor="end"))
+        d.add(String(left - 8, y + 3, name, fontName="SWTCCN", fontSize=8.2, fillColor=BLACK, textAnchor="end"))
         bar_w = max_bar * value / max_value
         d.add(Rect(left, y - 4, max_bar, 12, fillColor=PALE_GRAY, strokeColor=None))
         d.add(Rect(left, y - 4, bar_w, 12, fillColor=color, strokeColor=None))
         label = f"{value:.6f}" if value % 1 else f"{int(value)}"
-        d.add(String(left + bar_w + 7, y + 1, label, fontName="SWTCCN", fontSize=7.5, fillColor=MID_GRAY))
-    d.add(String(8, 11, "注：图中为官网各测试组原始分项；平台总分按官方计分规则显示为 1009.8903911255481。", fontName="SWTCCN", fontSize=7.3, fillColor=MID_GRAY))
+        d.add(String(left + bar_w + 7, y + 1, label, fontName="SWTCCN", fontSize=7.5, fillColor=BLACK))
+    d.add(String(8, 11, "注：图中为官网各测试组原始分项；平台总分按官方计分规则显示为 1009.8903911255481。", fontName="SWTCCN", fontSize=7.3, fillColor=BLACK))
     return d
 
 
@@ -465,7 +466,7 @@ def page_header_footer(canvas, doc) -> None:
     canvas.setLineWidth(0.5)
     canvas.line(MARGIN_X, PAGE_HEIGHT - 1.18 * cm, PAGE_WIDTH - MARGIN_X, PAGE_HEIGHT - 1.18 * cm)
     canvas.setFont("SWTCCN", 8.3)
-    canvas.setFillColor(MID_GRAY)
+    canvas.setFillColor(BLACK)
     canvas.drawString(MARGIN_X, PAGE_HEIGHT - 0.95 * cm, "SWTC 初赛作品文档")
     canvas.drawRightString(PAGE_WIDTH - MARGIN_X, PAGE_HEIGHT - 0.95 * cm, "上海电力大学 · sudo_win_the_cscc")
     canvas.setStrokeColor(LIGHT_LINE)
@@ -530,7 +531,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
                 ("FONTNAME", (0, 0), (-1, -1), "SWTCCN"),
                 ("BACKGROUND", (0, 0), (0, -1), PALE_RED),
                 ("BACKGROUND", (1, 0), (1, -1), PALE_GRAY),
-                ("TEXTCOLOR", (0, 0), (0, -1), DEEP_RED),
+                ("TEXTCOLOR", (0, 0), (0, -1), BLACK),
                 ("FONTNAME", (0, 0), (0, -1), "SWTCCN-Bold"),
                 ("GRID", (0, 0), (-1, -1), 0.5, LIGHT_LINE),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -1073,14 +1074,14 @@ fn main() {
     story.append(p("7. 构建、验证与后续计划", styles["h1"]))
     story.append(p("7.1 构建方式", styles["h2"]))
     build_box = Table(
-        [[p("<font color=\"#FFFFFF\">cd /mnt/e/WorkSpace/MinOS/os-kernel-contest<br/>make all</font>", styles["body_no_indent"])]],
+        [[p("<font color=\"#000000\">cd /mnt/e/WorkSpace/MinOS/os-kernel-contest<br/>make all</font>", styles["body_no_indent"])]],
         colWidths=[16.8 * cm],
     )
     build_box.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#202A35")),
-                ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 0), (-1, -1), BLACK),
                 ("FONTNAME", (0, 0), (-1, -1), "SWTCCN"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 12),
                 ("TOPPADDING", (0, 0), (-1, -1), 10),
@@ -1215,7 +1216,7 @@ fn main() {
         ("Chronix", "https://github.com/PACTHEMAN123/Chronix"),
     ]
     for index, (name, url) in enumerate(refs, 1):
-        story.append(p(f"[{index}] {name}：<link href=\"{url}\" color=\"#2F75B5\">{url}</link>", styles["reference"]))
+        story.append(p(f"[{index}] {name}：<link href=\"{url}\" color=\"#000000\">{url}</link>", styles["reference"]))
     story.append(Spacer(1, 0.45 * cm))
     story.append(p("开源与原创性说明", styles["h2"]))
     story.append(
