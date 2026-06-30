@@ -4,40 +4,13 @@
 
 SWTC 是一个面向 2026 操作系统大赛官方评测的双架构内核项目。项目目标是在同一个仓库和同一次官方提交中，稳定生成并运行 RISC-V64 `kernel-rv` 与 LoongArch64 `kernel-la`，覆盖官方镜像中的 basic、BusyBox、Lua、libcbench、libctest、LTP 等测试组。
 
-当前项目采用“两条主线、一个提交入口”的方式推进：RISC-V 主线负责保分和 Linux ABI 扩展，LoongArch 主线负责真实架构支持与新增得分点恢复。历史最高可见官方成绩为 `983.6805892892955`（2026-06-29 03:06:43）。最新可见官网提交为 2026-06-30 08:31:57，结果为 `Compile Error`，错误显示评测机未进入仓库根 `Makefile`；本地和 GitLab 远端已经确认根构建存在且干净导出 `make all` 通过。
+当前项目采用“两条主线、一个提交入口”的方式推进：RISC-V 主线负责保分和 Linux ABI 扩展，LoongArch 主线负责真实架构支持与新增得分点恢复。当前最高且最新可见官方成绩为 `1009.8903911255481`（提交时间 2026-06-30 09:17:33，Accepted）。其中 basic 为 408、BusyBox 为 208、Lua 为 36、libcbench 为 86.84477333493804、musl-rv libctest 为 217、musl-rv LTP 为 314。
 
 ## 2. 总体架构
 
-```mermaid
-flowchart LR
-    SRC[GitLab main 源码] --> MAKE[根目录 make all]
-    MAKE --> RV[RISC-V 构建<br/>SWTC/]
-    MAKE --> LA[LoongArch 构建<br/>SWTC-la/]
-    RV --> KRV[kernel-rv]
-    LA --> KLA[kernel-la]
-    KRV --> QRV[RISC-V QEMU]
-    KLA --> QLA[LoongArch QEMU]
-    QRV --> IMG[官方 EXT4 测试盘]
-    QLA --> IMG
-    IMG --> TEST[测试脚本与预编译 ELF]
-    TEST --> LOG[官方格式日志与得分]
-```
+![SWTC 双架构系统总体架构](assets/swtc-system-architecture.png)
 
-内核运行时的核心路径如下：
-
-```mermaid
-flowchart TB
-    BOOT[平台启动] --> DEV[virtio 设备初始化]
-    DEV --> FS[EXT4 只读路径解析]
-    FS --> SH[测试脚本读取]
-    SH --> PARSE[命令队列解析]
-    PARSE --> STAGE[tmpfs 资源暂存]
-    STAGE --> ELF[ELF 装载与 argv/envp/auxv]
-    ELF --> PROC[进程/线程/wait/timeout]
-    PROC --> SYSCALL[Linux syscall 兼容层]
-    SYSCALL --> OUT[START/END 与结果输出]
-    OUT --> SHUTDOWN[主动关机]
-```
+上图展示了统一构建入口、双架构内核产物、官方运行环境，以及从设备初始化到日志输出和主动关机的完整内核运行路径。
 
 ## 3. 工作内容
 
@@ -107,9 +80,9 @@ make all
 
 ## 7. 当前问题与下一步
 
-- 最新官网错误显示未进入仓库根 `Makefile`，需继续核对官网实际源包或提交方式；下一次日志应出现根构建诊断标记。
-- 当前首要目标是恢复 `983.6805892892955` 高分基线，而不是继续大范围添加不稳定测试组。
-- LoongArch 侧需要继续确认真实 `kernel-la` 在线上恢复 basic/BusyBox/Lua/libcbench 得分。
+- 最新 1009.8903911255481 分结果已确认双架构构建与主要测试入口能够进入官方评测；后续继续保留干净导出构建和 ELF 架构检查作为提交门禁。
+- 当前首要目标是巩固 `1009.8903911255481` 高分基线，而不是继续大范围添加不稳定测试组。
+- LoongArch 侧 basic、BusyBox、Lua 和 musl libcbench 已在线上计分，下一阶段重点补齐 LoongArch libctest 与 LTP。
 - LTP 和 libcbench 后续应按小批量、可回滚、可从日志解释的方式推进。
 
 ## 8. 参考与致谢

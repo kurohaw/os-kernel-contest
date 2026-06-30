@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="860" viewBox="0 0 1600 860" role="img" aria-labelledby="title desc">
+  <title id="title">SWTC 双架构系统总体架构</title>
+  <desc id="desc">展示统一构建入口、RISC-V 与 LoongArch 内核产物、官方测试环境及内核运行路径。</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#17365d" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 34px "Microsoft YaHei", "PingFang SC", sans-serif; fill: #8e1622; }
+      .subtitle { font: 400 18px "Microsoft YaHei", "PingFang SC", sans-serif; fill: #66717f; }
+      .layer { font: 700 22px "Microsoft YaHei", "PingFang SC", sans-serif; fill: #b51f2e; }
+      .box-title { font: 700 19px "Microsoft YaHei", "PingFang SC", sans-serif; fill: #20242a; text-anchor: middle; }
+      .box-sub { font: 400 16px "Microsoft YaHei", "PingFang SC", sans-serif; fill: #4f5b68; text-anchor: middle; }
+      .arrow { fill: none; stroke: #66717f; stroke-width: 3; }
+      .branch { fill: none; stroke: #66717f; stroke-width: 3; }
+      .box { stroke: #cbd5df; stroke-width: 2; filter: url(#shadow); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="860" fill="#ffffff"/>
+  <text class="title" x="70" y="62">SWTC 双架构系统总体架构</text>
+  <text class="subtitle" x="70" y="96">统一源码入口、双架构离线构建、官方测试资产执行与 Linux ABI 兼容链路</text>
+  <line x1="70" y1="118" x2="1530" y2="118" stroke="#d6dce4" stroke-width="2"/>
+
+  <text class="layer" x="70" y="168">统一构建层</text>
+  <rect class="box" x="120" y="195" width="260" height="92" rx="16" fill="#eaf2f8"/>
+  <text class="box-title" x="250" y="233">GitLab main</text>
+  <text class="box-sub" x="250" y="260">统一源码与提交入口</text>
+
+  <rect class="box" x="500" y="195" width="280" height="92" rx="16" fill="#f9ecee"/>
+  <text class="box-title" x="640" y="233">根目录 make all</text>
+  <text class="box-sub" x="640" y="260">双工具链、离线依赖与构建门禁</text>
+
+  <rect class="box" x="920" y="160" width="250" height="82" rx="16" fill="#e8f3ee"/>
+  <text class="box-title" x="1045" y="195">kernel-rv</text>
+  <text class="box-sub" x="1045" y="221">RISC-V64 ELF</text>
+
+  <rect class="box" x="920" y="260" width="250" height="82" rx="16" fill="#fff3df"/>
+  <text class="box-title" x="1045" y="295">kernel-la</text>
+  <text class="box-sub" x="1045" y="321">LoongArch64 ELF</text>
+
+  <path class="arrow" d="M 380 241 L 500 241" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="500,241 488,234 488,248" fill="#66717f"/>
+  <polyline points="780,241 840,241 840,201" fill="none" stroke="#66717f" stroke-width="3"/>
+  <path class="arrow" d="M 840 201 L 920 201" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="920,201 908,194 908,208" fill="#66717f"/>
+  <line x1="840" y1="241" x2="840" y2="301" stroke="#66717f" stroke-width="3"/>
+  <path class="arrow" d="M 840 301 L 920 301" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="920,301 908,294 908,308" fill="#66717f"/>
+
+  <rect x="1230" y="177" width="300" height="148" rx="18" fill="#f4f6f8" stroke="#d6dce4" stroke-width="2"/>
+  <text class="box-title" x="1380" y="219">构建产物门禁</text>
+  <text class="box-sub" x="1380" y="252">架构、入口地址、源树完整性</text>
+  <text class="box-sub" x="1380" y="282">禁止跨架构占位产物</text>
+  <path class="arrow" d="M 1170 201 L 1230 218" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1230,218 1216,207 1212,221" fill="#66717f"/>
+  <path class="arrow" d="M 1170 301 L 1230 282" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1230,282 1212,279 1216,293" fill="#66717f"/>
+
+  <text class="layer" x="70" y="395">官方运行层</text>
+  <rect class="box" x="120" y="425" width="230" height="92" rx="16" fill="#eaf2f8"/>
+  <text class="box-title" x="235" y="463">QEMU</text>
+  <text class="box-sub" x="235" y="490">RISC-V / LoongArch</text>
+
+  <rect class="box" x="430" y="425" width="230" height="92" rx="16" fill="#eaf2f8"/>
+  <text class="box-title" x="545" y="463">virtio-blk</text>
+  <text class="box-sub" x="545" y="490">无分区 EXT4 测试盘</text>
+
+  <rect class="box" x="740" y="425" width="230" height="92" rx="16" fill="#eaf2f8"/>
+  <text class="box-title" x="855" y="463">官方测试资产</text>
+  <text class="box-sub" x="855" y="490">脚本、ELF 与运行时</text>
+
+  <rect class="box" x="1050" y="425" width="230" height="92" rx="16" fill="#eaf2f8"/>
+  <text class="box-title" x="1165" y="463">受控执行</text>
+  <text class="box-sub" x="1165" y="490">分组、逐项与超时隔离</text>
+
+  <rect class="box" x="1360" y="425" width="170" height="92" rx="16" fill="#e8f3ee"/>
+  <text class="box-title" x="1445" y="463">官方输出</text>
+  <text class="box-sub" x="1445" y="490">计分与关机</text>
+
+  <path class="arrow" d="M 350 471 L 430 471" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="430,471 418,464 418,478" fill="#66717f"/>
+  <path class="arrow" d="M 660 471 L 740 471" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="740,471 728,464 728,478" fill="#66717f"/>
+  <path class="arrow" d="M 970 471 L 1050 471" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1050,471 1038,464 1038,478" fill="#66717f"/>
+  <path class="arrow" d="M 1280 471 L 1360 471" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1360,471 1348,464 1348,478" fill="#66717f"/>
+  <polyline points="1045,342 1045,376 235,376 235,413" fill="none" stroke="#66717f" stroke-width="3"/>
+  <path class="arrow" d="M 235 376 L 235 425" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="235,425 228,413 242,413" fill="#66717f"/>
+
+  <text class="layer" x="70" y="606">内核运行路径</text>
+  <rect class="box" x="100" y="640" width="200" height="92" rx="16" fill="#f4f6f8"/>
+  <text class="box-title" x="200" y="678">启动</text>
+  <text class="box-sub" x="200" y="705">平台与设备初始化</text>
+
+  <rect class="box" x="350" y="640" width="200" height="92" rx="16" fill="#f4f6f8"/>
+  <text class="box-title" x="450" y="678">存储</text>
+  <text class="box-sub" x="450" y="705">EXT4 路径与文件读取</text>
+
+  <rect class="box" x="600" y="640" width="200" height="92" rx="16" fill="#f4f6f8"/>
+  <text class="box-title" x="700" y="678">调度</text>
+  <text class="box-sub" x="700" y="705">脚本解析与命令队列</text>
+
+  <rect class="box" x="850" y="640" width="200" height="92" rx="16" fill="#f4f6f8"/>
+  <text class="box-title" x="950" y="678">装载</text>
+  <text class="box-sub" x="950" y="705">ELF、进程与运行时</text>
+
+  <rect class="box" x="1100" y="640" width="200" height="92" rx="16" fill="#f4f6f8"/>
+  <text class="box-title" x="1200" y="678">兼容</text>
+  <text class="box-sub" x="1200" y="705">Linux syscall ABI</text>
+
+  <rect class="box" x="1350" y="640" width="180" height="92" rx="16" fill="#f9ecee"/>
+  <text class="box-title" x="1440" y="678">收尾</text>
+  <text class="box-sub" x="1440" y="705">日志与主动退出</text>
+
+  <path class="arrow" d="M 300 686 L 350 686" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="350,686 338,679 338,693" fill="#66717f"/>
+  <path class="arrow" d="M 550 686 L 600 686" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="600,686 588,679 588,693" fill="#66717f"/>
+  <path class="arrow" d="M 800 686 L 850 686" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="850,686 838,679 838,693" fill="#66717f"/>
+  <path class="arrow" d="M 1050 686 L 1100 686" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1100,686 1088,679 1088,693" fill="#66717f"/>
+  <path class="arrow" d="M 1300 686 L 1350 686" fill="none" stroke="#66717f" stroke-width="3"/>
+  <polygon points="1350,686 1338,679 1338,693" fill="#66717f"/>
+
+  <rect x="70" y="790" width="1460" height="42" rx="10" fill="#f9ecee"/>
+  <text class="box-sub" x="800" y="817">核心目标：可构建、可启动、可执行、可计分、可复现</text>
+</svg>

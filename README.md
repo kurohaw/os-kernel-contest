@@ -11,7 +11,7 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 - **RISC-V64 主线**：位于 `SWTC/`，以 Titanix 往届 GPLv3 开源架构为基础，重点完成官方镜像入口、Linux ABI、EXT4 读取、脚本解析和测试组执行适配。
 - **LoongArch64 主线**：位于 `SWTC-la/`，参考 StarryX 与 ArceOS 组件化内核，重点完成官方 LoongArch 工具链、真实 `kernel-la`、EXT4 测试盘、BusyBox/basic 等测试入口适配。
 
-> 状态说明：历史最高可见官方成绩为 `983.6805892892955`（2026-06-29 03:06:43）。最新可见一次官网提交为 2026-06-30 08:31:57，结果是 `Compile Error`，错误为 `make: *** No rule to make target 'all'. Stop.`；本地和 GitLab 远端根目录均确认存在 `Makefile/GNUmakefile` 且干净导出 `make all` 通过，因此当前优先排查官网源包/执行目录异常。
+> 状态说明：当前最高且最新可见官方成绩为 `1009.8903911255481`（提交时间 2026-06-30 09:17:33，Accepted）。其中 basic 为 408、BusyBox 为 208、Lua 为 36、libcbench 为 86.84477333493804、musl-rv libctest 为 217、musl-rv LTP 为 314。
 
 ## 作品基本信息
 
@@ -46,38 +46,7 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 
 ## 系统架构
 
-```mermaid
-flowchart TB
-    subgraph Build[提交构建入口]
-        M[根目录 make all]
-        RVB[RISC-V 构建链<br/>nightly-2025-02-01]
-        LAB[LoongArch 构建链<br/>nightly-2025-05-20 + musl GCC]
-        KR[kernel-rv<br/>ELF64 RISC-V]
-        KL[kernel-la<br/>ELF64 LoongArch]
-    end
-
-    subgraph Runtime[官方 QEMU 运行环境]
-        QEMU[QEMU virt / loongarch64-virt]
-        DISK[无分区 EXT4 测试盘]
-        SCRIPT[glibc/musl 测试脚本]
-        ELF[官方预编译 ELF]
-    end
-
-    subgraph Kernel[SWTC 内核运行路径]
-        BOOT[启动与平台初始化]
-        VIRTIO[virtio-blk 只读块设备]
-        EXT4[EXT4 路径解析与文件读取]
-        QUEUE[测试脚本解析与命令队列]
-        PROC[ELF 装载 / 进程 / wait]
-        ABI[Linux syscall 兼容层]
-        LOG[官方格式 START/END 与结果输出]
-    end
-
-    M --> RVB --> KR --> QEMU
-    M --> LAB --> KL --> QEMU
-    QEMU --> DISK --> SCRIPT --> ELF
-    QEMU --> BOOT --> VIRTIO --> EXT4 --> QUEUE --> PROC --> ABI --> LOG
-```
+![SWTC 双架构系统总体架构](docs/assets/swtc-system-architecture.png)
 
 ## 完成度概览
 

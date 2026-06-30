@@ -439,7 +439,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
     )
     story.append(
         p(
-            "项目围绕官方无分区 EXT4 测试盘、预编译 ELF 和测试脚本构建端到端运行链路：内核启动后识别块设备，读取脚本与资源，组织测试队列，装载用户程序，提供最小 Linux ABI，按官方格式输出结果并主动关机。历史最高可见官网成绩为 983.6805892892955。",
+            "项目围绕官方无分区 EXT4 测试盘、预编译 ELF 和测试脚本构建端到端运行链路：内核启动后识别块设备，读取脚本与资源，组织测试队列，装载用户程序，提供最小 Linux ABI，按官方格式输出结果并主动关机。当前最高且最新可见官网成绩为 1009.8903911255481。",
             styles["body"],
         )
     )
@@ -558,7 +558,7 @@ def build_story(styles: dict[str, ParagraphStyle]) -> list[object]:
             styles,
         )
     )
-    story.append(p("历史最高可见官网成绩：983.6805892892955（2026-06-29）。", styles["quote"]))
+    story.append(p("当前最高且最新可见官网成绩：1009.8903911255481（提交时间 2026-06-30 09:17:33，Accepted）。", styles["quote"]))
     story.append(PageBreak())
 
     # 5. Innovations
