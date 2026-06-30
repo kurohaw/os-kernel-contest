@@ -13,7 +13,8 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 
 | 项目 | 内容 |
 |---|---|
-| 作品名称 | SWTC |
+| 队伍名称 | `sudo_win_the_cscc` |
+| 操作系统名称 | SWTC |
 | 比赛阶段 | 2026 操作系统大赛初赛开发期 |
 | 支持架构 | RISC-V64、LoongArch64 |
 | 主要语言 | Rust、Makefile、少量汇编/Shell |
@@ -22,6 +23,12 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 | 当前重点 | 恢复线上高分基线，稳定真实 LoongArch 构建，继续扩展 libc/LTP 覆盖 |
 | 详细初赛文档 | [docs/preliminary-report.md](docs/preliminary-report.md) |
 | 开发进度 | [docs/progress.md](docs/progress.md) |
+
+## 官网评测记录
+
+![sudo_win_the_cscc 官网评测列表截图](docs/assets/official-evaluation-2026-06-30.png)
+
+> 2026-06-30 官网评测列表截图，红框为本队 `sudo_win_the_cscc`；参赛操作系统名称为 SWTC。
 
 ## 系统架构
 
