@@ -1,4 +1,8 @@
-﻿# SWTC：面向官方评测的双架构 OS Kernel
+﻿<p align="center">
+  <img src="docs/assets/shanghai-university-of-electric-power-logo.png" alt="上海电力大学 Logo" width="650">
+</p>
+
+# SWTC：面向官方评测的双架构 OS Kernel
 
 SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目，目标是在同一个提交中同时产出官方要求的 `kernel-rv` 与 `kernel-la`，并尽量稳定通过官方镜像中的 Linux ABI、文件系统、进程管理与基础应用测试。
 
@@ -15,6 +19,7 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 |---|---|
 | 队伍名称 | `sudo_win_the_cscc` |
 | 操作系统名称 | SWTC |
+| 参赛学校 | 上海电力大学 |
 | 比赛阶段 | 2026 操作系统大赛初赛开发期 |
 | 支持架构 | RISC-V64、LoongArch64 |
 | 主要语言 | Rust、Makefile、少量汇编/Shell |
@@ -23,6 +28,16 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 | 当前重点 | 恢复线上高分基线，稳定真实 LoongArch 构建，继续扩展 libc/LTP 覆盖 |
 | 详细初赛文档 | [docs/preliminary-report.md](docs/preliminary-report.md) |
 | 开发进度 | [docs/progress.md](docs/progress.md) |
+
+## 项目人员
+
+| 参赛身份 | 姓名 | 学校与专业 |
+|---|---|---|
+| 指导教师 | 徐曼 | 上海电力大学 |
+| 队长、队员 | 余子豪 | 上海电力大学，计算机科学与技术（卓越计划），2024-09 入学 |
+| 队员 | 王溢敏 | 上海电力大学，计算机科学与技术（卓越计划），2024-09 入学 |
+
+> 为保护个人信息，本页不公开手机号和邮箱。项目技术分工将在队内确认后补充，避免根据报名身份推断实际贡献。
 
 ## 官网评测记录
 
