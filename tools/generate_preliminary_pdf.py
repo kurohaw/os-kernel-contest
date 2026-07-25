@@ -41,18 +41,18 @@ MARGIN_X = 1.8 * cm
 MARGIN_TOP = 1.8 * cm
 MARGIN_BOTTOM = 1.65 * cm
 
-RED = colors.HexColor("#B51F2E")
-DEEP_RED = colors.HexColor("#8E1622")
-NAVY = colors.HexColor("#17365D")
-BLUE = colors.HexColor("#2F75B5")
-TEAL = colors.HexColor("#2A8C82")
-PALE_BLUE = colors.HexColor("#EAF2F8")
-PALE_RED = colors.HexColor("#F9ECEE")
-PALE_GRAY = colors.HexColor("#F4F6F8")
-MID_GRAY = colors.HexColor("#66717F")
-LIGHT_LINE = colors.HexColor("#D6DCE4")
+RED = colors.HexColor("#111111")
+DEEP_RED = colors.HexColor("#111111")
+NAVY = colors.HexColor("#222222")
+BLUE = colors.HexColor("#333333")
+TEAL = colors.HexColor("#333333")
+PALE_BLUE = colors.HexColor("#F2F2F2")
+PALE_RED = colors.HexColor("#E9E9E9")
+PALE_GRAY = colors.HexColor("#F6F6F6")
+MID_GRAY = colors.HexColor("#666666")
+LIGHT_LINE = colors.HexColor("#CCCCCC")
+TEXT = colors.HexColor("#111111")
 BLACK = colors.black
-TEXT = BLACK
 
 
 def register_fonts() -> None:
@@ -355,8 +355,8 @@ def architecture_diagram() -> Drawing:
     d.add(String(8, 237, "统一构建层", fontName="SWTCCN-Bold", fontSize=9, fillColor=BLACK))
     add_box(d, 20, 190, 105, 38, ["GitLab main", "统一源码入口"], PALE_BLUE)
     add_box(d, 176, 190, 105, 38, ["根目录 make all", "离线构建与门禁"], PALE_RED)
-    add_box(d, 330, 211, 108, 34, ["kernel-rv", "RISC-V64 ELF"], colors.HexColor("#E8F3EE"))
-    add_box(d, 330, 166, 108, 34, ["kernel-la", "LoongArch64 ELF"], colors.HexColor("#FFF3DF"))
+    add_box(d, 330, 211, 108, 34, ["kernel-rv", "RISC-V64 ELF"], PALE_GRAY)
+    add_box(d, 330, 166, 108, 34, ["kernel-la", "LoongArch64 ELF"], PALE_GRAY)
     add_arrow(d, 125, 209, 176, 209)
     d.add(Line(281, 209, 305, 209, strokeColor=MID_GRAY, strokeWidth=1.2))
     d.add(Line(305, 183, 305, 228, strokeColor=MID_GRAY, strokeWidth=1.2))
@@ -1074,14 +1074,14 @@ fn main() {
     story.append(p("7. 构建、验证与后续计划", styles["h1"]))
     story.append(p("7.1 构建方式", styles["h2"]))
     build_box = Table(
-        [[p("<font color=\"#000000\">cd /mnt/e/WorkSpace/MinOS/os-kernel-contest<br/>make all</font>", styles["body_no_indent"])]],
+        [[p("<font color=\"#FFFFFF\">cd /mnt/d/os-kernel-contest<br/>make all</font>", styles["body_no_indent"])]],
         colWidths=[16.8 * cm],
     )
     build_box.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-                ("TEXTCOLOR", (0, 0), (-1, -1), BLACK),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#222222")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), "SWTCCN"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 12),
                 ("TOPPADDING", (0, 0), (-1, -1), 10),
@@ -1216,7 +1216,7 @@ fn main() {
         ("Chronix", "https://github.com/PACTHEMAN123/Chronix"),
     ]
     for index, (name, url) in enumerate(refs, 1):
-        story.append(p(f"[{index}] {name}：<link href=\"{url}\" color=\"#000000\">{url}</link>", styles["reference"]))
+        story.append(p(f"[{index}] {name}：<link href=\"{url}\" color=\"#111111\">{url}</link>", styles["reference"]))
     story.append(Spacer(1, 0.45 * cm))
     story.append(p("开源与原创性说明", styles["h2"]))
     story.append(
@@ -1226,7 +1226,7 @@ fn main() {
         )
     )
     story.append(Spacer(1, 1.1 * cm))
-    story.append(p("— 文档结束 —", styles["cover_subtitle"]))
+    story.append(p("- 文档结束 -", styles["cover_subtitle"]))
     return story
 
 

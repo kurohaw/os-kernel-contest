@@ -61,7 +61,7 @@ SWTC 是一个面向 2026 操作系统大赛官方评测的双架构内核项目
 ## 6. 构建与验证方式
 
 ```bash
-cd /mnt/e/WorkSpace/MinOS/os-kernel-contest
+cd /mnt/d/os-kernel-contest
 make all
 ```
 
@@ -76,7 +76,7 @@ make all
 - 干净导出源码后执行 `make all`：验证不依赖本地未提交文件。
 - RISC-V 无盘 QEMU：验证无测试盘时可主动关机。
 - 官方 EXT4 镜像 QEMU：验证测试组 START/END、case 输出和最终关机。
-- 官方网页结果回读：更新 `docs/progress.md` 与 `docs/test-matrix.md`。
+- 官方网页结果回读：更新 `docs/progress.md` 与初赛报告中的阶段性结论。
 
 ## 7. 当前问题与下一步
 

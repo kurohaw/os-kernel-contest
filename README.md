@@ -82,7 +82,7 @@ SWTC 是面向 2026 操作系统大赛初赛评测开发的双架构内核项目
 优先在 WSL/bash 中运行：
 
 ```bash
-cd /mnt/e/WorkSpace/MinOS/os-kernel-contest
+cd /mnt/d/os-kernel-contest
 make all
 ```
 
@@ -110,10 +110,44 @@ LoongArch 构建需要官方镜像同源环境中的 `cmake`、`loongarch64-linu
 
 ```text
 .
-├── Makefile / GNUmakefile       # 官方根构建入口
-├── SWTC/                        # RISC-V 主线内核、用户程序、vendor
-├── SWTC-la/                     # LoongArch 主线内核、ArceOS/StarryX 适配、vendor
-└── docs/                        # 初赛文档与开发进度
+├── .gitattributes               # 文本、二进制文件与平台换行属性
+├── .gitignore                   # 忽略构建产物、镜像、隐藏 Cargo 文件与本地配置
+├── Makefile                     # 官方根构建入口，执行 make all
+├── GNUmakefile                  # 官方根构建入口兼容文件
+├── README.md                    # 项目总览、成绩、构建方式与文档导航
+├── SWTC/                        # RISC-V64 主线内核
+│   ├── Makefile                 # RISC-V 子构建入口
+│   ├── rust-toolchain.toml      # RISC-V 固定 Rust nightly
+│   ├── bootloader/              # RISC-V 启动与加载相关代码
+│   ├── dependencies/            # RISC-V 本地依赖源码
+│   ├── kernel/                  # RISC-V 内核、驱动、VFS、syscall 与 oscomp 适配
+│   ├── user/                    # RISC-V 内置用户程序与 runtestcase
+│   └── vendor/                  # RISC-V 离线 Cargo 依赖
+├── SWTC-la/                     # LoongArch64 主线内核
+│   ├── Cargo.toml               # LoongArch workspace 配置
+│   ├── Cargo.lock               # LoongArch 依赖锁定文件
+│   ├── Makefile                 # LoongArch 子构建入口
+│   ├── README.md                # LoongArch 子项目说明
+│   ├── rust-toolchain.toml      # LoongArch 固定 Rust nightly
+│   ├── LICENSE.*                # 上游组件许可证
+│   ├── arceos/                  # ArceOS 组件化内核基础
+│   ├── cargo-config/            # 非隐藏 Cargo 配置模板
+│   ├── dependencies/            # LoongArch 本地依赖与官方过滤兼容副本
+│   ├── scripts/                 # LoongArch 构建、运行和辅助脚本
+│   ├── src/                     # LoongArch 启动入口、init 与测试调度逻辑
+│   ├── vendor/                  # LoongArch 离线 Cargo 依赖
+│   ├── xapi/                    # StarryX API 层源码
+│   ├── xcore/                   # StarryX 核心运行时
+│   └── xmodules/                # StarryX 模块集合
+├── docs/                        # 初赛文档、开发进度与图片资源
+│   ├── assets/                  # README 与初赛文档使用的截图、Logo、架构图
+│   ├── preliminary-report.md    # 初赛作品说明文档
+│   └── progress.md              # 开发进度、线上结果与回归记录
+├── output/
+│   └── pdf/
+│       └── SWTC-preliminary-report.pdf
+└── tools/
+    └── generate_preliminary_pdf.py
 ```
 
 ## 文档导航
